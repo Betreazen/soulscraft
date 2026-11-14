@@ -6,9 +6,13 @@
 // `turret_effects`) are RustCraft's to apply. Without RustCraft in the build each scenario is
 // skipped (passed, with the reason in the log): it is a soft dependency.
 //
+// RustCraft 0.10.0 on also runs SoulsCraft's `soulscraft-kill turret <owner> <id> <type> x y z` for
+// each kill (docs/research/integration.md 4.2).
+//
 // Scenarios: the revenant takes no poison; the brute holds bleed and slowness half as long as a
 // zombie and takes no poison; the bleed module gives `soulscraft:bleeding`; a turret's kill (what
-// SoulsCraft can see of the owner's credit); a mob takes cover from an attack turret and not from a support one.
+// SoulsCraft can see of the owner's credit); the same kill in the owner's hunter's book, once; a mob
+// takes cover from an attack turret and not from a support one.
 use crate::game::Game;
 use crate::game::soulscraft_selftest_altar::{at, centre, clear_site};
 use soulscraft_rules::geom::{self, V3};
@@ -27,6 +31,7 @@ pub(super) const CASES: &[(&str, u64)] = &[
     ("turret_brute_half_durations", 320),
     ("turret_bleed_module", 140),
     ("turret_kill_credit", 160),
+    ("turret_kill_book", 200),
     ("turret_cover_attack", 220),
     ("turret_cover_support", 160),
 ];
@@ -119,6 +124,7 @@ pub(super) fn step(game: &mut Game<'_>, now: u64, name: &str, first: bool) -> Op
         "turret_brute_half_durations" => brute_half(game, t, c),
         "turret_bleed_module" => bleed(game, t, c),
         "turret_kill_credit" => kill_credit(game, t, c),
+        "turret_kill_book" => kill_book(game, t, c),
         "turret_cover_attack" => cover(game, t, c, true),
         "turret_cover_support" => cover(game, t, c, false),
         other => Some(Err(format!("no scenario {other}"))),
@@ -298,4 +304,48 @@ fn cover(game: &mut Game<'_>, t: u64, c: &mut Case, attack: bool) -> Option<Resu
         _ => {}
     }
     None
+}
+
+/// Round 14 (1): a turret's kill in the owner's hunter's book. The owner (a still golem standing in
+/// for the test UUID) is 3 blocks from the turret; a husk of 1 health dies to it. RustCraft 0.10.0
+/// reports it by `soulscraft-kill` (and by `pct-machine kill` while Path-of-craft-tree is in the
+/// build): the book credits it once, to the zombie row.
+fn kill_book(game: &mut Game<'_>, t: u64, c: &mut Case) -> Option<Result<(), String>> {
+    let owner = u128::from_str_radix(OWNER, 16).ok()?;
+    match t {
+        2 => {
+            crate::game::soulscraft_book::clear_stand_ins();
+            let Some(g) = crate::game::soulscraft_selftest_altar::golem(game, [SPOT[0] + 5, SPOT[1], SPOT[2] + 3]) else {
+                return Some(Err("no stand-in".into()));
+            };
+            crate::game::soulscraft_book::add_stand_in(owner, "turret_owner", g);
+            c.health = f64::from(crate::game::soulscraft_book::reports_heard().1);
+            c.mob = summon(game, "minecraft:husk", SPOT, "NoAI:1b,Health:1f,");
+            c.turret = turret(game, [SPOT[0] + 5, SPOT[1], SPOT[2]], "slow");
+            if c.mob.is_none() || c.turret.is_none() {
+                return Some(Err("no husk or no turret".into()));
+            }
+            None
+        }
+        _ if t > 2 => {
+            if mob(game, c.mob?).is_some_and(|m| m.alive()) {
+                return None;
+            }
+            c.phase += 1;
+            // The reports come after the death, within a few ticks.
+            if c.phase < 20 {
+                return None;
+            }
+            let (pct, own) = crate::game::soulscraft_book::reports_heard();
+            let kills = crate::game::soulscraft_book::progress_of(owner).map_or(0.0, |p| p.mob("zombie").kills);
+            crate::game::soulscraft_book::clear_stand_ins();
+            let new_own = f64::from(own) - c.health;
+            Some(if kills == 1.0 && new_own >= 1.0 {
+                Ok(())
+            } else {
+                Err(format!("book kills {kills} (wanted 1), soulscraft-kill reports {new_own}, pct-machine reports {pct}"))
+            })
+        }
+        _ => None,
+    }
 }

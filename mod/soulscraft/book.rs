@@ -94,6 +94,8 @@ struct Book {
     reports: Vec<(MachineKill, u64)>,
     /// (entity, owner) credited from a report without a death heard: a second report of it is not.
     machine_credited: HashSet<(u32, u128)>,
+    /// Machine kill reports heard: [`pct-machine kill`, `soulscraft-kill`] (the self-test).
+    heard: [u32; 2],
     spawner_ids: HashSet<u32>,
     untagged: Vec<u32>,
     meets: Vec<(String, u128)>,
@@ -119,6 +121,7 @@ static BOOK: LazyLock<Mutex<Book>> = LazyLock::new(|| {
         deaths: HashMap::new(),
         reports: Vec::new(),
         machine_credited: HashSet::new(),
+        heard: [0; 2],
         spawner_ids: HashSet::new(),
         untagged: Vec::new(),
         meets: Vec::new(),
@@ -192,7 +195,11 @@ pub(super) fn on_spawner_planned(ids: &HashMap<u32, u32>) {
 pub(super) fn on_console(line: &str) -> bool {
     let own = line.trim_start_matches('/').split_whitespace().next() == Some(book::KILL_COMMAND);
     match book::machine_kill(line) {
-        Some(k) => book().reports.push((k, 0)),
+        Some(k) => {
+            let mut b = book();
+            b.heard[usize::from(k.at.is_some())] += 1;
+            b.reports.push((k, 0));
+        }
         None if own => log::warn!("soulscraft: book: unreadable report `{line}`"),
         None => {}
     }
@@ -717,6 +724,12 @@ pub(super) fn clear_stand_ins() {
 
 pub(super) fn progress_of(uuid: u128) -> Option<Progress> {
     book().players.get(&uuid).map(|p| p.progress.clone())
+}
+
+/// Machine kill reports heard so far: (`pct-machine kill`, `soulscraft-kill`).
+pub(super) fn reports_heard() -> (u32, u32) {
+    let h = book().heard;
+    (h[0], h[1])
 }
 
 
