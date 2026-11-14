@@ -1,0 +1,26 @@
+{
+  "type": "minecraft:block",
+  "pools": [
+    {
+      "rolls": 1,
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "soulscraft:banner_kin_flyers"
+        }
+      ],
+      "conditions": [
+        {
+          "type": "minecraft:survives_explosion"
+        },
+        {
+          "type": "minecraft:block_state_property",
+          "block": "soulscraft:banner_kin_flyers",
+          "properties": {
+            "part": "bottom"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+target/
+*.log
+/prototypes/**/target/
+metrics/raw/
+
+# The engine takes the crate dependency versions from Horizon's own Cargo.lock.
+/Cargo.lock
+
+# Raw bot screenshots (prototypes/shots.ps1); a scaled selection is kept in prototypes/evidence/.
+/prototypes/shots/

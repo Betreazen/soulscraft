@@ -1,0 +1,13 @@
+{
+ "textures": ["soulscraft:spore"],
+ "horizon:behaviour": {
+  "velocity": [0.0, 0.002, 0.0],
+  "velocity_jitter": [0.003, 0.003, 0.003],
+  "gravity": 0.0,
+  "friction": 1.0,
+  "lifetime": 70,
+  "size": [0.022, 0.016],
+  "alpha": [1.0, 0.0],
+  "animation": "first"
+ }
+}

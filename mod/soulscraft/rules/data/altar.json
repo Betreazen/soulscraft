@@ -1,0 +1,53 @@
+{
+  "format": "soulscraft-altar",
+  "version": 1,
+  "source": "docs/design/06-altar.md (levels and banners approved in round 4); numbers are hypothesis Г10; socket cells, the pedestal item pose and the banner ids are proposals of the art pass",
+  "frame": "cells in blocks: x east, z south, the core at (0, 0); the floor (slabs, sockets, the core) is layer y = 0, pieces stand on it from y = 1",
+  "levels": [
+    {"level": 1, "size": 3, "corner": null, "sockets": [], "spawn_boost": "слабый", "unlocks": "Ивенты первой ступени, слабый учащённый спавн"},
+    {"level": 2, "size": 5, "corner": "altar_pillar", "sockets": [[-2, 0], [2, 0]], "spawn_boost": "средний", "unlocks": "Ивенты второй ступени"},
+    {"level": 3, "size": 7, "corner": "altar_brazier", "sockets": [[0, -3], [0, 3]], "spawn_boost": "сильный", "unlocks": "Ивенты третьей ступени"},
+    {"level": 4, "size": 9, "corner": "altar_obelisk", "sockets": [[2, -4], [4, 2], [-2, 4], [-4, -2]], "spawn_boost": "самый сильный", "unlocks": "Ивенты четвёртой ступени, самый сильный учащённый спавн"}
+  ],
+  "pedestal_item": {"height_px": 17, "scale": 0.625, "spin_deg_per_tick": 2, "bob_px": 0.75, "bob_ticks": 60},
+  "modifiers": [
+    {"id": "weight", "banner": "banner_weight", "name": "Знамя тяжести", "short": "тяжесть", "emblem": "гиря", "effect": {"power": 0.15}, "text": "Враги ивента сильнее: + 0,15 к силе P для расчёта", "reward": "more", "opposite": "mercy"},
+    {"id": "mercy", "banner": "banner_mercy", "name": "Знамя милости", "short": "милость", "emblem": "открытая ладонь", "effect": {"power": -0.15}, "text": "Враги слабее: − 0,15 к силе P", "reward": "less", "opposite": "weight"},
+    {"id": "horde", "banner": "banner_horde", "name": "Знамя орды", "short": "орда", "emblem": "три копья", "effect": {"wave_size": 0.25}, "text": "В волнах на 25% больше врагов", "reward": "more", "opposite": "calm"},
+    {"id": "calm", "banner": "banner_calm", "name": "Знамя затишья", "short": "затишье", "emblem": "полумесяц", "effect": {"wave_size": -0.25}, "text": "В волнах на 25% меньше врагов", "reward": "less", "opposite": "horde"},
+    {"id": "haste", "banner": "banner_haste", "name": "Знамя спешки", "short": "спешка", "emblem": "молния", "effect": {"rest_seconds": -10}, "text": "Передышка между волнами короче на 10 секунд", "reward": "more", "opposite": "rest"},
+    {"id": "rest", "banner": "banner_rest", "name": "Знамя отдыха", "short": "отдых", "emblem": "костёр", "effect": {"rest_seconds": 15}, "text": "Передышка длиннее на 15 секунд", "reward": "less", "opposite": "haste"},
+    {"id": "resilience", "banner": "banner_resilience", "name": "Знамя стойкости", "short": "стойкость", "emblem": "щит", "effect": {"altar_health": 0.5}, "text": "Здоровье алтаря + 50%", "reward": "less", "opposite": null},
+    {"id": "kin_undead", "banner": "banner_kin_undead", "name": "Знамя рода: нежить", "short": "нежить", "emblem": "череп", "effect": {"kin": "undead", "kin_share": 0.25}, "text": "Учащает нежить в волнах и в учащённом спавне", "reward": "same", "opposite": null},
+    {"id": "kin_beasts", "banner": "banner_kin_beasts", "name": "Знамя рода: звери", "short": "звери", "emblem": "след лапы", "effect": {"kin": "beasts", "kin_share": 0.25}, "text": "Учащает зверей в волнах и в учащённом спавне", "reward": "same", "opposite": null},
+    {"id": "kin_slimes", "banner": "banner_kin_slimes", "name": "Знамя рода: слизни", "short": "слизни", "emblem": "слизень", "effect": {"kin": "slimes", "kin_share": 0.25}, "text": "Учащает слизней в волнах и в учащённом спавне", "reward": "same", "opposite": null},
+    {"id": "kin_flyers", "banner": "banner_kin_flyers", "name": "Знамя рода: летучие", "short": "летучие", "emblem": "крыло", "effect": {"kin": "flyers", "kin_share": 0.25}, "text": "Учащает летучих в волнах и в учащённом спавне", "reward": "same", "opposite": null},
+    {"id": "kin_water", "banner": "banner_kin_water", "name": "Знамя рода: водные", "short": "водные", "emblem": "рыба", "effect": {"kin": "water", "kin_share": 0.25}, "text": "Учащает водных в волнах и в учащённом спавне", "reward": "same", "opposite": null}
+  ],
+  "sample_banners": ["weight", "horde", "kin_undead", "resilience", "haste", "kin_slimes", "kin_flyers", "kin_water"],
+  "kin_names": {"undead": "нежить", "beasts": "звери", "slimes": "слизни", "flyers": "летучие", "water": "водные"},
+  "kin_rule": "Знамя рода в волне: доля kin_share слотов каждой волны (кроме знаменосца), которые заняты не мобами этого рода SoulsCraft, становится мобами этого рода (по кругу по data/mobs.json, слабые раньше; без только водных и элитных); знамёна складываются, всего не больше всех слотов. Предложение кода, итерация 3",
+  "spawn_boost": {
+    "source": "06-altar.md, вторая роль алтаря (раунд 2); П4; все числа — предложение кода итерации 3, гипотеза до плейтеста",
+    "extra_passes": [1, 1, 2, 3],
+    "sector_radius_chunks": 1,
+    "start_chunks": 6,
+    "drift_ticks": 6000,
+    "foreign": [
+      {"type": "minecraft:husk", "weight": 40, "min": 1, "max": 3},
+      {"type": "minecraft:stray", "weight": 40, "min": 1, "max": 3},
+      {"type": "minecraft:bogged", "weight": 25, "min": 1, "max": 2},
+      {"type": "minecraft:cave_spider", "weight": 15, "min": 1, "max": 2},
+      {"type": "minecraft:witch", "weight": 5, "min": 1, "max": 1}
+    ],
+    "soulscraft_weight": 10,
+    "kin_weight": 2.0,
+    "kin_vanilla": {
+      "undead": ["minecraft:zombie", "minecraft:skeleton", "minecraft:husk", "minecraft:stray", "minecraft:bogged", "minecraft:zombie_villager", "minecraft:drowned"],
+      "beasts": ["minecraft:spider", "minecraft:cave_spider"],
+      "slimes": ["minecraft:slime"],
+      "flyers": ["minecraft:phantom"],
+      "water": ["minecraft:drowned", "minecraft:guardian"]
+    }
+  }
+}

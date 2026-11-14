@@ -1,0 +1,395 @@
+/* SoulsCraft on top of the shared guide stylesheet. style.css is RustCraft's «Кузня душ» file,
+   copied byte for byte (README, «Оформление»): the palette, fonts, frame, tables and the gd- kit
+   (palette, toasts, sheets, rolling digits, card light) live there. This file adds only what is
+   SoulsCraft's: soul-fire accents, the 3D windows and the phase timeline, the bestiary, altar,
+   trophy and book pieces, the moveset sheet and the sparks. Colours here are either the shared
+   names or the SoulsCraft-only tokens below. */
+:root {
+  /* SoulsCraft-only tokens, built on the shared palette */
+  --surface-3: #2e2520;            /* pressed: one step above --surface-2 */
+  --soul-rgb: 95 227 208;          /* --soul and --ember as triplets, for glows with alpha */
+  --ember-rgb: 232 100 28;
+  --glow-soul: 0 0 0 1px rgb(var(--soul-rgb) / 0.55), 0 0 14px -2px rgb(var(--soul-rgb) / 0.45);
+  --glow-ember: 0 0 22px -6px rgb(var(--ember-rgb) / 0.55);
+  --shadow-inset: inset 0 1px 3px rgba(0, 0, 0, 0.6);
+  --on-bad: #ffffff;
+  --corner: 10px;                  /* brass corner brackets on panels, like a diorama base */
+  --r-pill: 999px;
+  --dur-toast: 2600ms;
+  /* type steps between the shared --fs-label (12), --fs-small (14) and --fs-body (16) */
+  --fs-2xs: 11px;
+  --fs-sm: 13px;
+  --fs-lg: 18px;
+  --fs-xl: 22px;
+  /* space, 4 px steps */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-7: 32px;
+  /* attack phases: timeline spans, legend, the moveset sheet (same meaning everywhere) */
+  --phase-windup: #f0b33c;
+  --phase-hold: #e0803c;
+  --phase-hit: #e0564a;
+  --phase-recover: #59d38c;
+  --phase-mark: var(--ink);
+  /* around the 3D windows (each scene sets its own clear colour) */
+  --stage-world: #8f949f;          /* the grey world of the Blender previews */
+  --stage-vignette-in: #2c241f;
+  --stage-vignette-out: #141110;
+  --checker-a: var(--surface-2);   /* behind transparent pixel art */
+  --checker-b: var(--surface);
+  --wip-a: #1a1513;
+  --wip-b: var(--surface-2);
+
+  /* game mocks: the vanilla-like altar menu and hunter's book draw the game's own GUI, not the
+     site; they stay as they are when the site palette changes */
+  --mock-font: Consolas, 'Courier New', monospace;
+  --mc-panel: #c6c6c6;
+  --mc-panel-2: #b4b4b4;
+  --mc-ink: #3f3f3f;
+  --mc-ink-strong: #202020;
+  --mc-ink-soft: #4a4a4a;
+  --mc-light: #ffffff;
+  --mc-dark: #555555;
+  --mc-black: #000000;
+  --mc-warn-bg: #8b1f1a;
+  --mc-warn-shadow: #3a0b08;
+  --mc-btn: #7a7a7a;
+  --mc-btn-hi: #aaaaaa;
+  --mc-btn-lo: #2b2b2b;
+  --mc-btn-on: #6e8f4e;
+  --mc-btn-on-hi: #b5d68f;
+  --mc-btn-on-lo: #2c3d1c;
+  --mc-slot: #8b8b8b;
+  --mc-slot-off: #9e9e9e;
+  --mc-slot-lo: #373737;
+  --mc-good: #1d4d14;
+  --mc-bar-bg: #3a1010;
+  --mc-bar-edge: #1a0505;
+  --mc-bar: #c0302a;
+  --bk-cover: #5b3b22;
+  --bk-cover-hi: #8a5d36;
+  --bk-cover-lo: #2a190d;
+  --bk-page: #efe3c2;
+  --bk-page-2: #e8dbb7;
+  --bk-page-3: #e6d8b4;
+  --bk-edge: #cdbb92;
+  --bk-edge-2: #a8946a;
+  --bk-ink: #2b2015;
+  --bk-ink-title: #2b1d10;
+  --bk-ink-head: #5a2d14;
+  --bk-ink-soft: #5d4c36;
+  --bk-ink-hint: #6b5838;
+  --bk-ink-locked: #8b7a5c;
+  --bk-tab: #b9a479;
+  --bk-tab-hi: #e4d4ae;
+  --bk-tab-lo: #6f5a39;
+  --bk-tab-ink: #3a2a18;
+  --bk-btn: #d9c99f;
+  --bk-btn-on: #b6c9a0;
+  --bk-btn-on-edge: #5f7a45;
+  --bk-arrow: #7a4b23;
+  --bk-pageno: #e9dab3;
+  --bk-sky-top: #5c7a9a;
+  --bk-sky-bottom: #8aa7c2;
+  --bk-label: #fff3c4;
+  --bk-actionbar: #fcfc54;
+  --bk-actionbar-shadow: #3f3f15;
+  --bk-hotbar: #2b2b2b;
+}
+
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+#main h3 { margin: var(--sp-6) 0 var(--sp-2); font: 700 var(--fs-xl) / 1.25 var(--font-display); color: var(--text-strong); }
+/* Long words in narrow cells wrap at word breaks first (#main breaks anywhere on phones). */
+#main table { overflow-wrap: break-word; }
+
+/* Brass corner brackets on the 3D panels and item cards, like the corners of a diorama base */
+.scene::after, .recipe::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 2; border-radius: inherit;
+  background:
+    linear-gradient(var(--brass), var(--brass)) top left / var(--corner) 1px,
+    linear-gradient(var(--brass), var(--brass)) top left / 1px var(--corner),
+    linear-gradient(var(--brass), var(--brass)) top right / var(--corner) 1px,
+    linear-gradient(var(--brass), var(--brass)) top right / 1px var(--corner),
+    linear-gradient(var(--brass), var(--brass)) bottom left / var(--corner) 1px,
+    linear-gradient(var(--brass), var(--brass)) bottom left / 1px var(--corner),
+    linear-gradient(var(--brass), var(--brass)) bottom right / var(--corner) 1px,
+    linear-gradient(var(--brass), var(--brass)) bottom right / 1px var(--corner);
+  background-repeat: no-repeat;
+  opacity: 0.7;
+}
+
+
+/* ------------------------------------------------------------------ bestiary cards */
+.sc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--sp-4); margin-top: var(--sp-2); }
+.sc-card {
+  position: relative; isolation: isolate;
+  display: flex; flex-direction: column;
+  background: var(--surface); border: 1px solid var(--edge); border-radius: var(--r-2);
+  color: var(--text); box-shadow: var(--shadow-1);
+  transition: border-color var(--dur) var(--ease-out), transform var(--dur) var(--ease-out), box-shadow var(--dur) var(--ease-out);
+}
+a.sc-card:hover { text-decoration: none; border-color: var(--brass-lo); transform: translateY(-2px); box-shadow: var(--shadow-1), var(--glow-ember); }
+@media (prefers-reduced-motion: reduce) { a.sc-card:hover { transform: none; } }
+.sc-thumb { position: relative; aspect-ratio: 1; border-radius: var(--r-2) var(--r-2) 0 0; overflow: hidden; display: flex; align-items: center; justify-content: center; background: radial-gradient(ellipse at 50% 60%, var(--stage-vignette-in) 0%, var(--stage-vignette-out) 75%); }
+.sc-thumb img { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+.sc-thumb.wip, .sc-stage.wip { background: repeating-linear-gradient(135deg, var(--wip-a) 0 12px, var(--wip-b) 12px 24px); }
+.sc-thumb.wip span, .sc-stage.wip span { padding: var(--sp-1) 10px; font: 600 var(--fs-sm) var(--mono); color: var(--warn); border: 1px dashed var(--warn); border-radius: var(--r-1); background: rgb(0 0 0 / 0.6); }
+.sc-card-body { display: flex; flex-direction: column; gap: 3px; padding: 10px var(--sp-3) var(--sp-3); border-top: 1px solid var(--edge); }
+.sc-card-body b { font: 700 var(--fs-xl) / 1.15 var(--font-display); color: var(--text-strong); }
+.sc-card-body code, .head code { font: var(--fs-label) var(--mono); color: var(--dim); }
+.sc-role { font-size: var(--fs-sm); color: var(--dim); }
+.sc-q { font-size: var(--fs-small); }
+.sc-nums { margin-top: var(--sp-1); font: var(--fs-label) var(--mono); color: var(--brass); }
+#nav .sc-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--warn); }
+#nav .sc-dot.ready { background: var(--soul); border-color: var(--soul); box-shadow: 0 0 6px rgb(var(--soul-rgb) / 0.7); }
+
+/* ------------------------------------------------------------------ 3D window, clips, toggles */
+.sc-stage { position: relative; display: flex; align-items: center; justify-content: center; width: 100%; aspect-ratio: 16 / 10; max-height: 64vh; background: var(--stage-world); border-radius: var(--r-2) var(--r-2) 0 0; overflow: hidden; }
+.sc-stage canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+.sc-stage.tall { aspect-ratio: 4 / 3; }
+/* Segmented buttons: clips, levels, lights, mobs. role=tablist rows are tabs (ui.js keeps
+   aria-selected and the roving tabindex), other rows are toggle groups (aria-pressed). */
+.sc-clips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: var(--sp-3) var(--sp-4) var(--sp-1); }
+.sc-clips button {
+  position: relative; min-height: 32px; padding: 5px var(--sp-3);
+  background: var(--surface-2); border: 1px solid var(--edge); border-radius: var(--r-2);
+  color: var(--text); font: var(--fs-sm) var(--font-body); cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+.sc-clips button:hover { border-color: var(--brass-lo); background: var(--surface-3); }
+.sc-clips button.on { color: var(--text-strong); background: rgb(var(--soul-rgb) / 0.12); border-color: rgb(var(--soul-rgb) / 0.7); box-shadow: 0 0 12px -4px rgb(var(--soul-rgb) / 0.7); }
+.sc-clips[role='tablist'] { gap: 0; padding-bottom: 0; border-bottom: 1px solid var(--edge); }
+.sc-clips[role='tablist'] button { border: 0; border-radius: 0; background: none; color: var(--dim); padding: var(--sp-2) var(--sp-3) 10px; }
+.sc-clips[role='tablist'] button:hover { color: var(--text); background: none; }
+.sc-clips[role='tablist'] button.on { color: var(--text-strong); background: none; box-shadow: inset 0 -2px 0 var(--soul), 0 6px 10px -8px rgb(var(--soul-rgb) / 0.9); }
+.sc-intro { margin: var(--sp-1) var(--sp-4) 10px; color: var(--dim); font-size: var(--fs-small); }
+.sc-cap { caption-side: bottom; margin-top: 6px; color: var(--dim); font-size: var(--fs-label); text-align: left; }
+.sc-states { padding-top: 0; align-items: center; }
+.sc-states[hidden] { display: none; }
+.sc-state-label { font-size: var(--fs-sm); color: var(--dim); }
+
+/* Readout under a window: tick counter (animated digits) and the phase now */
+.sc-readout { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); margin-left: var(--sp-2); font: var(--fs-sm) var(--mono); color: var(--dim); }
+.sc-readout b { font-weight: 600; color: var(--text-strong); }
+.sc-phase { display: inline-flex; align-items: center; gap: 6px; padding: 1px var(--sp-2); border-radius: var(--r-pill); background: var(--surface-2); color: var(--text); font: var(--fs-label) var(--font-body); transition: background-color var(--dur-fast) var(--ease-out); }
+.sc-phase i { width: 8px; height: 8px; border-radius: 50%; background: var(--c, var(--dim)); box-shadow: 0 0 8px var(--c, transparent); }
+.sc-phase:empty { display: none; }
+
+/* ------------------------------------------------------------------ phase timeline */
+.sc-tl { padding: var(--sp-4) var(--sp-4) 26px; }
+.tl-bar { position: relative; height: 20px; background: var(--sunken); border: 1px solid var(--edge); border-radius: var(--r-1); box-shadow: var(--shadow-inset); cursor: pointer; touch-action: none; }
+.tl-bar:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+.tl-span { position: absolute; top: 2px; bottom: 2px; opacity: 0.82; background-image: linear-gradient(rgb(255 255 255 / 0.22), transparent 55%); box-shadow: inset -1px 0 0 rgb(0 0 0 / 0.45); }
+.tl-tick { position: absolute; top: 100%; width: 1px; height: 5px; background: var(--edge-strong); }
+.tl-tick span { position: absolute; top: 6px; left: -10px; width: 20px; text-align: center; font: 10px var(--mono); color: var(--dim); }
+.tl-mark { position: absolute; top: -7px; bottom: -2px; width: 2px; background: var(--phase-mark); }
+.tl-mark span { position: absolute; bottom: 100%; left: 3px; white-space: nowrap; font: 600 var(--fs-2xs) var(--mono); color: var(--phase-mark); }
+/* The playhead: a soul-fire needle with a brass-set gem on top */
+.tl-head { position: absolute; top: -5px; bottom: -5px; width: 3px; background: var(--soul); box-shadow: 0 0 0 1px var(--sunken), 0 0 10px 1px rgb(var(--soul-rgb) / 0.75); pointer-events: none; }
+.tl-head::before { content: ''; position: absolute; left: 50%; top: -4px; width: 9px; height: 9px; transform: translateX(-50%) rotate(45deg); background: var(--soul); box-shadow: 0 0 0 1px var(--sunken), 0 0 0 2px var(--brass-lo); }
+.tl-legend { border-bottom: 0; }
+
+.sc-err { color: var(--on-bad); background: var(--bad); padding: var(--sp-2) var(--sp-4); font: var(--fs-sm) var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+.sc-err[hidden] { display: none; }
+.sc-thumb .sc-err { position: absolute; inset: auto 0 0 0; font-size: var(--fs-2xs); padding: var(--sp-1) var(--sp-2); }
+
+/* ------------------------------------------------------------------ tables and loot */
+.sc-moves { margin-top: var(--sp-2); }
+.sc-att { display: inline-flex; align-items: center; gap: 6px; padding: 0; background: none; border: 0; color: var(--soul); font: inherit; text-align: left; cursor: pointer; }
+.sc-att::after { content: '›'; color: var(--dim); transition: transform var(--dur-fast) var(--ease-out); }
+.sc-att:hover { text-decoration: underline; }
+.sc-att:hover::after { transform: translateX(2px); }
+.sc-effect { display: flex; align-items: center; gap: 6px; margin-top: var(--sp-1); font-size: var(--fs-label); color: var(--dim); white-space: nowrap; }
+.sc-effect img { width: 18px; height: 18px; image-rendering: pixelated; }
+.sc-loot { display: flex; flex-wrap: wrap; gap: var(--sp-4); }
+.sc-loot .recipe { flex: 0 1 300px; }
+.sc-item { width: 200px; max-width: 100%; aspect-ratio: 1; background: radial-gradient(ellipse at 50% 55%, var(--stage-vignette-in) 0%, var(--stage-vignette-out) 75%); border-radius: var(--r-1); }
+.sc-item canvas { display: block; width: 100%; height: 100%; }
+.sc-px { display: block; max-width: 100%; image-rendering: pixelated; background: repeating-conic-gradient(var(--checker-a) 0 25%, var(--checker-b) 0 50%) 0 0 / 16px 16px; border: 1px solid var(--edge); }
+.sc-equip { margin-top: 10px; height: auto; }
+
+/* ------------------------------------------------------------------ altar: banners */
+.sc-banners { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: var(--sp-3); }
+.sc-banner-card { position: relative; isolation: isolate; display: flex; flex-direction: column; gap: var(--sp-1); padding: var(--sp-3); background: var(--surface); border: 1px solid var(--edge); border-radius: var(--r-2); color: var(--text); transition: border-color var(--dur) var(--ease-out), transform var(--dur) var(--ease-out), box-shadow var(--dur) var(--ease-out); }
+.sc-banner-card:hover { text-decoration: none; border-color: var(--brass-lo); }
+.sc-banner-card b { color: var(--text-strong); }
+.sc-banner-card img { width: 64px; height: 64px; }
+.sc-reward { font: var(--fs-label) var(--mono); }
+.sc-reward.more { color: var(--warn); }
+.sc-reward.less { color: var(--ok); }
+.sc-reward.same { color: var(--dim); }
+.sc-banner-page { display: flex; flex-wrap: wrap; gap: var(--sp-5); align-items: flex-start; }
+.sc-banner-pics { display: flex; flex-wrap: wrap; gap: var(--sp-3); align-items: flex-end; max-width: 100%; }
+.sc-cloth { width: 120px; height: 250px; background: none; border: 0; }
+.sc-banner-view { width: 220px; height: 256px; aspect-ratio: auto; }
+.sc-pager { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--sp-3); margin-top: var(--sp-5); }
+.sc-pager a { overflow-wrap: normal; }
+
+/* ------------------------------------------------------------------ altar menu mock (vanilla-like GUI, not the site) */
+.mc-wrap { display: flex; flex-wrap: wrap; gap: var(--sp-5); align-items: flex-start; }
+.mc-mock-label { flex-basis: 100%; font: 600 var(--fs-label) var(--mono); color: var(--warn); }
+.mc-gui { width: 470px; max-width: 100%; padding: var(--sp-3) 14px 14px; background: var(--mc-panel); color: var(--mc-ink); border: 3px solid; border-color: var(--mc-light) var(--mc-dark) var(--mc-dark) var(--mc-light); box-shadow: 0 0 0 2px var(--mc-black); font: 15px/1.35 var(--mock-font); }
+.mc-title { margin-bottom: var(--sp-2); color: var(--mc-ink); font-weight: 700; }
+.mc-warn { margin-bottom: var(--sp-2); padding: 6px var(--sp-2); background: var(--mc-warn-bg); color: var(--mc-light); text-shadow: 2px 2px var(--mc-warn-shadow); }
+.mc-panel { margin-top: var(--sp-2); padding: var(--sp-2) 10px; background: var(--mc-panel-2); border: 2px solid; border-color: var(--mc-dark) var(--mc-light) var(--mc-light) var(--mc-dark); }
+.mc-h { margin-bottom: var(--sp-1); color: var(--mc-ink); font-weight: 700; }
+.mc-big { color: var(--mc-ink-strong); font-weight: 700; }
+.mc-small { margin-top: var(--sp-1); font-size: var(--fs-sm); color: var(--mc-ink-soft); }
+.mc-row { display: flex; gap: 6px; }
+.mc-btn { margin-top: 6px; padding: 5px 14px; background: var(--mc-btn); color: var(--mc-light); text-shadow: 2px 2px var(--mc-ink); border: 2px solid; border-color: var(--mc-btn-hi) var(--mc-btn-lo) var(--mc-btn-lo) var(--mc-btn-hi); box-shadow: 0 0 0 1px var(--mc-black); font: inherit; cursor: default; }
+.mc-btn.on { background: var(--mc-btn-on); border-color: var(--mc-btn-on-hi) var(--mc-btn-on-lo) var(--mc-btn-on-lo) var(--mc-btn-on-hi); }
+.mc-slots { display: flex; flex-wrap: wrap; gap: var(--sp-1); margin: var(--sp-1) 0 6px; }
+.mc-slot { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; background: var(--mc-slot); border: 2px solid; border-color: var(--mc-slot-lo) var(--mc-light) var(--mc-light) var(--mc-slot-lo); }
+.mc-slot.off { background: var(--mc-slot-off); opacity: 0.6; }
+.mc-slot img { width: 32px; height: 32px; image-rendering: pixelated; }
+.mc-eff { width: 100%; border-collapse: collapse; font-size: var(--fs-small); }
+.mc-eff td { padding: 1px 0; border: 0; color: var(--mc-ink); background: none; }
+.mc-eff tr:hover { background: none; }
+.mc-eff td:last-child { text-align: right; color: var(--mc-good); }
+.mc-bar { position: relative; height: 18px; margin: 6px 0 2px; background: var(--mc-bar-bg); border: 2px solid var(--mc-bar-edge); }
+.mc-bar i { position: absolute; inset: 0 auto 0 0; background: var(--mc-bar); transition: width var(--dur-slow) var(--ease-out); }
+.mc-bar > span { position: relative; padding-left: 6px; font-size: var(--fs-sm); color: var(--mc-light); text-shadow: 1px 1px var(--mc-black); }
+.mc-ctl { flex: 1 1 280px; min-width: 0; }
+.mc-ctl select, .bk-ctl select { min-height: 32px; padding: 3px var(--sp-1); background: var(--surface-2); color: var(--text); border: 1px solid var(--edge); border-radius: var(--r-2); font: var(--fs-sm) var(--font-body); }
+.mc-ctl select:hover, .bk-ctl select:hover { border-color: var(--brass-lo); }
+
+/* ------------------------------------------------------------------ trophies */
+.sc-vlabels { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--sp-2); padding: var(--sp-2) var(--sp-4) 2px; }
+.sc-vlabels.five { grid-template-columns: repeat(5, 1fr); }
+.sc-vlabel { display: flex; flex-direction: column; gap: 2px; text-align: center; font-size: var(--fs-sm); }
+.sc-vlabel b { font-size: var(--fs-small); }
+.sc-matrix td { text-align: center; vertical-align: top; }
+/* The shelf of all seven: each picture is a lit niche */
+.sc-matrix img { display: block; margin: 0 auto; width: 150px; height: 150px; background: var(--sunken); border: 1px solid var(--edge); border-radius: var(--r-1); transition: border-color var(--dur) var(--ease-out), box-shadow var(--dur) var(--ease-out), transform var(--dur) var(--ease-out); }
+.sc-matrix img:hover { border-color: var(--brass-lo); box-shadow: var(--glow-ember); }
+.sc-matrix td.sc-left { text-align: left; font-size: var(--fs-sm); max-width: 320px; }
+.sc-reco { margin: var(--sp-3) 0 var(--sp-1); padding: 10px 14px; border-left: 2px solid var(--soul); background: var(--surface); }
+.sc-chain { padding: 10px 14px; background: var(--sunken); border: 1px solid var(--edge); border-radius: var(--r-1); font: var(--fs-sm) var(--mono); white-space: pre; overflow-x: auto; }
+.sc-icons { display: flex; gap: var(--sp-3); align-items: center; padding: var(--sp-2) var(--sp-4) var(--sp-3); }
+.sc-plist { margin: var(--sp-1) 0 0; padding-left: 20px; font-size: var(--fs-sm); }
+.sc-sprite { background: var(--surface-2); }
+
+/* ------------------------------------------------------------------ hunter's book mock (vanilla-like book, not the site) */
+.bk-wrap { display: flex; flex-wrap: wrap; gap: var(--sp-5); align-items: flex-start; }
+.bk-wrap > div:first-child { flex: 0 1 760px; min-width: 0; }
+.bk-book { position: relative; width: 760px; max-width: 100%; padding: 30px var(--sp-4) var(--sp-4); background: var(--bk-cover); border: 3px solid; border-color: var(--bk-cover-hi) var(--bk-cover-lo) var(--bk-cover-lo) var(--bk-cover-hi); box-shadow: 0 0 0 2px var(--mc-black); font: 14px/1.4 var(--mock-font); color: var(--bk-ink); }
+.bk-tabs { position: absolute; top: var(--sp-1); left: var(--sp-4); display: flex; gap: var(--sp-1); }
+.bk-tab { padding: 3px 10px; background: var(--bk-tab); color: var(--bk-tab-ink); border: 2px solid; border-color: var(--bk-tab-hi) var(--bk-tab-lo) var(--bk-tab-lo) var(--bk-tab-hi); font: inherit; font-size: var(--fs-sm); cursor: pointer; }
+.bk-tab.on { background: var(--bk-page); }
+.bk-pageno { position: absolute; top: var(--sp-2); right: 20px; color: var(--bk-pageno); font-size: var(--fs-label); }
+.bk-spread { position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; min-height: 420px; }
+.bk-page { min-width: 0; padding: var(--sp-3) 14px 34px; background: var(--bk-page); box-shadow: inset 0 0 0 1px var(--bk-edge), inset -6px 0 10px -6px var(--bk-edge-2); }
+.bk-page + .bk-page { box-shadow: inset 0 0 0 1px var(--bk-edge), inset 6px 0 10px -6px var(--bk-edge-2); }
+.bk-title { margin-bottom: 6px; font-weight: 700; font-size: var(--fs-body); text-align: center; color: var(--bk-ink-title); }
+.bk-h { margin: var(--sp-2) 0 3px; font-weight: 700; color: var(--bk-ink-head); }
+.bk-page p { margin: 3px 0; }
+.bk-small { font-size: var(--fs-label); color: var(--bk-ink-soft); }
+.bk-hint { margin-top: 10px; font-size: var(--fs-label); font-style: italic; color: var(--bk-ink-hint); }
+.bk-pic { aspect-ratio: 1; background: var(--bk-page-2); border: 1px solid var(--bk-edge); }
+.bk-canvas { display: block; width: 100%; height: 100%; }
+.bk-clips { display: flex; flex-wrap: wrap; gap: var(--sp-1); margin: 6px 0; }
+.bk-btn, .bk-link { padding: 2px 6px; background: var(--bk-btn); color: var(--bk-ink); border: 1px solid var(--bk-edge-2); font: inherit; font-size: var(--fs-label); cursor: pointer; }
+.bk-btn.on { background: var(--bk-btn-on); border-color: var(--bk-btn-on-edge); }
+.bk-link { padding: 0 3px; font-weight: 700; }
+.bk-book :focus-visible { outline-color: var(--bk-ink-head); }
+.bk-bar .tl-bar { background: var(--bk-btn); border-color: var(--bk-edge-2); box-shadow: none; }
+.bk-bar .tl-tick span { color: var(--bk-ink-soft); }
+.bk-bar .tl-mark, .bk-bar .tl-mark span { color: var(--bk-ink); background: var(--bk-ink); }
+.bk-bar .tl-mark span { background: none; }
+.bk-bar .tl-head { background: var(--bk-ink); box-shadow: none; }
+.bk-bar .tl-head::before { display: none; }
+.bk-bar { padding: var(--sp-2) 2px 18px; }
+.bk-list { margin: 2px 0; padding-left: 18px; }
+.bk-list li { margin: 2px 0; }
+.bk-stats { border-collapse: collapse; font-size: var(--fs-sm); }
+.bk-stats td { padding: 1px 10px 1px 0; border: 0; background: none; color: var(--bk-ink); }
+.bk-stats tr:hover { background: none; }
+.bk-entry { margin: 5px 0; padding: var(--sp-1) 6px; border: 1px solid var(--bk-edge); }
+.bk-entry.locked { color: var(--bk-ink-locked); background: repeating-linear-gradient(135deg, var(--bk-page-3) 0 6px, var(--bk-page) 6px 12px); }
+.bk-lock { display: inline-block; width: 16px; color: var(--bk-ink-head); }
+.bk-banners { display: grid; grid-template-columns: repeat(6, 36px); gap: var(--sp-1); }
+.bk-banner { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; background: var(--bk-btn); border: 1px solid var(--bk-edge-2); }
+.bk-banner img { image-rendering: pixelated; }
+.bk-banner.locked img { filter: brightness(0) opacity(0.45); }
+.bk-arrows { position: absolute; left: 0; right: 0; bottom: var(--sp-1); display: flex; justify-content: space-between; padding: 0 10px; pointer-events: none; }
+.bk-arrow { pointer-events: auto; padding: 0 var(--sp-2); background: none; border: 0; color: var(--bk-arrow); font-size: var(--fs-body); cursor: pointer; }
+.bk-hud { position: relative; width: 760px; max-width: 100%; margin-top: var(--sp-3); padding: 30px 0 10px; display: flex; flex-direction: column; align-items: center; background: linear-gradient(var(--bk-sky-top), var(--bk-sky-bottom)); border: 1px solid var(--edge); }
+.bk-hud .mc-mock-label { position: absolute; top: 6px; left: 10px; right: 10px; color: var(--bk-label); }
+.bk-actionbar { min-height: 22px; margin-bottom: 6px; padding: 0 var(--sp-2); text-align: center; color: var(--bk-actionbar); font: 15px var(--mock-font); text-shadow: 2px 2px var(--bk-actionbar-shadow); opacity: 0; }
+.bk-actionbar.show { animation: bk-fade 3s ease-out forwards; }
+@keyframes bk-fade { 0% { opacity: 0; } 8% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: 0.6; } }
+.bk-hotbar { display: flex; max-width: 100%; padding: 2px; background: var(--bk-hotbar); border: 2px solid var(--mc-black); }
+.bk-hotbar .mc-slot { width: 36px; height: 36px; flex: 0 1 36px; min-width: 0; }
+.bk-hotbar .mc-slot img { width: 28px; height: 28px; max-width: 100%; image-rendering: pixelated; }
+.bk-ctl { flex: 1 1 300px; min-width: 0; }
+.bk-slider { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); padding: 6px var(--sp-4); }
+.bk-slider input { flex: 1 1 140px; accent-color: var(--soul); }
+.bk-opens tr.shut td { color: var(--dim); }
+.bk-opens tr.open td:first-child { color: var(--ok); }
+@media (prefers-reduced-motion: reduce) { .bk-actionbar.show { animation: none; opacity: 1; } }
+
+@media (max-width: 860px) {
+  .bk-spread { grid-template-columns: 1fr; }
+  .sc-vlabels, .sc-vlabels.five { grid-template-columns: repeat(2, 1fr); }
+  .sc-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: var(--sp-3); }
+  .sc-tl { padding: var(--sp-4) var(--sp-2) 26px; }
+  .mc-gui { font-size: var(--fs-sm); }
+  .sc-clips { padding-left: var(--sp-3); padding-right: var(--sp-3); }
+  .controls { padding-left: var(--sp-3); padding-right: var(--sp-3); }
+}
+@media (max-width: 480px) {
+  .sc-banner-view { width: 100%; height: 256px; }
+  .sc-cloth { width: 96px; height: 200px; }
+}
+
+/* The moveset on a phone: name and damage; a tap on the name opens the attack in a sheet */
+@media (max-width: 640px) {
+  .sc-moveset th:nth-child(n+2):nth-child(-n+5), .sc-moveset td:nth-child(n+2):nth-child(-n+5),
+  .sc-moveset th:nth-child(7), .sc-moveset td:nth-child(7) { display: none; }
+  .sc-moveset .sc-att { min-height: 32px; }
+}
+
+/* ------------------------------------------------------------------ moveset sheet (SC.sheet on the shared .gd-sheet) */
+.gd-sheet-body { width: min(680px, 100%); margin: 0 auto; }
+.gd-sheet-body h4 { margin: var(--sp-4) 0 var(--sp-2); font: 600 var(--fs-2xs) var(--mono); color: var(--brass); text-transform: uppercase; letter-spacing: 1.5px; }
+.att-phases { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: var(--sp-2); margin: 0; }
+.att-phases div { padding: var(--sp-2) 10px; background: var(--bg); border: 1px solid var(--edge); border-left: 3px solid var(--c); border-radius: var(--r-1); }
+.att-phases dt { font-size: var(--fs-label); color: var(--dim); }
+.att-phases dd { margin: 0; font: 600 var(--fs-lg) var(--mono); color: var(--text-strong); }
+.att-phases dd small { font: var(--fs-label) var(--font-body); color: var(--dim); }
+.att-strip { display: flex; height: 12px; margin: var(--sp-3) 0 0; border-radius: var(--r-1); overflow: hidden; background: var(--sunken); }
+.att-strip i { display: block; height: 100%; background: var(--c); opacity: 0.85; }
+/* the primary action, ember as on the site */
+.att-go { display: inline-flex; align-items: center; gap: var(--sp-2); margin-top: var(--sp-4); min-height: 40px; padding: var(--sp-2) var(--sp-4); border: 1px solid var(--ember-hi); border-radius: var(--r-2); background: var(--ember); color: var(--on-ember); font-weight: 600; transition: background-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out); }
+.att-go:hover { text-decoration: none; background: var(--ember-hi); box-shadow: var(--glow-ember); }
+
+/* the shared kit, SoulsCraft additions: a red toast, the soul light on the selected result */
+.gd-toast.bad i { background: var(--bad); color: var(--bad); }
+.gd-cmdk-item .gd-k { flex: none; font: var(--fs-2xs) var(--mono); color: var(--dim); }
+.gd-nf-d { -webkit-mask: linear-gradient(transparent, #000 20%, #000 80%, transparent); mask: linear-gradient(transparent, #000 20%, #000 80%, transparent); }
+.gd-nf-d.gd-snap > span { transition: none; }
+
+/* ------------------------------------------------------------------ rising sparks */
+/* A dozen sparks drift up from the ember glow, behind the panels. Only transform and opacity move;
+   they stop and fade while a 3D window is on screen (ui.js: body.calm) and are off when motion is
+   reduced. */
+.sparks { position: fixed; inset: auto 0 0 0; height: 70vh; z-index: -1; pointer-events: none; overflow: hidden; transition: opacity var(--dur-slow) var(--ease-out); }
+.sparks i {
+  position: absolute; bottom: -6px; left: var(--x); width: var(--s); height: var(--s); border-radius: 50%;
+  background: var(--spark); box-shadow: 0 0 6px 1px rgb(var(--ember-rgb) / 0.8);
+  opacity: 0; will-change: transform, opacity;
+  animation: sc-spark var(--t) linear var(--d) infinite;
+}
+@keyframes sc-spark {
+  0% { transform: translate3d(0, 0, 0); opacity: 0; }
+  10% { opacity: 0.9; }
+  60% { opacity: 0.55; }
+  100% { transform: translate3d(var(--dx), -70vh, 0); opacity: 0; }
+}
+body.calm .sparks { opacity: 0; }
+body.calm .sparks i { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) { .sparks { display: none; } }

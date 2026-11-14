@@ -1,0 +1,52 @@
+{
+ "variants": {
+  "rotation=0": {
+   "model": "soulscraft:block/revenant_head"
+  },
+  "rotation=1": {
+   "model": "soulscraft:block/revenant_head"
+  },
+  "rotation=2": {
+   "model": "soulscraft:block/revenant_head"
+  },
+  "rotation=3": {
+   "model": "soulscraft:block/revenant_head"
+  },
+  "rotation=4": {
+   "model": "soulscraft:block/revenant_head"
+  },
+  "rotation=5": {
+   "model": "soulscraft:block/revenant_head"
+  },
+  "rotation=6": {
+   "model": "soulscraft:block/revenant_head"
+  },
+  "rotation=7": {
+   "model": "soulscraft:block/revenant_head"
+  },
+  "rotation=8": {
+   "model": "soulscraft:block/revenant_head"
+  },
+  "rotation=9": {
+   "model": "soulscraft:block/revenant_head"
+  },
+  "rotation=10": {
+   "model": "soulscraft:block/revenant_head"
+  },
+  "rotation=11": {
+   "model": "soulscraft:block/revenant_head"
+  },
+  "rotation=12": {
+   "model": "soulscraft:block/revenant_head"
+  },
+  "rotation=13": {
+   "model": "soulscraft:block/revenant_head"
+  },
+  "rotation=14": {
+   "model": "soulscraft:block/revenant_head"
+  },
+  "rotation=15": {
+   "model": "soulscraft:block/revenant_head"
+  }
+ }
+}

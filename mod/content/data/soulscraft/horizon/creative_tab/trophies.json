@@ -1,0 +1,25 @@
+{
+  "title": "itemGroup.soulscraft.trophies",
+  "icon": "soulscraft:revenant_head",
+  "items": [
+    "soulscraft:revenant_head",
+    "soulscraft:revenant_trophy",
+    "soulscraft:stalker_head",
+    "soulscraft:stalker_trophy",
+    "soulscraft:marksman_head",
+    "soulscraft:marksman_trophy",
+    "soulscraft:brute_head",
+    "soulscraft:brute_trophy",
+    "soulscraft:shrike_head",
+    "soulscraft:shrike_trophy",
+    "soulscraft:lurker_head",
+    "soulscraft:lurker_trophy",
+    "soulscraft:bog_slime_head",
+    "soulscraft:bog_slime_trophy",
+    "soulscraft:rusty_helmet",
+    "soulscraft:rusty_chestplate",
+    "soulscraft:stalker_hood",
+    "soulscraft:marksman_hood",
+    "soulscraft:brute_helmet"
+  ]
+}

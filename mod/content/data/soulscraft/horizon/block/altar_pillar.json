@@ -1,0 +1,83 @@
+{
+  "template": "minecraft:stone",
+  "properties": {
+    "hardness": 2.0,
+    "requires_tool": false,
+    "occludes": false
+  },
+  "item": true,
+  "state_properties": {
+    "on_slab": {
+      "type": "boolean"
+    },
+    "part": {
+      "type": "enum",
+      "values": [
+        "bottom",
+        "top"
+      ]
+    }
+  },
+  "default_state": {
+    "on_slab": "false",
+    "part": "bottom"
+  },
+  "shapes": {
+    "properties": [
+      "on_slab",
+      "part"
+    ],
+    "values": {
+      "false,bottom": [
+        [
+          0.0625,
+          0.0,
+          0.0625,
+          0.9375,
+          1.0,
+          0.9375
+        ]
+      ],
+      "false,top": [
+        [
+          0.0625,
+          0.0,
+          0.0625,
+          0.9375,
+          1.0625,
+          0.9375
+        ]
+      ],
+      "true,bottom": [
+        [
+          0.0625,
+          0.0,
+          0.0625,
+          0.9375,
+          0.5,
+          0.9375
+        ]
+      ],
+      "true,top": [
+        [
+          0.0625,
+          0.0,
+          0.0625,
+          0.9375,
+          0.5625,
+          0.9375
+        ]
+      ]
+    },
+    "default": [
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    ]
+  }
+}

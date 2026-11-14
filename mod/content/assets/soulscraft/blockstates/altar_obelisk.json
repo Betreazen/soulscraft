@@ -1,0 +1,22 @@
+{
+ "variants": {
+  "on_slab=false,part=bottom": {
+   "model": "soulscraft:block/altar_obelisk_bottom"
+  },
+  "on_slab=false,part=middle": {
+   "model": "soulscraft:block/altar_obelisk_middle"
+  },
+  "on_slab=false,part=top": {
+   "model": "soulscraft:block/altar_obelisk_top"
+  },
+  "on_slab=true,part=bottom": {
+   "model": "soulscraft:block/altar_obelisk_bottom_on_slab"
+  },
+  "on_slab=true,part=middle": {
+   "model": "soulscraft:block/altar_obelisk_middle_on_slab"
+  },
+  "on_slab=true,part=top": {
+   "model": "soulscraft:block/altar_obelisk_top_on_slab"
+  }
+ }
+}

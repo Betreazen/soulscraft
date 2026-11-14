@@ -1,0 +1,13 @@
+# SoulsCraft's resources: the seven mobs' entity types, rigs and textures, their weapons, the
+# shared bleed effect and the mob numbers (data/soulscraft/mobs.json, read at run time by other
+# mods). Everything here but this file is written by ../sync.ps1 from ../../data and ../../assets.
+# Same id as the native bundle (../soulscraft), which drives and draws the mobs.
+id = "soulscraft"
+name = "SoulsCraft"
+version = "0.1.0"
+description = "Resources of the SoulsCraft native mod: souls-like enemies (revenant, stalker, marksman, brute, shrike, lurker, bog slime), their rigs, weapons and the shared bleeding effect."
+authors = ["SoulsCraft"]
+api = "0.2"
+# Both halves: the server compares id and version with each joining client (horizon:mod_list).
+side = "both"
+capabilities = ["registries"]

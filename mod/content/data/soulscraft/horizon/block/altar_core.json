@@ -1,0 +1,21 @@
+{
+  "template": "minecraft:stone",
+  "properties": {
+    "hardness": 3.5,
+    "requires_tool": false,
+    "light": 7
+  },
+  "item": true,
+  "shapes": {
+    "default": [
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    ]
+  }
+}

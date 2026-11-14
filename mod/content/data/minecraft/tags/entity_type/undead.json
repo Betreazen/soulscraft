@@ -1,0 +1,9 @@
+{
+  "replace": false,
+  "values": [
+    "soulscraft:revenant",
+    "soulscraft:marksman",
+    "soulscraft:brute",
+    "soulscraft:shrike"
+  ]
+}

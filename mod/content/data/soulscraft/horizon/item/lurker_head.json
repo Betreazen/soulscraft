@@ -1,0 +1,10 @@
+{
+  "template": "minecraft:bone",
+  "place_block": "soulscraft:lurker_head_stand",
+  "rarity": "uncommon",
+  "components": {
+    "minecraft:equippable": {
+      "slot": "head"
+    }
+  }
+}

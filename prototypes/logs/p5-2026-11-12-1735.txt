@@ -1,0 +1,46 @@
+[17:32:36] soulscraft: bench: 50 revenants at P 0.50 round -500 101 500
+[17:32:46] soulscraft: cost sampling on
+[17:33:17] soulscraft: cost over 30.0 s: tick rate 20, server tick average 7.60 ms
+[17:33:17] soulscraft: cost kind=minecraft:sheep mob_ticks=4808 total_ms=67.56 us_per_mob_tick=14.05
+[17:33:17] soulscraft: cost kind=minecraft:chicken mob_ticks=2404 total_ms=18.13 us_per_mob_tick=7.54
+[17:33:17] soulscraft: cost kind=soulscraft:revenant mob_ticks=601 total_ms=8.60 us_per_mob_tick=14.31
+[17:33:17] soulscraft: cost kind=soulscraft:revenant mob_ticks=601 total_ms=6.22 us_per_mob_tick=10.34
+[17:33:17] soulscraft: cost kind=soulscraft:revenant mob_ticks=601 total_ms=5.49 us_per_mob_tick=9.13
+[17:33:17] soulscraft: cost kind=soulscraft:revenant mob_ticks=601 total_ms=5.46 us_per_mob_tick=9.09
+[17:33:17] soulscraft: cost soulscraft_level_tick ticks=601 ms_per_tick=0.913
+[17:33:30] soulscraft: cost sampling on
+[17:34:00] soulscraft: cost over 30.0 s: tick rate 20, server tick average 5.07 ms
+[17:34:00] soulscraft: cost kind=minecraft:sheep mob_ticks=4808 total_ms=61.68 us_per_mob_tick=12.83
+[17:34:00] soulscraft: cost kind=minecraft:chicken mob_ticks=2404 total_ms=16.82 us_per_mob_tick=7.00
+[17:34:00] soulscraft: cost soulscraft_level_tick ticks=601 ms_per_tick=0.019
+[17:34:12] soulscraft: cost sampling on
+[17:34:42] soulscraft: cost over 30.1 s: tick rate 20, server tick average 5.57 ms
+[17:34:42] soulscraft: cost kind=minecraft:sheep mob_ticks=4808 total_ms=68.76 us_per_mob_tick=14.30
+[17:34:42] soulscraft: cost kind=minecraft:chicken mob_ticks=2404 total_ms=19.05 us_per_mob_tick=7.92
+[17:34:42] soulscraft: cost soulscraft_level_tick ticks=601 ms_per_tick=0.020
+[17:35:18] soulscraft: bench: 50 revenants at P 0.50 round -500 101 500
+[17:35:28] soulscraft: cost sampling on
+[17:35:58] soulscraft: cost over 30.1 s: tick rate 20, server tick average 11.88 ms
+[17:35:58] soulscraft: cost kind=minecraft:sheep mob_ticks=4808 total_ms=85.48 us_per_mob_tick=17.78
+[17:35:58] soulscraft: cost kind=minecraft:slime mob_ticks=3584 total_ms=55.45 us_per_mob_tick=15.47
+[17:35:58] soulscraft: cost kind=minecraft:chicken mob_ticks=2404 total_ms=24.61 us_per_mob_tick=10.24
+[17:35:58] soulscraft: cost kind=soulscraft:revenant mob_ticks=601 total_ms=11.48 us_per_mob_tick=19.10
+[17:35:58] soulscraft: cost kind=soulscraft:revenant mob_ticks=601 total_ms=7.91 us_per_mob_tick=13.16
+[17:35:58] soulscraft: cost kind=soulscraft:revenant mob_ticks=601 total_ms=7.35 us_per_mob_tick=12.22
+[17:35:58] soulscraft: cost soulscraft_level_tick ticks=601 ms_per_tick=1.174
+[17:36:13] soulscraft: cost sampling on
+[17:36:43] soulscraft: cost over 30.1 s: tick rate 20, server tick average 8.63 ms
+[17:36:43] soulscraft: cost kind=minecraft:slime mob_ticks=41693 total_ms=498.59 us_per_mob_tick=11.96
+[17:36:43] soulscraft: cost kind=minecraft:zombie mob_ticks=8907 total_ms=87.32 us_per_mob_tick=9.80
+[17:36:43] soulscraft: cost kind=minecraft:sheep mob_ticks=4808 total_ms=77.12 us_per_mob_tick=16.04
+[17:36:43] soulscraft: cost kind=minecraft:chicken mob_ticks=2404 total_ms=22.79 us_per_mob_tick=9.48
+[17:36:43] soulscraft: cost kind=minecraft:spider mob_ticks=601 total_ms=10.03 us_per_mob_tick=16.69
+[17:36:43] soulscraft: cost soulscraft_level_tick ticks=601 ms_per_tick=0.026
+[17:36:54] soulscraft: cost sampling on
+[17:37:24] soulscraft: cost over 30.1 s: tick rate 20, server tick average 11.55 ms
+[17:37:24] soulscraft: cost kind=minecraft:slime mob_ticks=40855 total_ms=522.64 us_per_mob_tick=12.79
+[17:37:24] soulscraft: cost kind=minecraft:sheep mob_ticks=4808 total_ms=81.06 us_per_mob_tick=16.86
+[17:37:24] soulscraft: cost kind=minecraft:chicken mob_ticks=2404 total_ms=23.72 us_per_mob_tick=9.87
+[17:37:24] soulscraft: cost kind=minecraft:spider mob_ticks=1053 total_ms=16.42 us_per_mob_tick=15.59
+[17:37:24] soulscraft: cost kind=minecraft:creeper mob_ticks=601 total_ms=7.78 us_per_mob_tick=12.95
+[17:37:24] soulscraft: cost soulscraft_level_tick ticks=601 ms_per_tick=0.026

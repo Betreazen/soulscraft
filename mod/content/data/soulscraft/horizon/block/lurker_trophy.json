@@ -1,0 +1,94 @@
+{
+  "template": "minecraft:stone",
+  "properties": {
+    "hardness": 1.5,
+    "requires_tool": false,
+    "occludes": false,
+    "light": 2,
+    "sounds": "minecraft:oak_planks"
+  },
+  "item": true,
+  "state_properties": {
+    "facing": {
+      "type": "enum",
+      "values": [
+        "north",
+        "east",
+        "south",
+        "west"
+      ]
+    }
+  },
+  "default_state": {
+    "facing": "north"
+  },
+  "shapes": {
+    "properties": [
+      "facing"
+    ],
+    "values": {
+      "east": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.9688,
+          1.0
+        ]
+      ],
+      "north": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.9688,
+          1.0
+        ]
+      ],
+      "south": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.9688,
+          1.0
+        ]
+      ],
+      "west": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.9688,
+          1.0
+        ]
+      ]
+    },
+    "default": [
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    ]
+  },
+  "collision_shapes": {
+    "default": [
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.1875,
+        1.0
+      ]
+    ]
+  }
+}

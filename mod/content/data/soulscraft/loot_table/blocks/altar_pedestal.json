@@ -1,0 +1,19 @@
+{
+  "type": "minecraft:block",
+  "pools": [
+    {
+      "rolls": 1,
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "soulscraft:altar_pedestal"
+        }
+      ],
+      "conditions": [
+        {
+          "type": "minecraft:survives_explosion"
+        }
+      ]
+    }
+  ]
+}

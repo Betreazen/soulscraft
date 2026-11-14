@@ -1,0 +1,26 @@
+{
+  "title": "itemGroup.soulscraft.altar",
+  "icon": "soulscraft:altar_core",
+  "items": [
+    "soulscraft:altar_core",
+    "soulscraft:altar_pedestal",
+    "soulscraft:altar_slab",
+    "soulscraft:altar_socket",
+    "soulscraft:altar_pillar",
+    "soulscraft:altar_brazier",
+    "soulscraft:altar_obelisk",
+    "soulscraft:banner_weight",
+    "soulscraft:banner_mercy",
+    "soulscraft:banner_horde",
+    "soulscraft:banner_calm",
+    "soulscraft:banner_haste",
+    "soulscraft:banner_rest",
+    "soulscraft:banner_resilience",
+    "soulscraft:banner_kin_undead",
+    "soulscraft:banner_kin_beasts",
+    "soulscraft:banner_kin_slimes",
+    "soulscraft:banner_kin_flyers",
+    "soulscraft:banner_kin_water",
+    "soulscraft:rotten_horn"
+  ]
+}

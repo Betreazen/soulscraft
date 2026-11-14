@@ -1,0 +1,19 @@
+{
+ "variants": {
+  "facing=north": {
+   "model": "soulscraft:block/brute_wall_head"
+  },
+  "facing=east": {
+   "model": "soulscraft:block/brute_wall_head",
+   "y": 90
+  },
+  "facing=south": {
+   "model": "soulscraft:block/brute_wall_head",
+   "y": 180
+  },
+  "facing=west": {
+   "model": "soulscraft:block/brute_wall_head",
+   "y": 270
+  }
+ }
+}

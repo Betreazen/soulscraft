@@ -1,0 +1,13 @@
+{
+ "textures": ["soulscraft:snow"],
+ "horizon:behaviour": {
+  "velocity": [0.0, -0.012, 0.0],
+  "velocity_jitter": [0.004, 0.002, 0.004],
+  "gravity": 0.0,
+  "friction": 1.0,
+  "lifetime": 55,
+  "size": [0.025, 0.02],
+  "alpha": [1.0, 0.6],
+  "animation": "first"
+ }
+}

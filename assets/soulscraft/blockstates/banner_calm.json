@@ -1,0 +1,64 @@
+{
+ "variants": {
+  "facing=north,on_slab=false,part=bottom": {
+   "model": "soulscraft:block/banner_calm_bottom"
+  },
+  "facing=north,on_slab=false,part=top": {
+   "model": "soulscraft:block/banner_calm_top"
+  },
+  "facing=north,on_slab=true,part=bottom": {
+   "model": "soulscraft:block/banner_calm_bottom_on_slab"
+  },
+  "facing=north,on_slab=true,part=top": {
+   "model": "soulscraft:block/banner_calm_top_on_slab"
+  },
+  "facing=east,on_slab=false,part=bottom": {
+   "model": "soulscraft:block/banner_calm_bottom",
+   "y": 90
+  },
+  "facing=east,on_slab=false,part=top": {
+   "model": "soulscraft:block/banner_calm_top",
+   "y": 90
+  },
+  "facing=east,on_slab=true,part=bottom": {
+   "model": "soulscraft:block/banner_calm_bottom_on_slab",
+   "y": 90
+  },
+  "facing=east,on_slab=true,part=top": {
+   "model": "soulscraft:block/banner_calm_top_on_slab",
+   "y": 90
+  },
+  "facing=south,on_slab=false,part=bottom": {
+   "model": "soulscraft:block/banner_calm_bottom",
+   "y": 180
+  },
+  "facing=south,on_slab=false,part=top": {
+   "model": "soulscraft:block/banner_calm_top",
+   "y": 180
+  },
+  "facing=south,on_slab=true,part=bottom": {
+   "model": "soulscraft:block/banner_calm_bottom_on_slab",
+   "y": 180
+  },
+  "facing=south,on_slab=true,part=top": {
+   "model": "soulscraft:block/banner_calm_top_on_slab",
+   "y": 180
+  },
+  "facing=west,on_slab=false,part=bottom": {
+   "model": "soulscraft:block/banner_calm_bottom",
+   "y": 270
+  },
+  "facing=west,on_slab=false,part=top": {
+   "model": "soulscraft:block/banner_calm_top",
+   "y": 270
+  },
+  "facing=west,on_slab=true,part=bottom": {
+   "model": "soulscraft:block/banner_calm_bottom_on_slab",
+   "y": 270
+  },
+  "facing=west,on_slab=true,part=top": {
+   "model": "soulscraft:block/banner_calm_top_on_slab",
+   "y": 270
+  }
+ }
+}

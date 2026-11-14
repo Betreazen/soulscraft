@@ -1,0 +1,36 @@
+round 8 checks, 2026-11-12T21:36:27
+== F3+B
+  hitboxes shown: 
+== bot effects
+  {"effects":{"active":[{"amplifier":3,"duration":-1,"id":"resistance"},{"amplifier":0,"duration":12,"id":"soulscraft:bleeding"}],"thrown":[]},"health":19.799999237060547}
+== stalker strikes
+  soulscraft: phase mob=stalker id=116 attack=double_slash phase=windup t=0 tick=2993
+  soulscraft: phase mob=stalker id=116 attack=double_slash phase=hit t=6 tick=2999
+  soulscraft: strike mob=stalker id=116 attack=double_slash t=6 tick=2999 hit=true dmg=1.20 target=sc_a
+  soulscraft: strike mob=stalker id=116 attack=double_slash t=9 tick=3002 hit=true dmg=1.20 target=sc_a
+  soulscraft: phase mob=stalker id=116 attack=double_slash phase=recover t=10 tick=3003
+  soulscraft: phase mob=stalker id=116 attack=double_slash phase=end t=18 tick=3011
+  soulscraft: phase mob=stalker id=116 attack=double_slash phase=windup t=0 tick=3014
+  soulscraft: phase mob=stalker id=116 attack=double_slash phase=hit t=6 tick=3020
+  soulscraft: strike mob=stalker id=116 attack=double_slash t=6 tick=3020 hit=false dmg=1.20 target=sc_a
+  soulscraft: strike mob=stalker id=116 attack=double_slash t=9 tick=3023 hit=false dmg=1.20 target=sc_a
+  soulscraft: phase mob=stalker id=116 attack=double_slash phase=recover t=10 tick=3024
+  soulscraft: phase mob=stalker id=116 attack=double_slash phase=end t=18 tick=3032
+== pct_selftest summary (real, after login)
+  sc_a: pct:summary {"v":1,"levels":{"archery":[0,75],"defense":[1,75],"melee":[0,75]},"ranks":{"archery":[0,68],"defense":[0,66],"melee":[0,69]}}
+== /sc power (real summary)
+  soulscraft: sc_a: P 0.00 = 0.50·T 0.00 (melee 0/75 ranks 0/69, archery 0/75 ranks 0/68, defense 1/75 ranks 0/66) + 0.50·G 0.00 (armour 0, weapon tier 0)
+== pct_selftest summary (after /sc pct sc_a 60 12 30)
+  sc_a: pct:summary {"levels":{"archery":[12,75],"defense":[30,75],"melee":[60,75]},"ranks":{"archery":[12,96],"defense":[30,96],"melee":[60,96]},"v":1}
+== /sc power and the adopted P (test summary)
+  soulscraft: sc_a: pct:summary melee 60 archery 12 defense 30 (read within 20 ticks)
+  soulscraft: pct player=sc_a summary melee 60/75 ranks 60/96, archery 12/75 ranks 12/96, defense 30/75 ranks 30/96 tick=3160
+  soulscraft: sc_a: P 0.30 = 0.50·T 0.60 (melee 60/75 ranks 60/96, archery 12/75 ranks 12/96, defense 30/75 ranks 30/96) + 0.50·G 0.00 (armour 0, weapon tier 0)
+  soulscraft: adopt mob=revenant id=117 p=0.00 size=0 fresh=false health=30.0 tick=3229
+== /sc power after /sc pct sc_a off (gear only)
+  soulscraft: sc_a: pct:summary taken away
+  soulscraft: pct player=sc_a summary none, gear only tick=3280
+  soulscraft: sc_a: P 0.00 = 0.50·T 0 (no pct:summary: gear only) + 0.50·G 0.00 (armour 0, weapon tier 0)
+== survival bot with the test summary: a mob without a P tag takes its P (Г5)
+  soulscraft: sc_a: P 0.30 = 0.50·T 0.60 (melee 60/75 ranks 60/96, archery 12/75 ranks 12/96, defense 30/75 ranks 30/96) + 0.50·G 0.00 (armour 0, weapon tier 0)
+  soulscraft: adopt mob=revenant id=139 p=0.30 size=0 fresh=false health=30.0 tick=4060

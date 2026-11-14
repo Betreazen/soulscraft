@@ -1,0 +1,14 @@
+round 9 checks, 2026-11-13T13:55:13
+== breach
+  soulscraft: event breach mob=145 at=-700,101,706 blocks=6 tick=11288
+  soulscraft: event broke mob=145 at=-700,101,706 block=minecraft:cobblestone tick=11304
+  soulscraft: event broke mob=145 at=-700,102,706 block=minecraft:cobblestone tick=11304
+  soulscraft: event broke mob=145 at=-700,103,706 block=minecraft:cobblestone tick=11304
+  soulscraft: event broke mob=145 at=-699,101,706 block=minecraft:cobblestone tick=11304
+  soulscraft: event broke mob=145 at=-699,102,706 block=minecraft:cobblestone tick=11304
+  soulscraft: event broke mob=145 at=-699,103,706 block=minecraft:cobblestone tick=11304
+  soulscraft: event lost=stopped core=-700,101,700 wave=1 hp=200.00 drained=0.00 cursed=0.00 parts=1 tick=11307
+  soulscraft: event restored blocks=5 kept=1
+  soulscraft: selftest PASS defense_breach_restore
+== curse
+  soulscraft: event curse mob=147 tick=11369

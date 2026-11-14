@@ -1,0 +1,40 @@
+name = "SoulsCraft"
+tagline = "Враги в духе souls-like с честным замахом и алтарь призыва с ивентами-волнами для Minecraft на Horizon"
+description = "site/description.md"
+preview = "site/preview.webp"
+showcase = "docs/showcase"
+
+[[model]]
+file = "assets/site/brute.glb"
+name = "Громила"
+kind = "mob"
+clips = ["attack_slam", "attack_swing"]
+
+[[model]]
+file = "assets/site/altar_level_4.glb"
+name = "Алтарь призыва"
+kind = "structure"
+
+[[model]]
+file = "assets/site/revenant.glb"
+name = "Латник-мертвец"
+kind = "mob"
+clips = ["attack_overhead", "shield_bash"]
+
+[[model]]
+file = "assets/site/stalker.glb"
+name = "Ловчий"
+kind = "mob"
+clips = ["attack_lunge", "attack_double"]
+
+[[model]]
+file = "assets/site/marksman.glb"
+name = "Костяной арбалетчик"
+kind = "mob"
+clips = ["attack_shoot"]
+
+[[model]]
+file = "assets/site/shrike.glb"
+name = "Сорокопут"
+kind = "mob"
+clips = ["attack_dive"]

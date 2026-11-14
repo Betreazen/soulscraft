@@ -1,0 +1,342 @@
+{
+ "format": "soulscraft-trophy",
+ "version": 2,
+ "id": "bog_slime",
+ "name": "Топяная слизь",
+ "rig": "soulscraft:bog_slime",
+ "frame": "block px from the bottom centre, +x east, +y up, +z south; chain: translate(0.5, 0, 0.5), rotate_about(y, turn), translate(offset / 16), rotate_about(y, yaw), scale(scale), scale(1, -1, -1), translate(0, -1.501, 0), parts at the pose; turn: floor head -22.5 * rotation, wall head and diorama -facing_y",
+ "head": {
+  "texture": {
+   "sprite": "soulscraft:entity/bog_slime",
+   "width": 64,
+   "height": 64
+  },
+  "parts": [
+   {
+    "name": "root",
+    "parent": null,
+    "pivot": [0, 24, 0],
+    "rotation": [0, 0, 0],
+    "cubes": []
+   },
+   {
+    "name": "lower",
+    "parent": "root",
+    "pivot": [0, 0, 0],
+    "rotation": [0, 0, 0],
+    "cubes": [
+     {
+      "origin": [-4, -2.2, -4],
+      "size": [8, 2, 8],
+      "uv": [32, 0],
+      "inflate": 0.2
+     }
+    ]
+   },
+   {
+    "name": "skirt_l",
+    "parent": "lower",
+    "pivot": [0, 0, 0],
+    "rotation": [0, 0, 0],
+    "cubes": [
+     {
+      "origin": [1, -1.35, -3.5],
+      "size": [3, 1, 7],
+      "uv": [0, 19]
+     }
+    ]
+   },
+   {
+    "name": "skirt_r",
+    "parent": "lower",
+    "pivot": [0, 0, 0],
+    "rotation": [0, 0, 0],
+    "cubes": [
+     {
+      "origin": [-4, -1.35, -3.5],
+      "size": [3, 1, 7],
+      "uv": [0, 19],
+      "mirror": true
+     }
+    ]
+   },
+   {
+    "name": "skirt_f",
+    "parent": "lower",
+    "pivot": [0, 0, 0],
+    "rotation": [0, 0, 0],
+    "cubes": [
+     {
+      "origin": [-3, -1.15, -4],
+      "size": [6, 1, 3],
+      "uv": [46, 22],
+      "inflate": [-0.1, 0, 0]
+     }
+    ]
+   },
+   {
+    "name": "skirt_b",
+    "parent": "lower",
+    "pivot": [0, 0, 0],
+    "rotation": [0, 0, 0],
+    "cubes": [
+     {
+      "origin": [-3, -1.15, 1],
+      "size": [6, 1, 3],
+      "uv": [46, 22],
+      "inflate": [-0.1, 0, 0]
+     }
+    ]
+   },
+   {
+    "name": "mid",
+    "parent": "lower",
+    "pivot": [0, -2, 0],
+    "rotation": [0, 0, 0],
+    "cubes": [
+     {
+      "origin": [-4, -3, -1],
+      "size": [8, 3, 5],
+      "uv": [0, 11]
+     },
+     {
+      "origin": [-4, -3, -4],
+      "size": [1, 3, 3],
+      "uv": [54, 16]
+     },
+     {
+      "origin": [2, -3, -4],
+      "size": [2, 3, 3],
+      "uv": [54, 10]
+     },
+     {
+      "origin": [-2, -2.7, -3.5],
+      "size": [1, 2, 1],
+      "uv": [46, 26]
+     },
+     {
+      "origin": [-1, -2, -2.8],
+      "size": [3, 1, 1],
+      "uv": [46, 20]
+     },
+     {
+      "origin": [-3.1, -1.05, -3.4],
+      "size": [2, 1, 1],
+      "uv": [8, 27]
+     }
+    ]
+   },
+   {
+    "name": "core",
+    "parent": "mid",
+    "pivot": [0, 0, 0],
+    "rotation": [0, 0, 0],
+    "cubes": [
+     {
+      "origin": [-3, -4, -2],
+      "size": [6, 5, 5],
+      "uv": [32, 10],
+      "inflate": [0, -0.1, 0]
+     }
+    ]
+   },
+   {
+    "name": "upper",
+    "parent": "mid",
+    "pivot": [0, -3, 0],
+    "rotation": [0, 0, 0],
+    "cubes": [
+     {
+      "origin": [-4, -3, -4],
+      "size": [8, 3, 8],
+      "uv": [0, 0],
+      "inflate": 0.3
+     },
+     {
+      "origin": [-3, -2.5, -4.8],
+      "size": [2, 2, 1],
+      "uv": [40, 25]
+     },
+     {
+      "origin": [1, -2.5, -4.8],
+      "size": [2, 2, 1],
+      "uv": [40, 25]
+     },
+     {
+      "origin": [-4, -4, -4],
+      "size": [4, 1, 4],
+      "uv": [20, 20],
+      "inflate": 0.4
+     },
+     {
+      "origin": [1, -4, 1],
+      "size": [3, 1, 3],
+      "uv": [20, 25],
+      "inflate": 0.4
+     },
+     {
+      "origin": [-3, -5, -3],
+      "size": [2, 1, 2],
+      "uv": [32, 25],
+      "inflate": 0.2
+     },
+     {
+      "origin": [2, -7, 2],
+      "size": [1, 3, 1],
+      "uv": [26, 15]
+     },
+     {
+      "origin": [3, -6, 3],
+      "size": [1, 2, 1],
+      "uv": [50, 26]
+     }
+    ]
+   },
+   {
+    "name": "root_a",
+    "parent": "upper",
+    "pivot": [-4.3, -1.5, 1],
+    "rotation": [0, 0, 0.34907],
+    "cubes": [
+     {
+      "origin": [-3, -0.5, -0.5],
+      "size": [3, 1, 1],
+      "uv": [0, 27]
+     }
+    ]
+   },
+   {
+    "name": "root_a2",
+    "parent": "root_a",
+    "pivot": [-3, 0, 0],
+    "rotation": [0, 0, 0.61087],
+    "cubes": [
+     {
+      "origin": [-2, -0.5, -0.5],
+      "size": [2, 1, 1],
+      "uv": [14, 27],
+      "inflate": [0, 0, 0.1]
+     }
+    ]
+   },
+   {
+    "name": "root_c",
+    "parent": "upper",
+    "pivot": [-1.5, -2.8, 4.3],
+    "rotation": [0.61087, 0, 0],
+    "cubes": [
+     {
+      "origin": [-0.5, -0.5, 0],
+      "size": [1, 1, 4],
+      "uv": [36, 20]
+     }
+    ]
+   },
+   {
+    "name": "root_c2",
+    "parent": "root_c",
+    "pivot": [0, 0, 2.5],
+    "rotation": [0, 0, -0.69813],
+    "cubes": [
+     {
+      "origin": [0, -0.5, -0.5],
+      "size": [2, 1, 1],
+      "uv": [32, 28]
+     }
+    ]
+   },
+   {
+    "name": "bubble_b",
+    "parent": "upper",
+    "pivot": [-2.5, -3.3, 2.5],
+    "rotation": [0, 0, 0],
+    "cubes": [
+     {
+      "origin": [-0.5, -0.6, -0.5],
+      "size": [1, 1, 1],
+      "uv": [38, 28]
+     }
+    ]
+   },
+   {
+    "name": "root_b",
+    "parent": "mid",
+    "pivot": [4, -1, 2.5],
+    "rotation": [0, 0, 0.61087],
+    "cubes": [
+     {
+      "origin": [0, -0.5, -0.5],
+      "size": [4, 1, 1],
+      "uv": [54, 26]
+     }
+    ]
+   },
+   {
+    "name": "bubble_a",
+    "parent": "mid",
+    "pivot": [4, -1.5, 0.5],
+    "rotation": [0, 0, 0],
+    "cubes": [
+     {
+      "origin": [-0.25, -1, -1],
+      "size": [1, 2, 2],
+      "uv": [26, 11]
+     }
+    ]
+   }
+  ],
+  "icon": ["lower", 0],
+  "floor": {
+   "scale": 0.65,
+   "offset": [0.362, -0.01, 0.996],
+   "yaw": 0
+  },
+  "wall": {
+   "scale": 0.65,
+   "offset": [-0.362, 4.09, 2.889],
+   "yaw": 180
+  }
+ },
+ "diorama": {
+  "block": "soulscraft:bog_slime_trophy",
+  "clip": "trophy",
+  "ticks": 80,
+  "loop": true,
+  "flags": [],
+  "scale": 0.6772,
+  "offset": [-0.904, 3.807, -1.557],
+  "yaw": 190,
+  "light": 3,
+  "text": "Топь: густая грязь с омутами, кувшинки, рогоз, полузатонувшее бревно со светящимися грибами, корни",
+  "plaque": {
+   "from": [4, 0.75, 0],
+   "to": [12, 2.25, 0.5]
+  },
+  "particles": [
+   {
+    "type": "soulscraft:mud_bubble",
+    "every": 9,
+    "box": {
+     "from": [4.5, 5.2, 1],
+     "to": [11, 5.4, 9]
+    }
+   },
+   {
+    "type": "soulscraft:mist",
+    "every": 7,
+    "box": {
+     "from": [1, 5.2, 1],
+     "to": [15, 6, 15]
+    }
+   },
+   {
+    "type": "soulscraft:spore",
+    "every": 20,
+    "box": {
+     "from": [5, 7, 10],
+     "to": [15, 10, 15]
+    }
+   }
+  ]
+ }
+}

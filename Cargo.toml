@@ -1,0 +1,5 @@
+# Workspace for running the tests of the mod's own crate. The engine stages the crate itself
+# (mod/soulscraft/horizon-mixin.toml, [[crate]]) and takes versions from Horizon's Cargo.lock.
+[workspace]
+resolver = "3"
+members = ["mod/soulscraft/rules"]

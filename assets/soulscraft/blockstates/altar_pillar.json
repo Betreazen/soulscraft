@@ -1,0 +1,16 @@
+{
+ "variants": {
+  "on_slab=false,part=bottom": {
+   "model": "soulscraft:block/altar_pillar_bottom"
+  },
+  "on_slab=false,part=top": {
+   "model": "soulscraft:block/altar_pillar_top"
+  },
+  "on_slab=true,part=bottom": {
+   "model": "soulscraft:block/altar_pillar_bottom_on_slab"
+  },
+  "on_slab=true,part=top": {
+   "model": "soulscraft:block/altar_pillar_top_on_slab"
+  }
+ }
+}

@@ -1,0 +1,19 @@
+{
+ "variants": {
+  "facing=north": {
+   "model": "soulscraft:block/shrike_trophy"
+  },
+  "facing=east": {
+   "model": "soulscraft:block/shrike_trophy",
+   "y": 90
+  },
+  "facing=south": {
+   "model": "soulscraft:block/shrike_trophy",
+   "y": 180
+  },
+  "facing=west": {
+   "model": "soulscraft:block/shrike_trophy",
+   "y": 270
+  }
+ }
+}

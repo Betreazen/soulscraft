@@ -1,0 +1,46 @@
+round 10 checks, 2026-11-14T19:41:47
+== diorama particles
+  soulscraft: trophy particles dioramas=7 sent=281 tick=18800
+  soulscraft: trophy particles dioramas=7 sent=378 tick=19000
+  soulscraft: trophy particles dioramas=7 sent=364 tick=19200
+== placed diorama
+  {"block":"soulscraft:shrike_trophy","loaded":true,"pos":[-492,101,492],"state":"soulscraft:shrike_trophy[facing=south]"}
+== wall head by the bot
+  soulscraft: trophy wall head=soulscraft:brute_head_mount[facing=south] at=-492,102,489 by=sc_a{"block":"soulscraft:brute_head_mount","loaded":true,"pos":[-492,102,489],"state":"soulscraft:brute_head_mount[facing=south]"}
+== floor head by the bot (looking north-west, yaw 135)
+  {"block":"soulscraft:brute_head_stand","loaded":true,"pos":[-490,101,491],"state":"soulscraft:brute_head_stand[rotation=14]"}
+== menu screen
+  {"buttons":[],"screen":"mod"}
+== xp_revenant_melee target
+  {"entities":[{"baby":false,"distance":2.987804191690202,"health":57.0,"hurt_time":0,"id":96,"kind":"mob","pos":[-499.5,101.0,498.5],"type":"soulscraft:revenant"}]}
+  
+== xp_revenant_melee bar
+  {"actionbar":"+16.8 опыта · Страж 1","chat":["Your game mode has been updated to Survival Mode"],"order":"newest first","styled":[{"translate":"gameMode.changed","with":[{"translate":"gameMode.survival"}]}],"subtitle":null,"title":null}
+
+== xp_revenant_melee log
+  
+== xp_revenant_arrow target
+  {"entities":[{"baby":false,"distance":6.0,"health":1.0,"hurt_time":2,"id":100,"kind":"mob","pos":[-499.5,101.0,494.5],"type":"soulscraft:revenant"}]}
+  
+== xp_revenant_arrow bar
+  {"actionbar":"+29.0 опыта · Стрелок 1","chat":["sc_a has made the advancement [Take Aim]","Your game mode has been updated to Survival Mode"],"order":"newest first","styled":[{"translate":"chat.type.advancement.task","with":[{"click_event":{"action":"suggest_command","command":"/tell sc_a "},"hover_event":{"action":"show_entity","id":"minecraft:player","name":"sc_a","uuid":"9ac0fc96-56ec-361e-b7b3-5581668bc9d3"},"insertion":"sc_a","text":"sc_a"},{"color":"green","translate":"chat.square_brackets","with":[{"hover_event":{"action":"show_text","value":{"extra":[{"color":"green","translate":"advancements.adventure.shoot_arrow.title"},{"color":"green","text":"\n"},{"color":"green","translate":"advancements.adventure.shoot_arrow.description"}],"text":""}},"translate":"advancements.adventure.shoot_arrow.title"}]}]},{"translate":"gameMode.changed","with":[{"translate":"gameMode.survival"}]}],"subtitle":null,"title":null}
+
+== xp_revenant_arrow log
+  soulscraft: death mob=revenant id=100 tick=20439
+== xp_slime_size1 target
+  {"entities":[{"baby":false,"distance":2.0,"health":1.0,"hurt_time":0,"id":105,"kind":"mob","pos":[-499.5,101.0,498.5],"type":"soulscraft:bog_slime"},{"distance":4.883194837255977,"kind":"orb","pos":[-499.15527784200424,101.0,495.6289879437236],"type":"minecraft:experience_orb","value":1,"velocity":[-0.0013824602515345426,0.0,0.019409599802320827]}]}
+  
+== xp_slime_size1 bar
+  {"actionbar":null,"chat":["sc_a has made the advancement [Take Aim]","Your game mode has been updated to Survival Mode"],"order":"newest first","styled":[{"translate":"chat.type.advancement.task","with":[{"click_event":{"action":"suggest_command","command":"/tell sc_a "},"hover_event":{"action":"show_entity","id":"minecraft:player","name":"sc_a","uuid":"9ac0fc96-56ec-361e-b7b3-5581668bc9d3"},"insertion":"sc_a","text":"sc_a"},{"color":"green","translate":"chat.square_brackets","with":[{"hover_event":{"action":"show_text","value":{"extra":[{"color":"green","translate":"advancements.adventure.shoot_arrow.title"},{"color":"green","text":"\n"},{"color":"green","translate":"advancements.adventure.shoot_arrow.description"}],"text":""}},"translate":"advancements.adventure.shoot_arrow.title"}]}]},{"translate":"gameMode.changed","with":[{"translate":"gameMode.survival"}]}],"subtitle":null,"title":null}
+
+== xp_slime_size1 log
+  
+== boost on (60 s)
+  soulscraft: boost spawn passes=+5400 lists=4061 us=35484.7 tick=20600
+  soulscraft: boost spawn passes=+5400 lists=4220 us=29347.1 tick=20800
+  soulscraft: boost spawn passes=+5400 lists=3838 us=27639.4 tick=21000
+  soulscraft: boost spawn passes=+5400 lists=4045 us=28466.2 tick=21200
+  soulscraft: boost spawn passes=+5400 lists=4094 us=26025.2 tick=21400
+  soulscraft: boost spawn passes=+5400 lists=4183 us=28247.0 tick=21600
+== menu with the boost line
+  {"buttons":[],"screen":"mod"}

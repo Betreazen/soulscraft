@@ -1,0 +1,16 @@
+{
+ "variants": {
+  "lit=false,on_slab=false": {
+   "model": "soulscraft:block/altar_brazier"
+  },
+  "lit=false,on_slab=true": {
+   "model": "soulscraft:block/altar_brazier_on_slab"
+  },
+  "lit=true,on_slab=false": {
+   "model": "soulscraft:block/altar_brazier_lit"
+  },
+  "lit=true,on_slab=true": {
+   "model": "soulscraft:block/altar_brazier_lit_on_slab"
+  }
+ }
+}

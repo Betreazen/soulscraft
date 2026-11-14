@@ -1,0 +1,195 @@
+[16:37:56] soulscraft: 7 mobs from the built-in mobs.json
+[16:37:56] soulscraft: self-test started
+[16:37:56] soulscraft: selftest start spawn_revenant tick=110
+[16:37:56] soulscraft: adopt mob=revenant id=1 p=0.00 size=0 fresh=true health=30.0 tick=111
+[16:37:56] soulscraft: selftest PASS spawn_revenant
+[16:37:56] soulscraft: selftest start p_scaling tick=112
+[16:37:56] soulscraft: adopt mob=revenant id=3 p=1.00 size=0 fresh=true health=30.0 tick=113
+[16:37:56] soulscraft: selftest PASS p_scaling
+[16:37:56] soulscraft: selftest start timing_revenant_thrust tick=114
+[16:37:56] soulscraft: adopt mob=revenant id=5 p=0.00 size=0 fresh=true health=30.0 tick=115
+[16:37:56] soulscraft: phase mob=revenant id=5 attack=thrust phase=windup t=0 tick=116
+[16:37:56] soulscraft: phase mob=revenant id=5 attack=thrust phase=hit t=6 tick=122
+[16:37:56] soulscraft: strike mob=revenant id=5 attack=thrust t=6 tick=122 hit=true dmg=2.80 target=mob6
+[16:37:56] soulscraft: phase mob=revenant id=5 attack=thrust phase=recover t=8 tick=124
+[16:37:56] soulscraft: phase mob=revenant id=5 attack=thrust phase=end t=18 tick=134
+[16:37:56] soulscraft: mode mob=revenant id=5 mode=pause tick=134
+[16:37:56] soulscraft: selftest timing mob=revenant attack=thrust end=18 strikes=1 lost=2.80 blow=2.80
+[16:37:56] soulscraft: selftest PASS timing_revenant_thrust
+[16:37:56] soulscraft: selftest start timing_revenant_slash tick=135
+[16:37:56] soulscraft: adopt mob=revenant id=7 p=0.00 size=0 fresh=true health=30.0 tick=136
+[16:37:56] soulscraft: phase mob=revenant id=7 attack=slash phase=windup t=0 tick=137
+[16:37:56] soulscraft: phase mob=revenant id=7 attack=slash phase=hit t=10 tick=147
+[16:37:56] soulscraft: strike mob=revenant id=7 attack=slash t=10 tick=147 hit=true dmg=4.00 target=mob8
+[16:37:56] soulscraft: phase mob=revenant id=7 attack=slash phase=recover t=12 tick=149
+[16:37:56] soulscraft: phase mob=revenant id=7 attack=slash phase=end t=24 tick=161
+[16:37:56] soulscraft: mode mob=revenant id=7 mode=pause tick=161
+[16:37:56] soulscraft: selftest timing mob=revenant attack=slash end=24 strikes=1 lost=4.00 blow=4.00
+[16:37:56] soulscraft: selftest PASS timing_revenant_slash
+[16:37:56] soulscraft: selftest start timing_revenant_overhead tick=162
+[16:37:56] soulscraft: adopt mob=revenant id=9 p=0.00 size=0 fresh=true health=30.0 tick=163
+[16:37:56] soulscraft: phase mob=revenant id=9 attack=overhead phase=windup t=0 tick=164
+[16:37:56] soulscraft: phase mob=revenant id=9 attack=overhead phase=hold t=10 tick=174
+[16:37:56] soulscraft: phase mob=revenant id=9 attack=overhead phase=hit t=18 tick=182
+[16:37:56] soulscraft: strike mob=revenant id=9 attack=overhead t=18 tick=182 hit=true dmg=5.20 target=mob10
+[16:37:56] soulscraft: phase mob=revenant id=9 attack=overhead phase=recover t=20 tick=184
+[16:37:56] soulscraft: phase mob=revenant id=9 attack=overhead phase=end t=36 tick=200
+[16:37:56] soulscraft: mode mob=revenant id=9 mode=pause tick=200
+[16:37:56] soulscraft: selftest timing mob=revenant attack=overhead end=36 strikes=1 lost=5.20 blow=5.20
+[16:37:56] soulscraft: selftest PASS timing_revenant_overhead
+[16:37:56] soulscraft: selftest start timing_revenant_shield_bash tick=201
+[16:37:56] soulscraft: adopt mob=revenant id=11 p=0.00 size=0 fresh=true health=30.0 tick=202
+[16:37:56] soulscraft: phase mob=revenant id=11 attack=shield_bash phase=windup t=0 tick=203
+[16:37:56] soulscraft: phase mob=revenant id=11 attack=shield_bash phase=hit t=8 tick=211
+[16:37:56] soulscraft: strike mob=revenant id=11 attack=shield_bash t=8 tick=211 hit=true dmg=2.00 target=mob12
+[16:37:56] soulscraft: phase mob=revenant id=11 attack=shield_bash phase=recover t=10 tick=213
+[16:37:56] soulscraft: phase mob=revenant id=11 attack=shield_bash phase=end t=18 tick=221
+[16:37:56] soulscraft: mode mob=revenant id=11 mode=pause tick=221
+[16:37:56] soulscraft: selftest timing mob=revenant attack=shield_bash end=18 strikes=1 lost=2.00 blow=2.00
+[16:37:56] soulscraft: selftest PASS timing_revenant_shield_bash
+[16:37:56] soulscraft: selftest start timing_stalker_double_slash tick=222
+[16:37:56] soulscraft: adopt mob=stalker id=13 p=0.00 size=0 fresh=true health=22.0 tick=223
+[16:37:56] soulscraft: phase mob=stalker id=13 attack=double_slash phase=windup t=0 tick=224
+[16:37:56] soulscraft: phase mob=stalker id=13 attack=double_slash phase=hit t=6 tick=230
+[16:37:56] soulscraft: strike mob=stalker id=13 attack=double_slash t=6 tick=230 hit=true dmg=1.20 target=mob14
+[16:37:56] soulscraft: strike mob=stalker id=13 attack=double_slash t=9 tick=233 hit=true dmg=1.20 target=mob14
+[16:37:56] soulscraft: phase mob=stalker id=13 attack=double_slash phase=recover t=10 tick=234
+[16:37:56] soulscraft: phase mob=stalker id=13 attack=double_slash phase=end t=18 tick=242
+[16:37:56] soulscraft: mode mob=stalker id=13 mode=backoff tick=242
+[16:37:56] soulscraft: selftest timing mob=stalker attack=double_slash end=18 strikes=2 lost=2.40 blow=1.20
+[16:37:56] soulscraft: selftest PASS timing_stalker_double_slash
+[16:37:56] soulscraft: selftest start timing_stalker_lunge tick=243
+[16:37:56] soulscraft: adopt mob=stalker id=15 p=0.00 size=0 fresh=true health=22.0 tick=244
+[16:37:56] soulscraft: phase mob=stalker id=15 attack=lunge phase=windup t=0 tick=245
+[16:37:56] soulscraft: phase mob=stalker id=15 attack=lunge phase=hit t=12 tick=257
+[16:37:56] soulscraft: strike mob=stalker id=15 attack=lunge t=12 tick=257 hit=true dmg=2.40 target=mob16
+[16:37:56] soulscraft: phase mob=stalker id=15 attack=lunge phase=recover t=18 tick=263
+[16:37:57] soulscraft: phase mob=stalker id=15 attack=lunge phase=end t=33 tick=278
+[16:37:57] soulscraft: mode mob=stalker id=15 mode=backoff tick=278
+[16:37:57] soulscraft: selftest timing mob=stalker attack=lunge end=33 strikes=1 lost=2.40 blow=2.40
+[16:37:57] soulscraft: selftest PASS timing_stalker_lunge
+[16:37:57] soulscraft: selftest start timing_marksman_aimed_shot tick=279
+[16:37:57] soulscraft: adopt mob=marksman id=17 p=0.00 size=0 fresh=true health=20.0 tick=280
+[16:37:57] soulscraft: phase mob=marksman id=17 attack=aimed_shot phase=windup t=0 tick=281
+[16:37:57] soulscraft: phase mob=marksman id=17 attack=aimed_shot phase=hit t=16 tick=297
+[16:37:57] soulscraft: strike mob=marksman id=17 attack=aimed_shot t=16 tick=297 hit=false dmg=7.00 target=mob18
+[16:37:57] soulscraft: phase mob=marksman id=17 attack=aimed_shot phase=recover t=18 tick=299
+[16:37:57] soulscraft: phase mob=marksman id=17 attack=aimed_shot phase=end t=48 tick=329
+[16:37:57] soulscraft: mode mob=marksman id=17 mode=pause tick=329
+[16:37:57] soulscraft: selftest timing mob=marksman attack=aimed_shot end=48 strikes=1 lost=7.00 blow=7.00
+[16:37:57] soulscraft: selftest PASS timing_marksman_aimed_shot
+[16:37:57] soulscraft: selftest start timing_marksman_butt_strike tick=330
+[16:37:57] soulscraft: adopt mob=marksman id=20 p=0.00 size=0 fresh=true health=20.0 tick=331
+[16:37:57] soulscraft: phase mob=marksman id=20 attack=butt_strike phase=windup t=0 tick=332
+[16:37:57] soulscraft: phase mob=marksman id=20 attack=butt_strike phase=hit t=8 tick=340
+[16:37:57] soulscraft: strike mob=marksman id=20 attack=butt_strike t=8 tick=340 hit=true dmg=3.00 target=mob21
+[16:37:57] soulscraft: phase mob=marksman id=20 attack=butt_strike phase=recover t=10 tick=342
+[16:37:57] soulscraft: phase mob=marksman id=20 attack=butt_strike phase=end t=20 tick=352
+[16:37:57] soulscraft: mode mob=marksman id=20 mode=backoff tick=352
+[16:37:57] soulscraft: selftest timing mob=marksman attack=butt_strike end=20 strikes=1 lost=3.00 blow=3.00
+[16:37:57] soulscraft: selftest PASS timing_marksman_butt_strike
+[16:37:57] soulscraft: selftest start timing_brute_wide_swing tick=353
+[16:37:57] soulscraft: adopt mob=brute id=22 p=0.00 size=0 fresh=true health=60.0 tick=354
+[16:37:57] soulscraft: phase mob=brute id=22 attack=wide_swing phase=windup t=0 tick=355
+[16:37:57] soulscraft: phase mob=brute id=22 attack=wide_swing phase=hit t=12 tick=367
+[16:37:57] soulscraft: strike mob=brute id=22 attack=wide_swing t=12 tick=367 hit=true dmg=8.00 target=mob23
+[16:37:57] soulscraft: phase mob=brute id=22 attack=wide_swing phase=recover t=14 tick=369
+[16:37:57] soulscraft: phase mob=brute id=22 attack=wide_swing phase=end t=28 tick=383
+[16:37:57] soulscraft: mode mob=brute id=22 mode=pause tick=383
+[16:37:57] soulscraft: selftest timing mob=brute attack=wide_swing end=28 strikes=1 lost=8.00 blow=8.00
+[16:37:57] soulscraft: selftest PASS timing_brute_wide_swing
+[16:37:57] soulscraft: selftest start timing_brute_overhead_wave tick=384
+[16:37:57] soulscraft: adopt mob=brute id=24 p=0.00 size=0 fresh=true health=60.0 tick=385
+[16:37:57] soulscraft: phase mob=brute id=24 attack=overhead_wave phase=windup t=0 tick=386
+[16:37:57] soulscraft: phase mob=brute id=24 attack=overhead_wave phase=hit t=16 tick=402
+[16:37:57] soulscraft: strike mob=brute id=24 attack=overhead_wave t=16 tick=402 hit=true dmg=12.80 target=mob25
+[16:37:57] soulscraft: phase mob=brute id=24 attack=overhead_wave phase=recover t=18 tick=404
+[16:37:57] soulscraft: phase mob=brute id=24 attack=overhead_wave phase=end t=38 tick=424
+[16:37:57] soulscraft: mode mob=brute id=24 mode=pause tick=424
+[16:37:57] soulscraft: selftest timing mob=brute attack=overhead_wave end=38 strikes=1 lost=12.80 blow=12.80
+[16:37:57] soulscraft: selftest PASS timing_brute_overhead_wave
+[16:37:57] soulscraft: selftest start timing_brute_charge tick=425
+[16:37:57] soulscraft: adopt mob=brute id=26 p=0.00 size=0 fresh=true health=60.0 tick=426
+[16:37:57] soulscraft: phase mob=brute id=26 attack=charge phase=windup t=0 tick=427
+[16:37:57] soulscraft: phase mob=brute id=26 attack=charge phase=hit t=14 tick=441
+[16:37:57] soulscraft: strike mob=brute id=26 attack=charge t=14 tick=441 hit=true dmg=11.20 target=mob27
+[16:37:57] soulscraft: phase mob=brute id=26 attack=charge phase=recover t=22 tick=449
+[16:37:57] soulscraft: phase mob=brute id=26 attack=charge phase=end t=32 tick=459
+[16:37:57] soulscraft: mode mob=brute id=26 mode=pause tick=459
+[16:37:57] soulscraft: selftest timing mob=brute attack=charge end=32 strikes=1 lost=11.20 blow=11.20
+[16:37:57] soulscraft: selftest PASS timing_brute_charge
+[16:37:57] soulscraft: selftest start timing_shrike_dive tick=460
+[16:37:57] soulscraft: adopt mob=shrike id=28 p=0.00 size=0 fresh=true health=14.0 tick=461
+[16:37:57] soulscraft: phase mob=shrike id=28 attack=dive phase=windup t=0 tick=462
+[16:37:57] soulscraft: phase mob=shrike id=28 attack=dive phase=hit t=14 tick=476
+[16:37:57] soulscraft: strike mob=shrike id=28 attack=dive t=14 tick=476 hit=true dmg=4.80 target=mob29
+[16:37:57] soulscraft: phase mob=shrike id=28 attack=dive phase=recover t=16 tick=478
+[16:37:57] soulscraft: phase mob=shrike id=28 attack=dive phase=end t=46 tick=508
+[16:37:57] soulscraft: mode mob=shrike id=28 mode=pause tick=508
+[16:37:57] soulscraft: selftest timing mob=shrike attack=dive end=46 strikes=1 lost=4.80 blow=4.80
+[16:37:57] soulscraft: selftest PASS timing_shrike_dive
+[16:37:57] soulscraft: selftest start timing_lurker_ambush tick=509
+[16:37:57] soulscraft: adopt mob=lurker id=30 p=0.00 size=0 fresh=true health=30.0 tick=510
+[16:37:57] soulscraft: phase mob=lurker id=30 attack=ambush phase=windup t=0 tick=511
+[16:37:57] soulscraft: phase mob=lurker id=30 attack=ambush phase=hit t=10 tick=521
+[16:37:57] soulscraft: strike mob=lurker id=30 attack=ambush t=10 tick=521 hit=true dmg=6.50 target=mob31
+[16:37:57] soulscraft: phase mob=lurker id=30 attack=ambush phase=recover t=16 tick=527
+[16:37:57] soulscraft: phase mob=lurker id=30 attack=ambush phase=end t=36 tick=547
+[16:37:57] soulscraft: mode mob=lurker id=30 mode=backoff tick=547
+[16:37:57] soulscraft: selftest timing mob=lurker attack=ambush end=36 strikes=1 lost=6.50 blow=6.50
+[16:37:57] soulscraft: selftest PASS timing_lurker_ambush
+[16:37:57] soulscraft: selftest start timing_bog_slime_high_jump tick=548
+[16:37:57] soulscraft: adopt mob=bog_slime id=32 p=0.00 size=4 fresh=true health=16.0 tick=549
+[16:37:57] soulscraft: phase mob=bog_slime id=32 attack=high_jump phase=windup t=0 tick=550
+[16:37:57] soulscraft: phase mob=bog_slime id=32 attack=high_jump phase=hit t=12 tick=562
+[16:37:57] soulscraft: phase mob=bog_slime id=32 attack=high_jump phase=recover t=14 tick=564
+[16:37:57] soulscraft: strike mob=bog_slime id=32 attack=high_jump t=28 tick=578 hit=true dmg=5.60 target=mob33
+[16:37:57] soulscraft: phase mob=bog_slime id=32 attack=high_jump phase=end t=29 tick=579
+[16:37:57] soulscraft: mode mob=bog_slime id=32 mode=pause tick=579
+[16:37:57] soulscraft: selftest timing mob=bog_slime attack=high_jump end=29 strikes=1 lost=5.60 blow=5.60
+[16:37:57] soulscraft: selftest PASS timing_bog_slime_high_jump
+[16:37:57] soulscraft: selftest start miss_when_away tick=580
+[16:37:57] soulscraft: adopt mob=revenant id=34 p=0.00 size=0 fresh=true health=30.0 tick=581
+[16:37:57] soulscraft: phase mob=revenant id=34 attack=overhead phase=windup t=0 tick=582
+[16:37:57] soulscraft: phase mob=revenant id=34 attack=overhead phase=hold t=10 tick=592
+[16:37:57] soulscraft: phase mob=revenant id=34 attack=overhead phase=hit t=18 tick=600
+[16:37:57] soulscraft: strike mob=revenant id=34 attack=overhead t=18 tick=600 hit=false dmg=5.20 target=mob35
+[16:37:57] soulscraft: selftest PASS miss_when_away
+[16:37:57] soulscraft: selftest start backoff_after_series tick=601
+[16:37:57] soulscraft: adopt mob=revenant id=36 p=0.00 size=0 fresh=true health=30.0 tick=602
+[16:37:57] soulscraft: phase mob=revenant id=36 attack=thrust phase=windup t=0 tick=622
+[16:37:57] soulscraft: phase mob=revenant id=36 attack=thrust phase=hit t=6 tick=628
+[16:37:57] soulscraft: strike mob=revenant id=36 attack=thrust t=6 tick=628 hit=true dmg=2.80 target=mob37
+[16:37:57] soulscraft: phase mob=revenant id=36 attack=thrust phase=recover t=8 tick=630
+[16:37:57] soulscraft: phase mob=revenant id=36 attack=thrust phase=end t=18 tick=640
+[16:37:57] soulscraft: mode mob=revenant id=36 mode=pause tick=640
+[16:37:57] soulscraft: mode mob=revenant id=36 mode=engage tick=646
+[16:37:57] soulscraft: phase mob=revenant id=36 attack=slash phase=windup t=0 tick=662
+[16:37:57] soulscraft: phase mob=revenant id=36 attack=slash phase=hit t=10 tick=672
+[16:37:57] soulscraft: strike mob=revenant id=36 attack=slash t=10 tick=672 hit=true dmg=4.00 target=mob37
+[16:37:57] soulscraft: phase mob=revenant id=36 attack=slash phase=recover t=12 tick=674
+[16:37:57] soulscraft: phase mob=revenant id=36 attack=slash phase=end t=24 tick=686
+[16:37:57] soulscraft: mode mob=revenant id=36 mode=backoff tick=686
+[16:37:57] soulscraft: selftest PASS backoff_after_series
+[16:37:57] soulscraft: selftest start shield_wait tick=687
+[16:37:57] soulscraft: adopt mob=revenant id=38 p=0.00 size=0 fresh=true health=30.0 tick=688
+[16:37:57] soulscraft: mode mob=revenant id=38 mode=circle tick=708
+[16:37:57] soulscraft: mode mob=revenant id=38 mode=engage tick=768
+[16:37:57] soulscraft: phase mob=revenant id=38 attack=shield_bash phase=windup t=0 tick=768
+[16:37:57] soulscraft: selftest PASS shield_wait
+[16:37:57] soulscraft: selftest start reload_numbers tick=769
+[16:37:57] soulscraft: adopt mob=revenant id=40 p=0.00 size=0 fresh=true health=30.0 tick=770
+[16:37:57] soulscraft: phase mob=revenant id=40 attack=overhead phase=windup t=0 tick=771
+[16:37:57] soulscraft: phase mob=revenant id=40 attack=overhead phase=hold t=14 tick=785
+[16:37:57] soulscraft: phase mob=revenant id=40 attack=overhead phase=hit t=22 tick=793
+[16:37:57] soulscraft: strike mob=revenant id=40 attack=overhead t=22 tick=793 hit=true dmg=5.20 target=mob41
+[16:37:57] soulscraft: selftest PASS reload_numbers
+[16:37:57] soulscraft: selftest start survive_unload tick=794
+[16:37:57] soulscraft: adopt mob=revenant id=42 p=0.60 size=0 fresh=true health=30.0 tick=795
+[16:37:57] soulscraft: adopt mob=revenant id=43 p=0.60 size=0 fresh=false health=40.0 tick=804
+[16:37:57] soulscraft: selftest survive unloaded after 7 ticks, back after 1 ticks: health 40/46.20000076293945
+[16:37:57] soulscraft: selftest PASS survive_unload
+[16:37:57] soulscraft: selftest start bleeding_ticks tick=805
+[16:37:57] soulscraft: selftest PASS bleeding_ticks
+[16:37:58] soulscraft: selftest done passed=22 failed=0
+[16:37:58] soulscraft: death mob=revenant id=43 tick=878

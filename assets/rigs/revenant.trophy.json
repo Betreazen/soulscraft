@@ -1,0 +1,88 @@
+{
+ "format": "soulscraft-trophy",
+ "version": 2,
+ "id": "revenant",
+ "name": "Латник-мертвец",
+ "rig": "soulscraft:revenant",
+ "frame": "block px from the bottom centre, +x east, +y up, +z south; chain: translate(0.5, 0, 0.5), rotate_about(y, turn), translate(offset / 16), rotate_about(y, yaw), scale(scale), scale(1, -1, -1), translate(0, -1.501, 0), parts at the pose; turn: floor head -22.5 * rotation, wall head and diorama -facing_y",
+ "head": {
+  "texture": {
+   "sprite": "soulscraft:entity/revenant",
+   "width": 64,
+   "height": 64
+  },
+  "parts": [
+   {
+    "name": "head",
+    "parent": null,
+    "pivot": [0, 0, 0],
+    "rotation": [0, 0, 0],
+    "cubes": [
+     {
+      "origin": [-4, -9, -4],
+      "size": [8, 9, 8],
+      "uv": [0, 0],
+      "inflate": 0.5
+     },
+     {
+      "origin": [-0.5, -10, -4],
+      "size": [1, 1, 8],
+      "uv": [0, 41]
+     },
+     {
+      "origin": [-3, -6, -4.6],
+      "size": [6, 1, 0],
+      "uv": [50, 14],
+      "glow": true,
+      "faces": ["front"]
+     }
+    ]
+   }
+  ],
+  "icon": ["head", 0],
+  "floor": {
+   "scale": 0.9,
+   "offset": [0, -21.164, -0.045],
+   "yaw": 0
+  },
+  "wall": {
+   "scale": 0.9,
+   "offset": [0, -17.889, 3.95],
+   "yaw": 180
+  }
+ },
+ "diorama": {
+  "block": "soulscraft:revenant_trophy",
+  "clip": "trophy",
+  "ticks": 80,
+  "loop": true,
+  "flags": [],
+  "scale": 0.2912,
+  "offset": [-0.712, 4.165, -1.356],
+  "yaw": 160,
+  "light": 4,
+  "text": "Кладбище ночью: могила с плитой, свечи с огнём душ, сломанный меч в земле, череп",
+  "plaque": {
+   "from": [4, 0.75, 0],
+   "to": [12, 2.25, 0.5]
+  },
+  "particles": [
+   {
+    "type": "soulscraft:mist",
+    "every": 6,
+    "box": {
+     "from": [1.5, 4.2, 1.5],
+     "to": [14.5, 5, 14.5]
+    }
+   },
+   {
+    "type": "soulscraft:wisp",
+    "every": 12,
+    "box": {
+     "from": [1.5, 6.5, 2],
+     "to": [7, 7.5, 11.5]
+    }
+   }
+  ]
+ }
+}

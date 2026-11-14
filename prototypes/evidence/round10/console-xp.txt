@@ -1,0 +1,38 @@
+round 10 checks, 2026-11-14T19:45:58
+== xp_revenant_melee target
+  {"entities":[{"baby":false,"distance":2.987804191690202,"health":1.0,"hurt_time":1,"id":141,"kind":"mob","pos":[-499.5,101.0,498.5],"type":"soulscraft:revenant"}]}
+  
+== xp_revenant_melee tags
+  Revenant has the following entity data: ["soulscraft.p=1.00", "pct.xp145"]
+== xp_revenant_melee attack
+  {"alive":false,"health":0.0,"health_before":1.0,"hit":true,"ok":true,"target":141}
+== xp_revenant_melee bar
+  {"actionbar":"+29.0 опыта · Воин 1","chat":["Your game mode has been updated to Survival Mode"],"order":"newest first","styled":[{"translate":"gameMode.changed","with":[{"translate":"gameMode.survival"}]}],"subtitle":null,"title":null}
+
+== xp_revenant_melee log
+  System chat: Revenant has the following entity data: ["soulscraft.p=1.00", "pct.xp145"]
+  soulscraft: death mob=revenant id=141 tick=23206
+  soulscraft: pct player=sc_a summary melee 1/75 ranks 0/69, archery 2/75 ranks 0/68, defense 2/75 ranks 0/66 tick=23220
+== xp_revenant_arrow target
+  {"entities":[{"baby":false,"distance":6.0,"health":1.0,"hurt_time":2,"id":144,"kind":"mob","pos":[-499.5,101.0,494.5],"type":"soulscraft:revenant"}]}
+  
+== xp_revenant_arrow tags
+  Revenant has the following entity data: ["soulscraft.p=1.00", "pct.xp145"]
+== xp_revenant_arrow bar
+  {"actionbar":null,"chat":["Your game mode has been updated to Survival Mode"],"order":"newest first","styled":[{"translate":"gameMode.changed","with":[{"translate":"gameMode.survival"}]}],"subtitle":null,"title":null}
+
+== xp_revenant_arrow log
+  System chat: Revenant has the following entity data: ["soulscraft.p=1.00", "pct.xp145"]
+== xp_slime_size1 target
+  {"entities":[{"baby":false,"distance":2.0,"health":1.0,"hurt_time":0,"id":149,"kind":"mob","pos":[-499.5,101.0,498.5],"type":"soulscraft:bog_slime"}]}
+  
+== xp_slime_size1 tags
+  Bog Slime has the following entity data: ["soulscraft.p=0.00", "soulscraft.size=1", "pct.xp6"]
+== xp_slime_size1 attack
+  {"alive":false,"health":0.0,"health_before":1.0,"hit":true,"ok":true,"target":149}
+== xp_slime_size1 bar
+  {"actionbar":"+1.2 опыта · Воин 1","chat":["Your game mode has been updated to Survival Mode"],"order":"newest first","styled":[{"translate":"gameMode.changed","with":[{"translate":"gameMode.survival"}]}],"subtitle":null,"title":null}
+
+== xp_slime_size1 log
+  System chat: Bog Slime has the following entity data: ["soulscraft.p=0.00", "soulscraft.size=1", "pct.xp6"]
+  soulscraft: death mob=bog_slime id=149 tick=23396
