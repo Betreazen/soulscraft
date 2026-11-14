@@ -220,6 +220,8 @@
 | --- | --- |
 | `stages[]` | `id`, `n` (0..4), `name`, `kills` и `elite_kills` (убийств для ступени, `null` — не встречен, 0 — встречен), `when`, `opens` |
 | `credit` | кому засчитывается убийство: `radius_blocks`, `window_seconds`, `spawner_weight` |
-| `altar_entries[]` | записи алтаря и ивентов: `id`, `name`, `when` |
+| `altar_entries[]` | записи алтаря и ивентов: `id`, `name`, `when`; `text` — что книга пишет на открытой записи (основа, знамёна, оборона алтаря) |
 | `sections` | разделы книги |
 | `action_bar` | сообщение над панелью предметов при новой ступени: `{mob}`, `{stage}` |
+
+Мод берёт `book.json` вкомпилированным в крейт (копия `mod/soulscraft/rules/data/book.json` от `sync.ps1`), как `mobs.json`. Записи раздела «Враги» — все мобы `mobs.json`: `mobs` и строки `vanilla.groups` (одна запись на строку со всеми её `types`); новый моб в данных получает запись без кода. Страница берёт из моба `name`, `role`, `look`, `spawn`, `stats`, `attacks` (`name`, `clip`, фазы, `tell`), `behavior` (список — тактика), `loot`, `hitbox` (масштаб модели в окне), из `trophies.json` — шанс головы, из `events` — волны с этим мобом. Прогресс игрока мод хранит в его постоянных данных под ключом `soulscraft:book` ([../prototypes/p9-book.md](../prototypes/p9-book.md)).

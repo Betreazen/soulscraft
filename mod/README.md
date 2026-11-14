@@ -39,6 +39,9 @@ mod/
     selftest_turret.rs        совместные сценарии с турелями RustCraft (`run turret`)
     vanilla.rs                ванильные мобы (07-vanilla-mobs.md): принятие, рост Г2 на ванильной базе, метка PCT, Г4, ворота целей, приёмы
     selftest_vanilla.rs       сценарии ванильных мобов (`vanilla_`, `vtiming_`, `vskeleton_`; медленные — `run vslow`)
+    book.rs                   книга охотника на сервере: прогресс в данных игрока, засчитывание убийств, строка над панелью, `/sc book`
+    book_client.rs            окно книги: разделы, страницы, модель моба в клипах (`native_draw_scene`), шкалы фаз
+    selftest_book.rs          сценарии книги (`book_`) на площадке алтаря, големы вместо игроков
     hook_*.rs                 тонкие хелперы: одна строка, вызов модуля
 ```
 
@@ -65,6 +68,8 @@ mod/
 | `trophy` | файлы трофеев (`<моб>.trophy.json`, копии в `data/trophy/`), какой блок чей, поворот головы и диорамы при установке, коробки частиц по `facing`, частота частиц, фаза клипа фигурки |
 | `boost` | учащённый спавн: сектор и его смещение к алтарю, сила по уровню и знамёнам, лишние кандидаты-чанки, список спавна сектора, строка меню |
 | `vanilla` | `data/mobs.json` `vanilla`: группы, приёмы, сигналы замаха, проверки; мозг ванильного моба (`VBrain`): когда он берёт моба и что приказывает |
+| `book` | книга охотника: `data/book.json`, записи врагов из `mobs.json` (свои и `vanilla.groups`), прогресс игрока и его JSON, ступени (элитные быстрее), кому засчитать убийство, вес спавнера, отчёт турели `pct-machine kill`, что открывает предмет в руке, сообщение клиенту |
+| `book_page` | страницы книги по ступеням: строки, клипы, шкалы фаз атак; разделы «Алтарь» и «Ивенты» |
 
 ## Команды
 
@@ -135,6 +140,17 @@ cargo test                         # крейт rules, секунды (из ко
 | `spawn_hooks`, `RETURN` (по имени функции) | `game/natural_spawning.rs:457-459`, из `mobs/spawn_selection.rs:715, 1312` | истина в измерении с активным сектором: так спавн спрашивает `potential_spawns` без trait-мода | сама функция и есть ловушка: `!mods().is_empty()` |
 | `potential_spawns` (API 388) | `native_hooks.rs:6335-6356` из `natural_spawning.rs:460-472` | позиция монстров в секторе: монстры других биомов и мобы SoulsCraft, знамя рода поднимает веса своей группы | вызывается только при `spawn_hooks()`, его включает инъекция выше |
 
+Хуки четвёртой итерации (книга охотника, [../prototypes/p9-book.md](../prototypes/p9-book.md)):
+
+| Хук | Где вызывается (SRC/crates/horizon-client/src) | Что делает мод | Ловушка `mods().is_empty()` |
+| --- | --- | --- | --- |
+| `use_item` (API 13) | `game.rs:6971` | правый клик книгой: забирает клик, сервер шлёт игроку прогресс с «открыть» | нет |
+| `mob_death_canceled`, `HEAD` (по имени функции) | `game/creatures.rs:1585`, из `mob_died` до `:1626` | смерть моба книги: убийца из последнего урона и `last_hurt_by_player`, метка спавнера | именованный `living_death` за `mods().is_empty()` (`:1586`), поэтому инъекция в функцию |
+| `add_planned`, `RETURN` (по имени функции) | `game/spawner.rs:145` | id мобов спавнера (их же читает PCT) | — |
+| `perform_console_command` (тот же) | `game/native_server.rs:779` для `native_run_mod_command` | отчёт турели RustCraft `pct-machine kill` | нет |
+| `block_entity_submit` (тот же) | `game/native_scene.rs:155-166` из `native_draw_scene` | фигурка моба в окне книги (block entity `soulscraft:book_figure` на невидимом блоке сцены) | нет |
+| `tick`, `screen_render_post`, `screen_mouse_button_pressed_pre`, `net_from_server` (те же) | см. выше | окно книги (экран `soulscraft_book`) и сообщение `soulscraft:book` | нет |
+
 Trait-мод не нужен и в третьей итерации: `native_potential_spawns` молчит не из-за хука, а из-за одной функции `spawn_hooks`, и бандл сам возвращает из неё истину там, где стоит активный алтарь. Охраняемые хуки движка (40 мест в 20 файлах) остаются выключенными, как у PCT и RustCraft. Подробно и цена — [../prototypes/p4-spawn.md](../prototypes/p4-spawn.md).
 
 ## Как устроен моб
@@ -171,6 +187,8 @@ soulscraft: vadopt mob=minecraft:zombie id=40 group=zombie p=0.00 spawner=false 
 soulscraft: vphase mob=minecraft:zombie id=40 attack=lunge phase=hit t=10 tick=950
 soulscraft: vstrike mob=minecraft:zombie id=40 attack=lunge t=10 tick=950 hit=true target=sc_a
 soulscraft: vmode mob=minecraft:skeleton id=41 mode=retreat tick=960
+soulscraft: book credit mob=revenant id=12 players=["sc_a"] weight=1 how=kill
+soulscraft: book player=sc_a entry=revenant stage=Убит
 ```
 
 Их разбирает `prototypes/lib/log.ps1`.
