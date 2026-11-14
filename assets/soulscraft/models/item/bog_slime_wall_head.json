@@ -871,6 +871,16 @@
    "rotation": [75, 45, 0],
    "translation": [0, 2.5, 0],
    "scale": [0.3644, 0.3644, 0.3644]
+  },
+  "firstperson_righthand": {
+   "rotation": [0, 45, 0],
+   "translation": [0, 0, 0],
+   "scale": [0.3887, 0.3887, 0.3887]
+  },
+  "firstperson_lefthand": {
+   "rotation": [0, 225, 0],
+   "translation": [0, 0, 0],
+   "scale": [0.3887, 0.3887, 0.3887]
   }
  }
 }

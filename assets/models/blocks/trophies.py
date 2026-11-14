@@ -190,7 +190,11 @@ class HeadItem:
         ground, in a frame and in the hand (by its extent)."""
         f = min(1.0, 16.0 / self.extent)
         out = {}
-        for ctx, d in items.HELMET.items():
+        # First person: the helmets have none, so a held head would be drawn at its full size in
+        # the view; this is vanilla's block/block first-person display.
+        hands = {'firstperson_righthand': {'rotation': [0, 45, 0], 'translation': [0, 0, 0], 'scale': [0.4, 0.4, 0.4]},
+                 'firstperson_lefthand': {'rotation': [0, 225, 0], 'translation': [0, 0, 0], 'scale': [0.4, 0.4, 0.4]}}
+        for ctx, d in list(items.HELMET.items()) + list(hands.items()):
             if ctx == 'head':
                 out[ctx] = d
             else:

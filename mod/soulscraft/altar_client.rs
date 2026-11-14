@@ -30,6 +30,8 @@ const STALE: i64 = 40;
 const GHOST_SHOW: i64 = 600;
 const LINE: f32 = 11.0;
 const PANEL_W: f32 = 300.0;
+/// The widest the menu panel grows on a wide screen.
+const PANEL_MAX_W: f32 = 460.0;
 const BUTTON_H: f32 = 18.0;
 const LEFT: i32 = 0;
 
@@ -112,18 +114,25 @@ fn is_ours(game: &Game<'_>, screen: &NativeScreenView<'_>) -> bool {
 /// The panel and its three buttons, in GUI pixels: (panel, [boost on, boost off, ghost]).
 fn layout(screen: &NativeScreenView<'_>, lines: usize) -> ([f32; 4], [[f32; 4]; 3]) {
     let [x, y, w, h] = screen.rect;
+    let panel_w = panel_width(screen);
     let ph = 12.0 + lines as f32 * LINE + 8.0 + BUTTON_H + 10.0;
-    let px = x + (w - PANEL_W) / 2.0;
+    let px = x + (w - panel_w) / 2.0;
     let py = y + ((h - ph) / 2.0).max(4.0);
     let by = py + ph - BUTTON_H - 8.0;
-    let bw = (PANEL_W - 4.0 * 8.0) / 3.0;
+    let bw = (panel_w - 4.0 * 8.0) / 3.0;
     let b = |i: f32| [px + 8.0 + i * (bw + 8.0), by, bw, BUTTON_H];
-    ([px, py, PANEL_W, ph], [b(0.0), b(1.0), b(2.0)])
+    ([px, py, panel_w, ph], [b(0.0), b(1.0), b(2.0)])
+}
+
+/// The panel as wide as the screen allows, from PANEL_W up to PANEL_MAX_W, so a full altar's
+/// banner list wraps into few lines and the buttons stay on the screen.
+fn panel_width(screen: &NativeScreenView<'_>) -> f32 {
+    (screen.rect[2] - 16.0).clamp(PANEL_W, PANEL_MAX_W)
 }
 
 /// The menu's lines wrapped to the panel's text width (a long line, the spawn boost's, breaks).
-fn wrapped(game: &Game<'_>, menu: &view::Menu) -> Vec<String> {
-    view::wrap(&view::menu_lines(menu), PANEL_W - 16.0, |s| game.native_text_width(s))
+fn wrapped(game: &Game<'_>, screen: &NativeScreenView<'_>, menu: &view::Menu) -> Vec<String> {
+    view::wrap(&view::menu_lines(menu), panel_width(screen) - 16.0, |s| game.native_text_width(s))
 }
 
 fn inside(r: [f32; 4], at: [f32; 2]) -> bool {
@@ -136,7 +145,7 @@ pub(super) fn draw_screen(game: &Game<'_>, batch: &mut HudBatch, screen: &Native
         return;
     }
     let Some(menu) = client().menu.clone() else { return };
-    let lines = wrapped(game, &menu);
+    let lines = wrapped(game, screen, &menu);
     let (panel, buttons) = layout(screen, lines.len() + 1);
     game.native_fill(batch, panel, 0xE01A_1714);
     game.native_fill(batch, [panel[0], panel[1], panel[2], 1.0], 0xFF9C_F5E4);
@@ -162,7 +171,7 @@ pub(super) fn on_screen_press(game: &Game<'_>, screen: &NativeScreenView<'_>, bu
     }
     let mut c = client();
     let Some(menu) = c.menu.clone() else { return };
-    let (_, buttons) = layout(screen, wrapped(game, &menu).len() + 1);
+    let (_, buttons) = layout(screen, wrapped(game, screen, &menu).len() + 1);
     let Some(i) = buttons.iter().position(|b| inside(*b, screen.mouse)) else { return };
     *canceled = true;
     match i {
