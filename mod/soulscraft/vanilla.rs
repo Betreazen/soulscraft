@@ -486,13 +486,14 @@ fn tick_mob(
     if let Some(idx) = tick.cue {
         cue(game, dim, now, m, g, idx);
     }
-    // A cube in its windup stands still: what is left of its own hop along the ground stops.
+    // A cube in its windup stands still: what is left of its own hop stops, on the ground or in the
+    // air (its cue hop is straight up).
     let in_windup = || {
         let s = state();
         let run = s.mobs.get(&m.id).and_then(|v| v.brain.as_ref()?.attack(now));
         run.is_some_and(|(i, t)| g.attacks.get(i).is_some_and(|a| t < a.def.windup))
     };
-    let slide = g.behavior() == Behavior::Cube && m.on_ground && tick.launch.is_none() && in_windup();
+    let slide = g.behavior() == Behavior::Cube && tick.launch.is_none() && in_windup();
     drive(game, dim, now, m, &tick, slide);
     for strike in &tick.strikes {
         deal(game, dim, now, m, g, strike, target);
@@ -588,7 +589,7 @@ fn drive(game: &mut Game<'_>, dim: &str, now: u64, m: &Seen, tick: &VTick, slide
 /// Holds a mob where it is for this tick: its path ends and its move control waits (a vanilla goal
 /// that ran before the gate took its slot may have set both; the gate holds from the next full
 /// goal tick). Each tick, because vanilla's goals of the mob may still be ticking this one. `slide`
-/// also stops what is left of a cube's own hop along the ground.
+/// also stops what is left of a cube's own hop along the ground and in the air.
 fn stand(game: &mut Game<'_>, dim: &str, id: u32, slide: bool) {
     game.native_mob_stop(dim, id);
     let Some(m) = game.mobs.iter_mut().find(|m| m.id == id) else { return };

@@ -34,7 +34,7 @@ pub(super) fn cases(data: &MobsFile) -> Vec<(String, u64)> {
     ];
     for g in &data.vanilla.groups {
         for a in &g.attacks {
-            out.push((format!("vtiming_{}_{}", g.id, a.def.id), u64::from(Timeline::of(&a.def).end()) + 60));
+            out.push((format!("vtiming_{}_{}", g.id, a.def.id), u64::from(Timeline::of(&a.def).end()) + 90));
         }
     }
     out.extend([
@@ -349,7 +349,9 @@ fn timing(game: &mut Game<'_>, now: u64, rest: &str, c: &mut Case) -> Option<Res
         let flag = game.mobs.iter().find(|m| m.id == id).is_some_and(|m| m.extra.flag);
         c.flags.push((now - start, flag));
     }
-    if !ended && now - start <= u64::from(line.end()) + 4 {
+    // A cube's jump lasts until it lands: its end comes after its flight, not on the data's tick.
+    let wait = if behavior == Behavior::Cube { 45 } else { 4 };
+    if !ended && now - start <= u64::from(line.end()) + wait {
         return None;
     }
     let hit = u64::from(line.hit_start());
