@@ -45,6 +45,9 @@ _DIRS = {'east': (1, 0, 0), 'west': (-1, 0, 0), 'up': (0, 1, 0), 'down': (0, -1,
 _SNAP = (-45.0, -22.5, 0.0, 22.5, 45.0)
 # A worn head encloses the player's head (8 px) and its hat layer (8.5 px), with a little to spare.
 WORN_MIN_PX = 8.75
+# Worn, a filler box this big (head px) under the head's cubes covers the gaps between them: over
+# the hat layer, inside the core.
+WORN_FILL_PX = 8.6
 # A cube belongs to the head's core when its longest side is at least this share of the biggest's.
 CORE_SHARE = 0.6
 # Item models may sit from -16 to 32 px (the game's element limit).
@@ -124,6 +127,10 @@ class HeadItem:
         # The core's sizes in head px (model px times the floor scale): head_scale.
         self.core = [(hi[i] - lo[i]) * self.scale for i in range(3)]
         self.elements = [e for e in (self._element(*x) for x in self.cubes) if e]
+        # The filler wears the skin of the head's biggest cube (the skull, the stalker's face, the
+        # slime's upper layer).
+        skin = max((x[2] for x in self.cubes), key=lambda c: c['size'][0] * c['size'][1] * c['size'][2])
+        self.elements.append(self._filler(skin))
         lo = [min(min(e['from'][i], e['to'][i]) for e in self.elements) for i in range(3)]
         hi = [max(max(e['from'][i], e['to'][i]) for e in self.elements) for i in range(3)]
         for i in range(3):
@@ -200,6 +207,16 @@ class HeadItem:
             sx, sy = 16 / self.tex_w, 16 / self.tex_h
             out[face] = {'uv': [items.rnd(u0 * sx), items.rnd(v0 * sy), items.rnd(u1 * sx), items.rnd(v1 * sy)], 'texture': '#0'}
         return out
+
+    def _filler(self, skin):
+        """A box of `WORN_FILL_PX` head px worn, centred on the core, on the skin of cube `skin`: the
+        core's box encloses the player's head, but its cubes leave gaps (a hood's open face, the
+        shrike's small skull, the slime's layers) where the player's skin showed (round
+        20261115-010927). Inside the core it is hidden; in a gap it shows the mob's own skin."""
+        half = WORN_FILL_PX / (items.HEAD_SCALE * self.head_scale()) / 2
+        el = {'from': [items.rnd(8 - half)] * 3, 'to': [items.rnd(8 + half)] * 3}
+        el['faces'] = self._faces(skin, [(0, 1), (1, 1), (2, 1)], None)
+        return el
 
     def head_scale(self):
         """Worn: the core (`__init__`), centred on the player's head, must enclose it with its hat
