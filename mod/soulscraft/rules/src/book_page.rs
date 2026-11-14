@@ -168,10 +168,12 @@ pub fn mob_page(book: &BookFile, catalog: &Catalog, trophies: &Value, e: &Entry,
 }
 
 fn stats_lines(m: &Value, lines: &mut Vec<Line>) {
-    let st = m.get("stats").cloned().unwrap_or(Value::Null);
-    let f = |k: &str| st.get(k).and_then(Value::as_f64).unwrap_or(0.0);
     lines.push(line(Tone::Head, "Числа"));
-    lines.push(line(Tone::Text, format!("Здоровье {} · урон {} · броня {}", num(f("health")), num(f("damage")), num(f("armor")))));
+    // A changed vanilla mob keeps vanilla's numbers: the data gives none.
+    if let Some(st) = m.get("stats").filter(|s| s.is_object()) {
+        let f = |k: &str| st.get(k).and_then(Value::as_f64).unwrap_or(0.0);
+        lines.push(line(Tone::Text, format!("Здоровье {} · урон {} · броня {}", num(f("health")), num(f("damage")), num(f("armor")))));
+    }
     let names: Vec<&str> = attacks(m).into_iter().map(|a| s(a, "name")).filter(|n| !n.is_empty()).collect();
     if !names.is_empty() {
         lines.push(line(Tone::Text, format!("Атаки: {}", names.join(", "))));

@@ -155,11 +155,11 @@ pub struct Catalog {
 }
 
 /// The vanilla mobs' list in mobs.json, whatever shape it takes: `vanilla` as a list, an object
-/// with a `mobs` list, or an object of mobs.
+/// with a `groups` (07-vanilla-mobs.md's rows) or `mobs` list, or an object of mobs.
 fn vanilla_list(root: &Value) -> Vec<Value> {
     match root.get("vanilla") {
         Some(Value::Array(v)) => v.clone(),
-        Some(Value::Object(o)) => match o.get("mobs") {
+        Some(Value::Object(o)) => match o.get("groups").or_else(|| o.get("mobs")) {
             Some(Value::Array(v)) => v.clone(),
             _ => o
                 .iter()
@@ -175,7 +175,7 @@ fn vanilla_list(root: &Value) -> Vec<Value> {
 }
 
 fn keys_of(m: &Value, id: &str) -> Vec<String> {
-    let mut keys: Vec<String> = match m.get("keys") {
+    let mut keys: Vec<String> = match m.get("keys").or_else(|| m.get("types")) {
         Some(Value::Array(v)) => v.iter().filter_map(|k| k.as_str().map(str::to_owned)).collect(),
         _ => Vec::new(),
     };

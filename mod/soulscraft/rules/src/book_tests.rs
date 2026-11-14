@@ -82,6 +82,17 @@ fn the_catalog_has_every_mob_of_the_data_and_its_types() {
     assert!(c.by_key("minecraft:pig").is_none());
     assert_eq!(c.event_name("test_zombies"), "Тестовый ивент первого среза");
     assert_eq!(c.event_name("nope"), "nope");
+    // The changed vanilla mobs of the data (07-vanilla-mobs.md): one entry a row, every type of it.
+    let root: Value = serde_json::from_str(crate::data::EMBEDDED).unwrap();
+    if let Some(groups) = root["vanilla"]["groups"].as_array() {
+        for g in groups {
+            for t in g["types"].as_array().unwrap() {
+                let e = c.by_key(t.as_str().unwrap()).unwrap();
+                assert_eq!((e.id.as_str(), e.vanilla), (g["id"].as_str().unwrap(), true));
+            }
+        }
+        assert_eq!(c.entries.len(), data.mobs.len() + groups.len());
+    }
 }
 
 #[test]
@@ -91,6 +102,7 @@ fn changed_vanilla_mobs_get_entries_whatever_the_list_looks_like() {
         json!([{"id": "zombie", "name": "Зомби", "keys": ["minecraft:zombie", "minecraft:husk"]}, {"id": "skeleton", "name": "Скелет"}]),
         json!({"mobs": [{"id": "zombie", "name": "Зомби", "keys": ["minecraft:zombie", "minecraft:husk"]}, {"id": "skeleton", "name": "Скелет"}]}),
         json!({"zombie": {"name": "Зомби", "keys": ["minecraft:zombie", "minecraft:husk"]}, "skeleton": {"name": "Скелет", "key": "minecraft:skeleton"}, "note": "text"}),
+        json!({"source": "x", "groups": [{"id": "zombie", "name": "Зомби", "types": ["minecraft:zombie", "minecraft:husk"]}, {"id": "skeleton", "name": "Скелет", "types": ["minecraft:skeleton"]}]}),
     ];
     for v in shapes {
         let mut root = base.clone();
