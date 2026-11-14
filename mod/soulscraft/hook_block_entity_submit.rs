@@ -5,6 +5,9 @@ fn soulscraft_block_entity_submit(
     entity: &horizon_client::containers::ModBlockEntity,
     draw: &mut crate::game::native_block_entity_draw::BlockEntityDraw,
 ) {
+    if crate::game::soulscraft_book_client::draw_figure(game, entity, draw) {
+        return;
+    }
     if !crate::game::soulscraft_trophy_client::draw_block_entity(game, pos, block, draw) {
         crate::game::soulscraft_altar_client::draw_block_entity(game, pos, block, entity, draw);
     }

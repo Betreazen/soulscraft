@@ -232,6 +232,7 @@ pub(super) fn on_level_tick(game: &mut Game<'_>, dimension: &str) {
     send_notes(game, dimension, now, &players, notes);
     // The approved vanilla changes (07-vanilla-mobs.md): adopt and drive vanilla mobs.
     crate::game::soulscraft_vanilla::on_level_tick(game, dimension, now, &players);
+    crate::game::soulscraft_book::on_level_tick(game, dimension, now);
     let spent = started.elapsed().as_nanos() as u64;
     {
         let mut t = OWN_TIME.lock().unwrap_or_else(PoisonError::into_inner);
@@ -385,6 +386,8 @@ fn tick_mob(
         Some(Steering::Fight(e)) => target_entity(game, m, e, players),
         _ => choose_target(game, m, players),
     };
+    // The hunter's book: the mob saw its target («Встречен», soulscraft_book).
+    crate::game::soulscraft_book::saw(&m.kind, m.pos, target.as_ref().map(|t| (t.entity, t.player, t.pos)));
     let mut s = state();
     let State { data, mobs, debug, .. } = &mut *s;
     let Some(t) = mobs.get_mut(&m.id) else { return };
@@ -855,6 +858,7 @@ fn deal(
         }
         landed = game.native_hurt_entity(dim, tg.entity, blow as f32, "minecraft:mob_attack", Some(m.id));
         if landed {
+            crate::game::soulscraft_book::struck(&def.key, tg.entity, tg.player);
             give_effects(game, &a.effects, tg.player);
         }
     }
@@ -868,6 +872,7 @@ fn deal(
             }
             if game.native_hurt_entity(dim, p.entity_id as u32, wave_blow as f32, "minecraft:mob_attack", Some(m.id)) {
                 landed = true;
+                crate::game::soulscraft_book::struck(&def.key, p.entity_id as u32, Some(p.uuid));
                 give_effects(game, &effects, Some(p.uuid));
             }
         }

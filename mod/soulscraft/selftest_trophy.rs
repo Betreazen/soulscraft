@@ -40,7 +40,7 @@ pub(super) fn step(game: &mut Game<'_>, now: u64, t: u64, name: &str, c: &mut Ca
         "reward_seeded_win" => seeded_win(game, now, t, c),
         "kin_wave" => kin_wave(game, now, t, c),
         "boost_sector" => boost_sector(game, now, t, c),
-        other => Some(Err(format!("no scenario {other}"))),
+        other => crate::game::soulscraft_selftest_book::step(game, now, t, other, c),
     }
 }
 

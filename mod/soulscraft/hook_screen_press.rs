@@ -5,4 +5,5 @@ fn soulscraft_screen_press(
     canceled: &mut bool,
 ) {
     crate::game::soulscraft_altar_client::on_screen_press(game, screen, button, canceled);
+    crate::game::soulscraft_book_client::on_screen_press(game, screen, button, canceled);
 }

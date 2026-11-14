@@ -778,6 +778,7 @@ fn finish(game: &mut Game<'_>, r: &mut EventRun, won: bool, how: &str, now: u64)
         r.hp.by_curse,
         r.joined.len() + r.stand_ins.len()
     ));
+    crate::game::soulscraft_book::event_ended(&r.event, r.joined.keys().copied().collect(), r.stand_ins.clone(), won);
     if won {
         reward(game, r, now);
         tell_zone(game, r, "Алтарь выстоял", "Победа");

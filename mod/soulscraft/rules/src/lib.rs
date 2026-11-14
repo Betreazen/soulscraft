@@ -22,3 +22,5 @@ pub mod cover;
 pub mod trophy;
 pub mod boost;
 pub mod vanilla;
+pub mod book;
+pub mod book_page;

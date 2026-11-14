@@ -101,6 +101,7 @@ foreach ($f in Get-ChildItem (Join-Path $Repo 'assets\textures\entity') -Filter 
 # The crate reads the altar's cells and the trophy chances compiled in, as it does mobs.json.
 Copy-File (Join-Path $Repo 'data\altar.json') (Join-Path $Crate 'data\altar.json')
 Copy-File (Join-Path $Repo 'data\trophies.json') (Join-Path $Crate 'data\trophies.json')
+Copy-File (Join-Path $Repo 'data\book.json') (Join-Path $Crate 'data\book.json')
 $altar = Get-Content -Raw -Encoding utf8 (Join-Path $Repo 'data\altar.json') | ConvertFrom-Json
 $art = Join-Path $Repo 'assets\soulscraft'
 
@@ -235,8 +236,23 @@ Write-Text (Join-Path $Content 'assets\soulscraft\items\rotten_horn.json') `
     (Json ([ordered]@{ model = [ordered]@{ type = 'minecraft:model'; model = 'soulscraft:item/rotten_horn' } }))
 $lang['item.soulscraft.rotten_horn'] = 'Гнилой горн'
 
-# The creative tab with the altar's blocks, banners and the horn.
-$tabItems = @($blocks.Keys | ForEach-Object { "soulscraft:$_" }) + @('soulscraft:rotten_horn')
+# The hunter's book (docs/design/08-guide-book.md, data/book.json `item`): a plain item on paper's
+# template (a book's would be enchantable), drawn with the art's model (assets/models/blocks/altar.py), crafted cheaply from
+# a book and rotten flesh. A right click opens its window (soulscraft_book).
+$bookItem = (Get-Content -Raw -Encoding utf8 (Join-Path $Repo 'data\book.json') | ConvertFrom-Json).item -replace '^soulscraft:', ''
+Write-Text (Join-Path $Content "data\soulscraft\horizon\item\$bookItem.json") `
+    (Json ([ordered]@{ template = 'minecraft:paper'; max_stack_size = 1 }))
+Copy-File (Join-Path $art "models\item\$bookItem.json") (Join-Path $Content "assets\soulscraft\models\item\$bookItem.json")
+Copy-File (Join-Path $art "textures\item\$bookItem.png") (Join-Path $Content "assets\soulscraft\textures\item\$bookItem.png")
+Write-Text (Join-Path $Content "assets\soulscraft\items\$bookItem.json") `
+    (Json ([ordered]@{ model = [ordered]@{ type = 'minecraft:model'; model = "soulscraft:item/$bookItem" } }))
+Write-Text (Join-Path $Content "data\soulscraft\recipe\$bookItem.json") `
+    (Json ([ordered]@{ type = 'minecraft:crafting_shapeless'; category = 'misc'
+        ingredients = @('minecraft:book', 'minecraft:rotten_flesh'); result = [ordered]@{ id = "soulscraft:$bookItem"; count = 1 } }))
+$lang["item.soulscraft.$bookItem"] = 'Книга охотника'
+
+# The creative tab with the altar's blocks, banners, the horn and the book.
+$tabItems = @($blocks.Keys | ForEach-Object { "soulscraft:$_" }) + @('soulscraft:rotten_horn', "soulscraft:$bookItem")
 Write-Text (Join-Path $Content 'data\soulscraft\horizon\creative_tab\altar.json') `
     (Json ([ordered]@{ title = 'itemGroup.soulscraft.altar'; icon = 'soulscraft:altar_core'; items = $tabItems }))
 $lang['itemGroup.soulscraft.altar'] = 'SoulsCraft: алтарь'
@@ -376,6 +392,7 @@ foreach ($id in $blocks.Keys) {
         'Banner of ' + (Get-Culture).TextInfo.ToTitleCase(($id -replace '^banner_', '' -replace '_', ' ')) }
 }
 $en['item.soulscraft.rotten_horn'] = 'Rotten Horn'
+$en["item.soulscraft.$bookItem"] = "Hunter's Book"
 $en['itemGroup.soulscraft.altar'] = 'SoulsCraft: Altar'
 foreach ($k in $enTrophy.Keys) { $en[$k] = $enTrophy[$k] }
 Write-Text (Join-Path $Content 'assets\soulscraft\lang\en_us.json') (Json $en)

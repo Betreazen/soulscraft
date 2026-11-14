@@ -4,4 +4,5 @@ fn soulscraft_screen_render_post(
     screen: &crate::game::native_hooks::NativeScreenView<'_>,
 ) {
     crate::game::soulscraft_altar_client::draw_screen(game, batch, screen);
+    crate::game::soulscraft_book_client::draw_screen(game, batch, screen);
 }

@@ -4,5 +4,7 @@ fn soulscraft_perform_command(
     command: &str,
     ran: &mut bool,
 ) {
-    crate::game::soulscraft_tools::on_command(game, Some(player), command, ran);
+    if !crate::game::soulscraft_book::on_command(game, command, ran) {
+        crate::game::soulscraft_tools::on_command(game, Some(player), command, ran);
+    }
 }

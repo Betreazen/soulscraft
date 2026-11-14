@@ -231,6 +231,24 @@ pub(super) fn draw_rig(
     draw: &mut BlockEntityDraw,
     seed: u32,
 ) -> bool {
+    draw_rig_with(game, key, make, clip, t, flags, draw, seed, 0xFF_FFFF, true)
+}
+
+/// [`draw_rig`] tinted (`0` for the hunter's book's black silhouette) and with or without the
+/// socket items.
+#[allow(clippy::too_many_arguments)]
+pub(super) fn draw_rig_with(
+    game: &Game<'_>,
+    key: &str,
+    make: impl FnOnce() -> Option<Rig>,
+    clip: &str,
+    t: f32,
+    flags: &[&str],
+    draw: &mut BlockEntityDraw,
+    seed: u32,
+    tint: u32,
+    items: bool,
+) -> bool {
     let mut c = client();
     if !c.models.contains_key(key) {
         let m = make().map(build);
@@ -242,13 +260,28 @@ pub(super) fn draw_rig(
     draw.scale([1.0, -1.0, -1.0]);
     draw.translate([0.0, -1.501, 0.0]);
     pose_tree(model, &poses, flags);
-    paint(game, model, &poses, flags, 0xFF_FFFF, draw, seed);
+    paint(game, model, &poses, flags, tint, draw, seed, items);
     draw.pop();
     true
 }
 
+/// The clips of mob `id`'s rig (loaded the first time): name, ticks, looped.
+pub(super) fn clips_of(game: &Game<'_>, id: &str) -> Vec<(String, f32, bool)> {
+    let mut c = client();
+    if !c.models.contains_key(id) {
+        let m = load(game, id);
+        c.models.insert(id.to_owned(), m);
+    }
+    c.models
+        .get(id)
+        .and_then(Option::as_ref)
+        .map(|m| m.rig.clips.iter().map(|(n, c)| (n.clone(), c.ticks as f32, c.looped)).collect())
+        .unwrap_or_default()
+}
+
 /// The posed model drawn: its cubes, then its glowing cubes at full light, then its items.
-fn paint(game: &Game<'_>, model: &mut Model, poses: &[Pose], flags: &[&str], tint: u32, draw: &mut BlockEntityDraw, seed: u32) {
+#[allow(clippy::too_many_arguments)]
+fn paint(game: &Game<'_>, model: &mut Model, poses: &[Pose], flags: &[&str], tint: u32, draw: &mut BlockEntityDraw, seed: u32, items: bool) {
     let sprite = model.rig.texture.sprite.clone();
     show_glow(model, false);
     game.native_draw_model_part(draw, &model.tree, &sprite, tint);
@@ -260,7 +293,9 @@ fn paint(game: &Game<'_>, model: &mut Model, poses: &[Pose], flags: &[&str], tin
         draw.light = light;
         show_glow(model, false);
     }
-    draw_items(game, model, poses, flags, draw, seed);
+    if items {
+        draw_items(game, model, poses, flags, draw, seed);
+    }
 }
 
 /// The clip a mob shows when the server names none: its walk or idle, by how it moves.
@@ -320,7 +355,7 @@ pub(super) fn draw_mob(game: &Game<'_>, mob: &NativeMobRender<'_>, draw: &mut Bl
     draw.translate([0.0, -1.501, 0.0]);
     pose_tree(model, &poses, &flags);
     let tint = if mob.hurt_time > 0 { HURT_TINT } else { 0xFF_FFFF };
-    paint(game, model, &poses, &flags, tint, draw, mob.id);
+    paint(game, model, &poses, &flags, tint, draw, mob.id, true);
     draw.pop();
 }
 

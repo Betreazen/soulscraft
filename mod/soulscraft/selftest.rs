@@ -113,6 +113,9 @@ fn scenarios(data: &MobsFile, filter: Option<&str>) -> Vec<Scenario> {
     }
     for (name, timeout) in crate::game::soulscraft_selftest_trophy::CASES {
         all.push(Scenario { name: (*name).to_owned(), kind: Kind::Altar(*name), timeout: *timeout });
+    }    // The hunter's book, on the altar's site too (soulscraft_selftest_book, through the trophy step).
+    for (name, timeout) in crate::game::soulscraft_selftest_book::CASES {
+        all.push(Scenario { name: (*name).to_owned(), kind: Kind::Altar(*name), timeout: *timeout });
     }
     for (name, timeout) in crate::game::soulscraft_selftest_undead::CASES {
         all.push(Scenario { name: (*name).to_owned(), kind: Kind::Undead(*name), timeout: *timeout });

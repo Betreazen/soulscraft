@@ -556,3 +556,63 @@ bindings = [
   { name = "pos", ty = "[i32; 3]", value = "pos" },
   { name = "entries", ty = "&mut Vec<horizon_client::biome::SpawnEntry>", value = "&mut *entries" },
 ]
+# ---- Iteration 4: the hunter's book (docs/design/08-guide-book.md, ../../prototypes/p9-book.md) ----
+
+# The book on the server: progress in the players' persistent data, kill credit, the action bar.
+[[module]]
+id = "book"
+file = "crates/horizon-client/src/game.rs"
+name = "soulscraft_book"
+source = "book.rs"
+
+# The book's window on the client: sections, pages, the model in its clips, the phase strips.
+[[module]]
+id = "book_client"
+file = "crates/horizon-client/src/game.rs"
+name = "soulscraft_book_client"
+source = "book_client.rs"
+
+# The book's self-test scenarios (soulscraft_selftest run book_), on the altar's site.
+[[module]]
+id = "selftest_book"
+file = "crates/horizon-client/src/game.rs"
+name = "soulscraft_selftest_book"
+source = "selftest_book.rs"
+
+# A right click with an item (API 13; game.rs:6971, no mods() check): the book opens.
+[[injection]]
+id = "use_item"
+hook = "use_item"
+hook_version = 1
+kind = "HEAD"
+helper = "hook_use_item.rs"
+bindings = [
+  { name = "game", ty = "&crate::game::Game<'_>", value = "&*self" },
+  { name = "stack", ty = "&horizon_client::items::ItemStack", value = "stack" },
+  { name = "claimed", ty = "&mut bool", value = "&mut *claimed" },
+]
+
+# A mob's health ran out (LivingEntity.die): the killer from its last damage and
+# `last_hurt_by_player`, before `mob_died` clears it (game/creatures.rs:1585, :1626). The named hook
+# `living_death` is behind `mods().is_empty()` there (:1586): at the function, pinned by
+# horizon_revision.
+[[injection]]
+id = "mob_death"
+target = "horizon_client::game::creatures::Game<'_>::mob_death_canceled"
+kind = "HEAD"
+helper = "hook_mob_death.rs"
+bindings = [
+  { name = "game", ty = "&crate::game::Game<'_>", value = "&*self" },
+  { name = "mob", ty = "&horizon_client::mobs::Mob", value = "m" },
+]
+
+# The mobs a spawner made (game/spawner.rs:145; Path-of-craft-tree reads the same ids): a book kill
+# of one counts a quarter.
+[[injection]]
+id = "spawner_planned"
+target = "horizon_client::game::spawner::Game<'_>::add_planned"
+kind = "RETURN"
+helper = "hook_spawner_planned.rs"
+bindings = [
+  { name = "value", ty = "HashMap<u32, u32>", value = "$value" },
+]
