@@ -1,38 +1,42 @@
-round 10 checks, 2026-11-14T19:45:58
+round 10 checks, 2026-11-14T20:31:22
 == xp_revenant_melee target
-  {"entities":[{"baby":false,"distance":2.987804191690202,"health":1.0,"hurt_time":1,"id":141,"kind":"mob","pos":[-499.5,101.0,498.5],"type":"soulscraft:revenant"}]}
+  {"entities":[{"baby":false,"distance":2.987804191690202,"health":1.0,"hurt_time":3,"id":113,"kind":"mob","pos":[-499.5,101.0,498.5],"type":"soulscraft:revenant"},{"distance":8.723418009966778,"kind":"orb","pos":[-496.3422868703503,101.0,493.35596125374246],"type":"minecraft:experience_orb","value":3,"velocity":[-6.769013590689902e-12,0.0,1.5314364896321708e-11]},{"distance":8.81964029879044,"kind":"orb","pos":[-500.4455564816636,101.0,492.7189970926583],"type":"minecraft:experience_orb","value":1,"velocity":[1.3415097330617712e-12,0.0,1.1040087960775794e-11]}]}
   
 == xp_revenant_melee tags
   Revenant has the following entity data: ["soulscraft.p=1.00", "pct.xp145"]
 == xp_revenant_melee attack
-  {"alive":false,"health":0.0,"health_before":1.0,"hit":true,"ok":true,"target":141}
+  {"alive":false,"health":0.0,"health_before":1.0,"hit":true,"ok":true,"target":113}
 == xp_revenant_melee bar
-  {"actionbar":"+29.0 опыта · Воин 1","chat":["Your game mode has been updated to Survival Mode"],"order":"newest first","styled":[{"translate":"gameMode.changed","with":[{"translate":"gameMode.survival"}]}],"subtitle":null,"title":null}
+  {"actionbar":"+43.5 опыта · Воин 3","chat":["Your game mode has been updated to Survival Mode"],"order":"newest first","styled":[{"translate":"gameMode.changed","with":[{"translate":"gameMode.survival"}]}],"subtitle":null,"title":null}
 
 == xp_revenant_melee log
   System chat: Revenant has the following entity data: ["soulscraft.p=1.00", "pct.xp145"]
-  soulscraft: death mob=revenant id=141 tick=23206
-  soulscraft: pct player=sc_a summary melee 1/75 ranks 0/69, archery 2/75 ranks 0/68, defense 2/75 ranks 0/66 tick=23220
+  soulscraft: death mob=revenant id=113 tick=4902
+  soulscraft: pct player=sc_a summary melee 3/75 ranks 0/69, archery 2/75 ranks 0/68, defense 2/75 ranks 0/66 tick=4920
 == xp_revenant_arrow target
-  {"entities":[{"baby":false,"distance":6.0,"health":1.0,"hurt_time":2,"id":144,"kind":"mob","pos":[-499.5,101.0,494.5],"type":"soulscraft:revenant"}]}
+  {"entities":[{"baby":false,"distance":6.0,"health":1.0,"hurt_time":3,"id":117,"kind":"mob","pos":[-499.5,101.0,494.5],"type":"soulscraft:revenant"},{"distance":7.806664996747985,"kind":"orb","pos":[-496.34409679493234,101.0,493.35967134287966],"type":"minecraft:experience_orb","value":3,"velocity":[-0.000020503720013049623,0.0,0.00004639027824428812]},{"distance":7.835610996978181,"kind":"orb","pos":[-500.4452385459226,101.0,492.72161174874464],"type":"minecraft:experience_orb","value":1,"velocity":[4.015258272088508e-6,0.0,0.00003304164636968384]}]}
   
 == xp_revenant_arrow tags
   Revenant has the following entity data: ["soulscraft.p=1.00", "pct.xp145"]
+== xp_revenant_arrow shot 1
+  target left: False
 == xp_revenant_arrow bar
-  {"actionbar":null,"chat":["Your game mode has been updated to Survival Mode"],"order":"newest first","styled":[{"translate":"gameMode.changed","with":[{"translate":"gameMode.survival"}]}],"subtitle":null,"title":null}
+  {"actionbar":"+43.5 опыта · Стрелок 3","chat":["Your game mode has been updated to Survival Mode"],"order":"newest first","styled":[{"translate":"gameMode.changed","with":[{"translate":"gameMode.survival"}]}],"subtitle":null,"title":null}
 
 == xp_revenant_arrow log
   System chat: Revenant has the following entity data: ["soulscraft.p=1.00", "pct.xp145"]
+  soulscraft: death mob=revenant id=117 tick=5022
+  soulscraft: pct player=sc_a summary melee 3/75 ranks 0/69, archery 3/75 ranks 0/68, defense 2/75 ranks 0/66 tick=5040
 == xp_slime_size1 target
-  {"entities":[{"baby":false,"distance":2.0,"health":1.0,"hurt_time":0,"id":149,"kind":"mob","pos":[-499.5,101.0,498.5],"type":"soulscraft:bog_slime"}]}
+  {"entities":[{"baby":false,"distance":2.0,"health":1.0,"hurt_time":0,"id":123,"kind":"mob","pos":[-499.5,101.0,498.5],"type":"soulscraft:bog_slime"},{"distance":7.792984733463089,"kind":"orb","pos":[-496.3494929467397,101.0,493.3722432446564],"type":"minecraft:experience_orb","value":3,"velocity":[-0.00002434921698109021,0.0,0.00005508805208059851]},{"distance":7.826679927847169,"kind":"orb","pos":[-500.4439748230044,101.0,492.73045495369905],"type":"minecraft:experience_orb","value":1,"velocity":[4.616359027995434e-6,0.0,0.00003799572561858539]},{"distance":8.120645088503455,"kind":"orb","pos":[-501.39273013859946,101.0,492.6030101129688],"type":"minecraft:experience_orb","value":3,"velocity":[0.0,0.0,0.0]}]}
   
 == xp_slime_size1 tags
   Bog Slime has the following entity data: ["soulscraft.p=0.00", "soulscraft.size=1", "pct.xp6"]
 == xp_slime_size1 attack
-  {"alive":false,"health":0.0,"health_before":1.0,"hit":true,"ok":true,"target":149}
+  {"alive":false,"health":0.0,"health_before":1.0,"hit":true,"ok":true,"target":123}
 == xp_slime_size1 bar
-  {"actionbar":"+1.2 опыта · Воин 1","chat":["Your game mode has been updated to Survival Mode"],"order":"newest first","styled":[{"translate":"gameMode.changed","with":[{"translate":"gameMode.survival"}]}],"subtitle":null,"title":null}
+  {"actionbar":"+1.0 опыта · Воин 3","chat":["Your game mode has been updated to Survival Mode"],"order":"newest first","styled":[{"translate":"gameMode.changed","with":[{"translate":"gameMode.survival"}]}],"subtitle":null,"title":null}
 
 == xp_slime_size1 log
   System chat: Bog Slime has the following entity data: ["soulscraft.p=0.00", "soulscraft.size=1", "pct.xp6"]
-  soulscraft: death mob=bog_slime id=149 tick=23396
+  soulscraft: death mob=bog_slime id=123 tick=5134

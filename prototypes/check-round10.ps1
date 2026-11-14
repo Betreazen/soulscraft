@@ -227,9 +227,18 @@ try {
             $tags = Invoke-Console "data get entity @e[type=$($k.summon),limit=1,sort=nearest,x=$ax,y=$ay,z=$az] Tags"
             Note "$($k.name) tags" $tags
             if ($k.weapon -eq 'minecraft:bow') {
-                Invoke-Bot $bot 'mouse right down' | Out-Null
-                Start-Sleep -Milliseconds 1300
-                Invoke-Bot $bot 'mouse right up' | Out-Null
+                # Aim at the body's middle and draw fully; shoot again (up to three times) until the
+                # revenant is down, so the arrow really is the killing blow.
+                for ($shot = 1; $shot -le 3; $shot++) {
+                    Invoke-Bot $bot "look-at $($ax + 0.5) $($ay + 1.1) $($az - $far + 0.5)" | Out-Null
+                    Invoke-Bot $bot 'mouse right down' | Out-Null
+                    Start-Sleep -Milliseconds 1500
+                    Invoke-Bot $bot 'mouse right up' | Out-Null
+                    Start-Sleep -Milliseconds 1500
+                    $left = ((Invoke-Bot $bot 'entities' | Out-String | ConvertFrom-Json).entities | Where-Object { $_.id -eq $target })
+                    Note "$($k.name) shot $shot" "target left: $([bool]$left)"
+                    if (-not $left) { break }
+                }
             } else {
                 Note "$($k.name) attack" (Invoke-Bot $bot "attack $target")
             }
