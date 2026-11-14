@@ -36,7 +36,8 @@ function Get-Layout([double]$W, [double]$H) {
     $top = $py + 26
     [pscustomobject]@{ Px = $px; Py = $py; Top = $top; Tab = { param($i) @(($px + 6 + $i * 68 + 32), ($py + 13)) }.GetNewClosure()
         Row = { param($i) @(($px + 6 + 50), ($top + $i * 11 + 5)) }.GetNewClosure()
-        Clip = { param($i) @(($px + 6 + 104 + 6 + 52), ($top + 108 + $i * 12 + 5)) }.GetNewClosure() }
+        Clip = { param($i) @(($px + 6 + 104 + 6 + 52), ($top + 108 + $i * 12 + 5)) }.GetNewClosure()
+        ListDown = @(($px + 6 + 18 + 8), ($top + ($ph - 32) - 6)) }
 }
 function Click($Bot, $At) { Invoke-Bot $Bot "click-at $([int]$At[0]) $([int]$At[1])" | Out-Null; Start-Sleep -Milliseconds 700 }
 function Open-Book($Bot) {
@@ -116,10 +117,12 @@ try {
     Click $bot (& $l.Clip 0)
     Start-Sleep -Seconds 4
     Save-Shot $bot 'book_vanilla_husk_idle'
-    Click $bot (& $l.Row 16)
-    Save-Shot $bot 'book_vanilla_slime_killed'
     Click $bot (& $l.Row 14)
     Save-Shot $bot 'book_vanilla_hoglin_met'
+    # The list holds 16 rows: the slime row (16) is on the next page, its first row.
+    Click $bot $l.ListDown
+    Click $bot (& $l.Row 0)
+    Save-Shot $bot 'book_vanilla_slime_killed'
     Click $bot (& $l.Tab 1)
     Save-Shot $bot 'book_altar_locked'
     Click $bot (& $l.Tab 2)

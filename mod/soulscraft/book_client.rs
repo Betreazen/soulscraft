@@ -293,8 +293,8 @@ fn draw_list(game: &Game<'_>, batch: &mut HudBatch, l: &Layout, c: &BookClient, 
             game.native_fill(batch, r, 0x803A_2E22);
         }
         game.native_fill(batch, [r[0] + 3.0, r[1] + 3.0, 4.0, 4.0], stage_color(stage));
-        let name = if stage == book::UNKNOWN { "???" } else { e.name.as_str() };
-        game.native_text(batch, name, [r[0] + 10.0, r[1] + 1.5], if stage == book::UNKNOWN { 0x8C8478 } else { 0xE8E0D0 }, true);
+        let name = if stage == book::UNKNOWN { "???".to_owned() } else { fit(game, &e.name, r[2] - 12.0) };
+        game.native_text(batch, &name, [r[0] + 10.0, r[1] + 1.5], if stage == book::UNKNOWN { 0x8C8478 } else { 0xE8E0D0 }, true);
     }
     if d.catalog.entries.len() > rows {
         let (u, w) = list_arrows(l);
@@ -436,7 +436,7 @@ fn draw_text(game: &Game<'_>, batch: &mut HudBatch, l: &Layout, c: &mut BookClie
     let lines = text_lines(game, l, c, page);
     let rows = (l.text[3] / LINE).max(1.0) as usize;
     c.scroll = c.scroll.min(lines.len().saturating_sub(rows));
-    game.native_text(batch, &page.title, [l.text[0], l.text[1]], 0xE8C878, true);
+    game.native_text(batch, &fit(game, &page.title, l.text[2]), [l.text[0], l.text[1]], 0xE8C878, true);
     for (i, (text, color)) in lines.iter().skip(c.scroll).take(rows.saturating_sub(1)).enumerate() {
         game.native_text(batch, text, [l.text[0], l.text[1] + LINE * (i as f32 + 1.0)], *color, true);
     }
@@ -551,11 +551,11 @@ pub(super) fn draw_figure(game: &Game<'_>, entity: &ModBlockEntity, draw: &mut B
 //
 // Vanilla's renderer for an entity cannot be called from a screen or a scene: `native_draw_scene`
 // draws blocks and calls `native_block_entity_submit` for a block entity (native_scene.rs:155-166),
-// and the engine's mob drawing (`native_mob_submit`, game/native_mob_draw.rs) runs for mobs in the
+// and the engine's mob drawing (`native_mob_submit`, game/native_mob_draw.rs:110-118) runs for mobs in the
 // world only. What a block entity's draw can do is draw a model part tree with a texture
 // (`native_draw_model_part`, native_block_entity_draw.rs:727) — and a vanilla type's own model is
-// such a tree: its `MobType.model` and `MobType.texture` (mobs.rs:415-416, the same layers
-// `native_bake_layer` bakes, :752-762). So the book draws the vanilla mob's real model and skin,
+// such a tree: its `MobType.model` and `MobType.texture` (mobs.rs:412-416, the same layers
+// `native_bake_layer` bakes, :750-762). So the book draws the vanilla mob's real model and skin,
 // posed here by hand (rest, a walk, an attack's phases): not vanilla's own animation or its extra
 // layers (a drowned's or a stray's clothes, armour, held items).
 
@@ -662,4 +662,20 @@ fn seg_progress(s: &book_page::Strip, t: f32) -> Option<(book_page::Seg, f32)> {
         at -= n;
     }
     None
+}
+
+/// `text` cut to `width` GUI pixels with «…» (a vanilla row's long name in the list and the title).
+fn fit(game: &Game<'_>, text: &str, width: f32) -> String {
+    if game.native_text_width(text) <= width {
+        return text.to_owned();
+    }
+    let mut out = String::new();
+    for ch in text.chars() {
+        out.push(ch);
+        if game.native_text_width(&format!("{out}…")) > width {
+            out.pop();
+            break;
+        }
+    }
+    format!("{}…", out.trim_end_matches([' ', ',']))
 }

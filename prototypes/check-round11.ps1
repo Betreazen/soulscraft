@@ -46,23 +46,28 @@ try {
     C 'weather clear'
 
     if ($Parts -contains 'heads') {
-        # Worn: third person from the front (F5 twice), then from behind-left (F5 once more is first
-        # person again, so turn the bot instead).
-        C "tp sc_a $($ax + 0.5) $ay $($az + 4.5) 0 0"
-        Invoke-Bot $bot 'key f5 tap' | Out-Null
-        Invoke-Bot $bot 'key f5 tap' | Out-Null
-        # Each head from the front, the side and the back: the camera stays in front of the bot,
-        # the bot turns (yaw 0, 90, 180).
-        foreach ($m in $Mobs) {
-            C "item replace entity sc_a armor.head with soulscraft:$($m)_head"
-            foreach ($view in @(@('front', 0), @('side', 90), @('back', 180))) {
-                C "tp sc_a $($ax + 0.5) $ay $($az + 4.5) $($view[1]) 0"
-                Start-Sleep -Milliseconds 1200
-                Save-Shot $bot "worn_$($m)_head_$($view[0])"
+        # Worn: sc_a stands still facing south (yaw 0) wearing each head; a second bot, sc_b, is the
+        # camera in first person with the GUI hidden, 1.6 blocks away at sc_a's eye height, in front,
+        # at the side and behind. (A third-person camera turns with its own player, so turning sc_a
+        # under it shows the front three times: round 20261115-010927 found that.)
+        $cam = Start-Bot sc_b
+        try {
+            C 'gamemode spectator sc_b'
+            Invoke-Bot $cam 'key f1 tap' | Out-Null
+            C "tp sc_a $($ax + 0.5) $ay $($az + 4.5) 0 0"
+            foreach ($m in $Mobs) {
+                C "item replace entity sc_a armor.head with soulscraft:$($m)_head"
+                foreach ($view in @(@('front', 0, 1.6, 180), @('side', 1.6, 0, 90), @('back', 0, -1.6, 0))) {
+                    C "tp sc_a $($ax + 0.5) $ay $($az + 4.5) 0 0"
+                    C "tp sc_b $($ax + 0.5 + $view[1]) $ay $($az + 4.5 + $view[2]) $($view[3]) 0"
+                    Start-Sleep -Milliseconds 1200
+                    Save-Shot $cam "worn_$($m)_head_$($view[0])"
+                }
             }
+        } finally {
+            C 'gamemode creative sc_b'
+            Stop-Bot $cam
         }
-        C "tp sc_a $($ax + 0.5) $ay $($az + 4.5) 0 0"
-        Invoke-Bot $bot 'key f5 tap' | Out-Null
         C 'item replace entity sc_a armor.head with air'
         # The inventory: all seven heads in the hotbar, then the inventory screen.
         for ($i = 0; $i -lt $Mobs.Count; $i++) { C "item replace entity sc_a hotbar.$i with soulscraft:$($Mobs[$i])_head" }

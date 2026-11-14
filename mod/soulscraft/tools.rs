@@ -358,7 +358,26 @@ fn summon_nbt(game: &mut Game<'_>, dim: &str, key: &str, at: V3, snbt: &str) -> 
     id
 }
 
-/// The nearest SoulsCraft mob within 16 blocks starts `attack` now.
+/// `/sc force` with no SoulsCraft mob near: the nearest adopted vanilla mob within 16 blocks that
+/// has the move (07-vanilla-mobs.md), for the bots' telegraph shots.
+fn force_vanilla(game: &mut Game<'_>, attack: &str, at: V3) {
+    let mut near: Vec<(f64, u32, String)> = game
+        .mobs
+        .iter()
+        .filter(|m| !m.removed && m.alive())
+        .map(|m| (geom::dist([m.position.x, m.position.y, m.position.z], at), m.id, m.kind.id.to_string()))
+        .filter(|x| x.0 <= 16.0)
+        .collect();
+    near.sort_by(|a, b| a.0.total_cmp(&b.0));
+    for (_, id, kind) in near {
+        if crate::game::soulscraft_vanilla::force(id, attack) {
+            return say(game, format!("{kind} {id} starts {attack}"));
+        }
+    }
+    say(game, format!("no SoulsCraft or changed vanilla mob within 16 blocks has {attack}"));
+}
+
+/// The nearest SoulsCraft mob within 16 blocks starts `attack` now (else a vanilla one).
 fn force(game: &mut Game<'_>, attack: &str, at: V3, _now: u64) {
     let living: Vec<u32> = game.mobs.iter().filter(|m| !m.removed && m.alive()).map(|m| m.id).collect();
     let mut s = server::state();
@@ -369,7 +388,7 @@ fn force(game: &mut Game<'_>, attack: &str, at: V3, _now: u64) {
         .min_by(|a, b| geom::dist(a.1.pos, at).total_cmp(&geom::dist(b.1.pos, at)))
     else {
         drop(s);
-        return say(game, "no SoulsCraft mob within 16 blocks");
+        return force_vanilla(game, attack, at);
     };
     let def = &data.mobs[t.kind];
     let Some(idx) = def.attack_index(attack) else {
