@@ -28,6 +28,9 @@ cd "C:\Claude code projects\horizon-joint-dev"
 .\joint.ps1 client                           # клиент нужен только для вида
 .\joint.ps1 open; .\joint.ps1 serve -Owner "soulscraft agent"
 .\prototypes\shots.ps1 -Mob revenant         # 3. бот sc_a, скриншоты по фазам, тики из лога
+.\prototypes\check-book.ps1                  # книга охотника в окне: evidence\book\
+.\prototypes\check-round11.ps1 -Parts heads  # надетые головы, камера — второй бот sc_b: evidence\round11\
+.\prototypes\check-vanilla.ps1               # замахи ванильных мобов через /sc force: evidence\vanilla\
 .\prototypes\tune.ps1                        # числа из data/mobs.json на живой сервер (/sc reload)
 .\prototypes\p5-world.ps1 init               # П5: свой сервер и мир без естественного спавна (раз)
 .\prototypes\p5-bench.ps1                    # П5, только на тихом ПК; heavy.lock берёт сам
@@ -44,7 +47,7 @@ cd "C:\Claude code projects\horizon-joint-dev"
 | `/sc slowmo <1..20\|off>` | `/tick rate`; `/sc freeze [off]` — `/tick freeze` |
 | `/sc arena` | плоская освещённая арена 31×31 на y 100 в центре участка SoulsCraft (−500, 500): бассейн для удильщика, стена для тарана |
 | `/sc wave start\|next\|stop` | заглушка тестового ивента: волны зомби из `events[0]` кольцом вокруг игрока, передышка после волны |
-| `/sc force <атака>` | ближайший моб начинает эту атаку сейчас |
+| `/sc force <атака>` | ближайший моб SoulsCraft начинает эту атаку сейчас; если его нет в 16 блоках — ближайший принятый ванильный моб с этим приёмом |
 | `/sc clear`, `/sc info` | убрать мобов SoulsCraft рядом; что загружено |
 | `/sc bench [N] [моб\|mixed]`, `/sc cost start\|stop` | П5: кольцо из N латников (или мобов одного вида, или всех семи по очереди); замер стоимости |
 | `/sc power` | сила P каждого игрока по частям: дерево `T` из сводки PCT и снаряжение `G` (Г1) |

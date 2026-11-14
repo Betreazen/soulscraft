@@ -1,0 +1,59 @@
+vanilla telegraph checks, 2026-11-15T02:05:50
+== tick unfreeze
+  The game is running normally
+== sc arena
+  
+== sc clear
+  
+== time set noon
+  Set minecraft:overworld to time marker minecraft:noon
+== weather clear
+  Set the weather to clear
+== gamemode spectator sc_a
+  Set sc_a's game mode to Spectator Mode
+== sc debug on
+  [SoulsCraft] debug on: labels over the mobs, creative players hunted
+== tp sc_a -499.5 101.6 506.5 180 8
+  Teleported sc_a to -499.500000, 101.600000, 506.500000
+== summon minecraft:zombie -499.5 101 502.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[0f,0f],Tags:["soulscraft.p=0.00","soulscraft.fresh"]}
+  Summoned new Zombie
+== sc force lunge
+  
+== kill @e[type=minecraft:zombie,x=-500,y=101,z=500,distance=..10]
+  Killed Zombie
+== summon minecraft:vindicator -499.5 101 502.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[0f,0f],Tags:["soulscraft.p=0.00","soulscraft.fresh"]}
+  Summoned new Vindicator
+== sc force overhead
+  
+== kill @e[type=minecraft:vindicator,x=-500,y=101,z=500,distance=..10]
+  Killed Vindicator
+== summon minecraft:hoglin -499.5 101 502.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[0f,0f],Tags:["soulscraft.p=0.00","soulscraft.fresh"]}
+  Summoned new Hoglin
+== sc force ram
+  
+== kill @e[type=minecraft:hoglin,x=-500,y=101,z=500,distance=..10]
+  Killed Hoglin
+== summon minecraft:spider -499.5 101 502.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[0f,0f],Tags:["soulscraft.p=0.00","soulscraft.fresh"]}
+  Summoned new Spider
+== sc force pounce
+  
+== kill @e[type=minecraft:spider,x=-500,y=101,z=500,distance=..10]
+  Killed Spider
+== summon minecraft:witch -499.5 101 502.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[0f,0f],Tags:["soulscraft.p=0.00","soulscraft.fresh"]}
+  Summoned new Witch
+== sc force potion_throw
+  
+== kill @e[type=minecraft:witch,x=-500,y=101,z=500,distance=..10]
+  Killed Witch
+== summon minecraft:piglin_brute -499.5 101 502.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[0f,0f],Tags:["soulscraft.p=0.00","soulscraft.fresh"]}
+  Summoned new Piglin Brute
+== sc force heavy_strike
+  
+== kill @e[type=minecraft:piglin_brute,x=-500,y=101,z=500,distance=..10]
+  Killed Piglin Brute
+== sc debug off
+  [SoulsCraft] debug off
+== gamemode creative sc_a
+  Set sc_a's game mode to Creative Mode
+== sc clear
+  

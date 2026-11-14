@@ -1,0 +1,58 @@
+book checks, 2026-11-15T02:07:20
+== tick unfreeze
+  The game is running normally
+== sc arena
+  
+== sc clear
+  
+== gamemode creative sc_a
+  
+== clear sc_a
+  No items were found on player sc_a
+== time set noon
+  Set minecraft:overworld to time marker minecraft:noon
+== weather clear
+  Set the weather to clear
+== tp sc_a -499.5 101 500.5 0 0
+  Teleported sc_a to -499.500000, 101.000000, 500.500000
+== item replace entity sc_a hotbar.0 with soulscraft:hunter_book
+  Replaced 1 slot(s) on sc_a with [Hunter's Book]
+== sc book sc_a reset
+  [SoulsCraft] sc_a: book reset
+== screen
+  {"buttons":[],"screen":"mod"}
+
+== sc book sc_a kill revenant 1
+  [SoulsCraft] sc_a: revenant +1 kills
+== sc book sc_a kill revenant 4
+  [SoulsCraft] sc_a: revenant +4 kills
+== sc book sc_a meet stalker
+  [SoulsCraft] sc_a: stalker met
+== sc book sc_a kill brute 8
+  [SoulsCraft] sc_a: brute +8 kills
+== sc book sc_a kill zombie 15
+  [SoulsCraft] sc_a: zombie +15 kills
+== sc book sc_a kill slime 1
+  [SoulsCraft] sc_a: slime +1 kills
+== sc book sc_a meet hoglin
+  [SoulsCraft] sc_a: hoglin met
+== gui
+  427 x 240
+== item replace entity sc_a hotbar.1 with soulscraft:altar_core
+  Replaced 1 slot(s) on sc_a with [Altar Core]
+== item replace entity sc_a hotbar.2 with soulscraft:banner_horde
+  Replaced 1 slot(s) on sc_a with [Banner of Horde]
+== sc altar 2
+  
+== book before relog
+  [SoulsCraft] sc_a: revenant Изучен (5), stalker Встречен (0), marksman Неизвестен (0), brute Знаток (8), shrike Неизвестен (0), lurker Неизвестен (0), bog_slime Неизвестен (0), zombie Знаток (15), skeleton Неизвестен (0), spider Неизвестен (0), witch Неизвестен (0), pillager Неизвестен (0), vindicator Неизвестен (0), piglin_brute Неизвестен (0), hoglin Встречен (0), wither_skeleton Неизвестен (0), slime Убит (1), phantom Неизвестен (0); altar base true levels {1, 2} banners {"horde"} defense false; events {}
+== book after relog
+  [SoulsCraft] sc_a: revenant Изучен (5), stalker Встречен (0), marksman Неизвестен (0), brute Знаток (8), shrike Неизвестен (0), lurker Неизвестен (0), bog_slime Неизвестен (0), zombie Знаток (15), skeleton Неизвестен (0), spider Неизвестен (0), witch Неизвестен (0), pillager Неизвестен (0), vindicator Неизвестен (0), piglin_brute Неизвестен (0), hoglin Встречен (0), wither_skeleton Неизвестен (0), slime Убит (1), phantom Неизвестен (0); altar base true levels {1, 2} banners {"horde"} defense false; events {}
+== gamemode creative sc_a
+  
+== clear sc_a
+  Removed 3 item(s) from player sc_a
+== sc book sc_a reset
+  [SoulsCraft] sc_a: book reset
+== sc clear
+  
