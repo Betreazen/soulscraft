@@ -396,7 +396,8 @@ pub(super) fn debug_labels(game: &Game<'_>, primitives: &mut WorldPrimitives) {
     if c.shown.values().all(|s| s.flags & wire::DEBUG == 0) {
         return;
     }
-    for m in game.mobs.iter().filter(|m| !m.removed && m.kind.id.starts_with("soulscraft:")) {
+    // SoulsCraft's mobs and the vanilla mobs the server labels (07-vanilla-mobs.md).
+    for m in game.mobs.iter().filter(|m| !m.removed && c.shown.contains_key(&m.id)) {
         let Some(s) = c.shown.get(&m.id) else { continue };
         if s.flags & wire::DEBUG == 0 || s.label.is_empty() {
             continue;

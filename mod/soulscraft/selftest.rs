@@ -42,6 +42,9 @@ enum Kind {
     Turret(&'static str),
     /// Undead and living types against effects and potions (soulscraft_selftest_undead).
     Undead(&'static str),
+    /// The vanilla changes (soulscraft_selftest_vanilla); `vslow_` ones only when the filter
+    /// names them.
+    Vanilla(String),
 }
 
 #[derive(Clone, Debug)]
@@ -114,6 +117,9 @@ fn scenarios(data: &MobsFile, filter: Option<&str>) -> Vec<Scenario> {
     for (name, timeout) in crate::game::soulscraft_selftest_undead::CASES {
         all.push(Scenario { name: (*name).to_owned(), kind: Kind::Undead(*name), timeout: *timeout });
     }
+    for (name, timeout) in crate::game::soulscraft_selftest_vanilla::cases(data) {
+        all.push(Scenario { name: name.clone(), kind: Kind::Vanilla(name), timeout });
+    }
     for (name, timeout) in crate::game::soulscraft_selftest_turret::CASES {
         all.push(Scenario { name: (*name).to_owned(), kind: Kind::Turret(*name), timeout: *timeout });
     }
@@ -121,6 +127,10 @@ fn scenarios(data: &MobsFile, filter: Option<&str>) -> Vec<Scenario> {
     // The turret group needs RustCraft and takes a while: only when asked for (`run turret`).
     if !filter.is_some_and(|f| f.contains("turret")) {
         all.retain(|s| !matches!(s.kind, Kind::Turret(_)));
+    }
+    // The slow vanilla group (real arrows, walks round a wall): only when asked for (`run vslow`).
+    if !filter.is_some_and(|f| f.contains("vslow")) {
+        all.retain(|s| !s.name.starts_with("vslow_"));
     }
     all
 }
@@ -223,6 +233,9 @@ pub(super) fn on_tick(game: &mut Game<'_>, dim: &str, now: u64) {
         }
         if matches!(sc.kind, Kind::Undead(_)) {
             crate::game::soulscraft_selftest_undead::cleanup(game);
+        }
+        if matches!(sc.kind, Kind::Vanilla(_)) {
+            crate::game::soulscraft_selftest_vanilla::cleanup(game);
         }
         match v {
             Ok(()) => {
@@ -417,6 +430,7 @@ fn step(game: &mut Game<'_>, dim: &str, now: u64, sc: &Scenario, live: &mut Live
         Kind::Altar(name) => crate::game::soulscraft_selftest_altar::step(game, now, name, first),
         Kind::Turret(name) => crate::game::soulscraft_selftest_turret::step(game, now, name, first),
         Kind::Undead(name) => crate::game::soulscraft_selftest_undead::step(game, now, name, first),
+        Kind::Vanilla(name) => crate::game::soulscraft_selftest_vanilla::step(game, now, name, first),
     }
 }
 

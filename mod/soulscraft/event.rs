@@ -179,6 +179,11 @@ pub(super) fn running(dim: &str, core: [i32; 3]) -> bool {
     events().contains_key(&(dim.to_owned(), core))
 }
 
+/// A mob an event spawned (the vanilla changes leave it to the event).
+pub(super) fn is_wave(mob: u32) -> bool {
+    WAVE_IDS.lock().unwrap_or_else(PoisonError::into_inner).contains(&mob)
+}
+
 pub(super) fn steering(mob: u32) -> Option<Steering> {
     STEER.lock().unwrap_or_else(PoisonError::into_inner).get(&mob).copied()
 }

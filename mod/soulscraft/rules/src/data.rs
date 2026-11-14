@@ -32,6 +32,9 @@ pub struct MobsFile {
     /// Cover from shooting turrets (crate::cover::CoverRules reads it).
     #[serde(default)]
     pub cover: Value,
+    /// The approved changes of vanilla mobs (07-vanilla-mobs.md; crate::vanilla).
+    #[serde(default)]
+    pub vanilla: crate::vanilla::VanillaSection,
 }
 
 /// Room for a mob's box where it appears (owner's decision, round 9; crate::fit).
@@ -185,6 +188,8 @@ pub struct AttackDef {
     pub id: String,
     #[serde(default)]
     pub name: String,
+    /// The rig clip; empty for a vanilla mob's attack (vanilla keeps its own model).
+    #[serde(default)]
     pub clip: String,
     pub windup: u32,
     #[serde(default)]
@@ -318,6 +323,7 @@ impl MobsFile {
         for mob in &file.mobs {
             mob.check()?;
         }
+        file.vanilla.check()?;
         Ok(file)
     }
 

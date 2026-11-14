@@ -174,8 +174,12 @@ pub fn plan(event: &EventDef, mobs: &MobsFile, effects: &Effects, power: f64) ->
                 let count = ((f64::from(g.count) * size).round() as u32).max(1);
                 let armored = (f64::from(g.armored) * size).round() as u32;
                 let banner = g.kind == "banner_zombie";
-                let base = if banner || g.kind.starts_with("minecraft:") {
-                    SpawnMob::vanilla(if banner { "minecraft:zombie" } else { &g.kind })
+                let base = if banner {
+                    SpawnMob::vanilla("minecraft:zombie")
+                } else if g.kind.starts_with("minecraft:") {
+                    // A changed vanilla type takes its role from data/mobs.json `vanilla`.
+                    let role = mobs.vanilla.role_of(&g.kind).map(Role::parse);
+                    SpawnMob { role: role.unwrap_or(Role::Assault), ..SpawnMob::vanilla(&g.kind) }
                 } else {
                     match mobs.mob(&g.kind) {
                         Some(d) => SpawnMob::of(d),

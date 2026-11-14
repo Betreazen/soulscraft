@@ -230,6 +230,8 @@ pub(super) fn on_level_tick(game: &mut Game<'_>, dimension: &str) {
     }
     forget_gone(dimension, now);
     send_notes(game, dimension, now, &players, notes);
+    // The approved vanilla changes (07-vanilla-mobs.md): adopt and drive vanilla mobs.
+    crate::game::soulscraft_vanilla::on_level_tick(game, dimension, now, &players);
     let spent = started.elapsed().as_nanos() as u64;
     {
         let mut t = OWN_TIME.lock().unwrap_or_else(PoisonError::into_inner);

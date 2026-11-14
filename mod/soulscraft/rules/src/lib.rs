@@ -21,3 +21,4 @@ pub mod cover;
 
 pub mod trophy;
 pub mod boost;
+pub mod vanilla;

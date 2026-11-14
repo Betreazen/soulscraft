@@ -458,6 +458,21 @@ file = "crates/horizon-client/src/game.rs"
 name = "soulscraft_selftest_undead"
 source = "selftest_undead.rs"
 
+# The approved vanilla changes (07-vanilla-mobs.md): adoption, Г2 on the vanilla base, the gate
+# goals and the moves of soulscraft_rules::vanilla, driven after SoulsCraft's own mobs.
+[[module]]
+id = "vanilla"
+file = "crates/horizon-client/src/game.rs"
+name = "soulscraft_vanilla"
+source = "vanilla.rs"
+
+# Their self-test (soulscraft_selftest run vanilla_|vtiming_|vskeleton_; the slow ones: vslow).
+[[module]]
+id = "selftest_vanilla"
+file = "crates/horizon-client/src/game.rs"
+name = "soulscraft_selftest_vanilla"
+source = "selftest_vanilla.rs"
+
 # ---- Iteration 3: trophies and the altar's spawn boost (prototypes/p7-rewards.md, p4-spawn.md) ----
 
 # Heads and dioramas on the server: block entities, placement, wall heads, particles.

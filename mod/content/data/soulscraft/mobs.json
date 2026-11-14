@@ -287,6 +287,187 @@
       "assumed": ["attacks.*.hit"]
     }
   ],
+  "vanilla": {
+    "source": "docs/design/07-vanilla-mobs.md (утверждено, раунд 4–5); числа замахов — Г6, рост — Г2, мобы из спавнеров — Г4; остальные числа — гипотезы среза",
+    "spawner_radius_blocks": 5,
+    "groups": [
+      {
+        "id": "zombie",
+        "name": "Зомби, кадавр, утопленник, зомби-житель",
+        "types": ["minecraft:zombie", "minecraft:husk", "minecraft:drowned", "minecraft:zombie_villager"],
+        "behavior": "brawler",
+        "undead": ["minecraft:zombie", "minecraft:husk", "minecraft:drowned", "minecraft:zombie_villager"],
+        "wave_role": "assault",
+        "attacks": [
+          { "id": "lunge", "name": "Выпад", "windup": 10, "hold": 0, "hit": 4, "recover": 12, "damage": 1.0, "dash_blocks": 3, "tell": "замирает, руки вперёд, рык", "cue": { "sound": "minecraft:entity.{name}.ambient", "pitch": 0.7, "pose": "aggressive", "particle": "minecraft:angry_villager" } },
+          { "id": "trident_throw", "name": "Бросок трезубца", "only": ["minecraft:drowned"], "windup": 14, "hold": 0, "hit": 2, "recover": 26, "damage": 1.0, "projectile": "trident", "tell": "поднимает трезубец над головой", "cue": { "sound": "minecraft:entity.drowned.ambient", "pitch": 0.8, "pose": "aggressive" } }
+        ],
+        "params": {
+          "lunge_range_blocks": [2.5, 5],
+          "lunge_chance": 0.35,
+          "step_back_chance": 0.3,
+          "step_back_blocks": 2,
+          "step_back_ticks": 10,
+          "flank_min_group": 3,
+          "flank_degrees": 70,
+          "flank_radius_blocks": 3,
+          "flank_until_blocks": 3.5,
+          "flank_search_blocks": 16,
+          "trident_range_blocks": [4, 15],
+          "trident_keep_blocks": 4
+        }
+      },
+      {
+        "id": "skeleton",
+        "name": "Скелет, зимогор, болотник",
+        "types": ["minecraft:skeleton", "minecraft:stray", "minecraft:bogged"],
+        "behavior": "archer",
+        "undead": ["minecraft:skeleton", "minecraft:stray", "minecraft:bogged"],
+        "wave_role": "ranged",
+        "attacks": [],
+        "params": {
+          "retreat_below_blocks": 4,
+          "retreat_to_blocks": 7,
+          "retreat_max_ticks": 30,
+          "high_every_ticks": 100,
+          "high_search_blocks": 8,
+          "high_min_above_blocks": 2,
+          "high_max_ticks": 80,
+          "shots_before_pause": 3,
+          "pause_ticks": 20
+        }
+      },
+      {
+        "id": "spider",
+        "name": "Паук, пещерный паук",
+        "types": ["minecraft:spider", "minecraft:cave_spider"],
+        "behavior": "pouncer",
+        "undead": [],
+        "wave_role": "hunter",
+        "attacks": [
+          { "id": "pounce", "name": "Прыжок", "windup": 8, "hold": 0, "hit": 8, "recover": 10, "damage": 1.0, "dash_blocks": 4, "tell": "припадает к земле и шипит", "cue": { "sound": "minecraft:entity.spider.ambient", "pitch": 0.6, "particle": "minecraft:poof" } }
+        ],
+        "params": {
+          "pounce_range_blocks": [2, 6],
+          "pounce_chance": 0.4,
+          "no_vanilla_leap_within_blocks": 6,
+          "wait_above_blocks": 2,
+          "wait_from_blocks": 10,
+          "wait_until_blocks": 2.5,
+          "wait_max_ticks": 200
+        }
+      },
+      {
+        "id": "witch",
+        "name": "Ведьма",
+        "types": ["minecraft:witch"],
+        "behavior": "witch",
+        "undead": [],
+        "wave_role": "ranged",
+        "attacks": [
+          { "id": "potion_throw", "name": "Бросок зелья", "windup": 12, "hold": 0, "hit": 2, "recover": 46, "damage": 1.0, "projectile": "potion", "tell": "смеётся, вокруг вьются искры", "cue": { "sound": "minecraft:entity.witch.celebrate", "particle": "minecraft:witch" } }
+        ],
+        "params": {
+          "control_within_blocks": 16,
+          "keep_distance_blocks": [6, 10],
+          "heal_below_health": 0.5,
+          "hide_search_blocks": 8,
+          "hide_ticks": 60,
+          "hide_cooldown_ticks": 200
+        }
+      },
+      {
+        "id": "pillager",
+        "name": "Разбойник",
+        "types": ["minecraft:pillager"],
+        "behavior": "crossbow",
+        "undead": [],
+        "wave_role": "ranged",
+        "attacks": [
+          { "id": "crossbow_shot", "name": "Выстрел из арбалета", "windup": 10, "hold": 0, "hit": 2, "recover": 40, "damage": 1.0, "projectile": "bolt", "tell": "вскидывает арбалет, щелчок", "cue": { "sound": "minecraft:item.crossbow.loading_end", "pose": "aggressive" } }
+        ],
+        "params": {
+          "control_within_blocks": 20,
+          "keep_distance_blocks": [8, 14],
+          "hide_search_blocks": 8
+        }
+      },
+      {
+        "id": "vindicator",
+        "name": "Поборник",
+        "types": ["minecraft:vindicator"],
+        "behavior": "axe",
+        "undead": [],
+        "wave_role": "assault",
+        "attacks": [
+          { "id": "overhead", "name": "Задержанный удар сверху", "windup": 10, "hold": 6, "hit": 2, "recover": 14, "damage": 1.3, "tell": "топор над головой и замирает", "cue": { "sound": "minecraft:entity.vindicator.ambient", "pitch": 0.8, "pose": "aggressive", "particle": "minecraft:crit" } }
+        ],
+        "params": { "overhead_chance": 0.5 }
+      },
+      {
+        "id": "piglin_brute",
+        "name": "Брут пиглинов",
+        "types": ["minecraft:piglin_brute"],
+        "behavior": "heavy",
+        "undead": [],
+        "wave_role": "assault",
+        "attacks": [
+          { "id": "heavy_strike", "name": "Удар с замахом", "windup": 12, "hold": 0, "hit": 2, "recover": 15, "damage": 1.0, "recover_if": "miss", "tell": "топор отведён, рык", "cue": { "sound": "minecraft:entity.piglin_brute.angry", "pose": "aggressive", "particle": "minecraft:angry_villager" } }
+        ],
+        "params": { "engage_blocks": 4, "recover_on_hit_ticks": 4 }
+      },
+      {
+        "id": "hoglin",
+        "name": "Хоглин, зоглин",
+        "types": ["minecraft:hoglin", "minecraft:zoglin"],
+        "behavior": "ram",
+        "undead": ["minecraft:zoglin"],
+        "wave_role": "assault",
+        "attacks": [
+          { "id": "ram", "name": "Таран", "windup": 10, "hold": 0, "hit": 6, "recover": 20, "damage": 1.0, "dash_blocks": 5, "knockback": true, "recover_if": "miss", "tell": "роет землю копытом", "cue": { "sound": "minecraft:entity.{name}.angry", "particle": "minecraft:poof" } }
+        ],
+        "params": { "ram_range_blocks": [2.5, 7], "ram_chance": 0.5, "recover_on_hit_ticks": 4 }
+      },
+      {
+        "id": "wither_skeleton",
+        "name": "Иссушённый скелет",
+        "types": ["minecraft:wither_skeleton"],
+        "behavior": "fencer",
+        "undead": ["minecraft:wither_skeleton"],
+        "wave_role": "assault",
+        "attacks": [
+          { "id": "series", "name": "Серия из двух ударов", "windup": 8, "hold": 0, "hit": 10, "recover": 6, "damage": 1.0, "strikes_at": [0, 8], "tell": "меч отведён, стук костей", "cue": { "sound": "minecraft:entity.wither_skeleton.ambient", "pose": "aggressive" } }
+        ],
+        "params": { "series_chance": 0.5, "backstep_blocks": 3, "backstep_ticks": 16 }
+      },
+      {
+        "id": "slime",
+        "name": "Слизень, магмовый куб",
+        "types": ["minecraft:slime", "minecraft:magma_cube"],
+        "behavior": "cube",
+        "undead": [],
+        "wave_role": "assault",
+        "attacks": [
+          { "id": "high_jump", "name": "Большой прыжок", "windup": 10, "hold": 0, "hit": 2, "recover": 10, "damage": 1.0, "wave": { "radius_blocks": 1.5 }, "tell": "сжимается и хлюпает", "cue": { "sound": "minecraft:entity.{name}.squish", "hop": 0.2, "particle": "minecraft:item_slime", "by_type": { "minecraft:magma_cube": { "particle": "minecraft:flame" } } } }
+        ],
+        "params": { "jump_range_blocks": 8, "jump_chance": 0.3, "min_size": 2, "leap_up": 0.75 }
+      },
+      {
+        "id": "phantom",
+        "name": "Фантом",
+        "types": ["minecraft:phantom"],
+        "behavior": "phantom",
+        "undead": ["minecraft:phantom"],
+        "wave_role": "hunter",
+        "attacks": [
+          { "id": "cry", "name": "Крик перед пике", "windup": 10, "hold": 0, "hit": 1, "recover": 0, "damage": 0, "tell": "короткий крик, фантом ещё кружит", "cue": { "sound": "minecraft:entity.phantom.ambient", "pitch": 1.6 } }
+        ],
+        "params": {}
+      }
+    ],
+    "untouched": ["minecraft:creeper", "minecraft:silverfish", "minecraft:endermite", "minecraft:blaze", "minecraft:ghast", "minecraft:evoker", "minecraft:ravager", "minecraft:breeze", "minecraft:guardian", "minecraft:elder_guardian", "minecraft:creaking", "minecraft:shulker", "minecraft:ender_dragon", "minecraft:wither", "minecraft:enderman", "minecraft:zombified_piglin", "minecraft:piglin"],
+    "assumed": ["groups.*.params", "groups.*.attacks.*.hit", "groups.*.attacks.*.recover", "groups.*.attacks.*.dash_blocks", "groups.wither_skeleton.attacks.series", "groups.*.attacks.*.cue"]
+  },
   "events": [
     {
       "id": "test_zombies",
