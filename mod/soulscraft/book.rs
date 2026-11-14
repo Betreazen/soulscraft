@@ -496,7 +496,8 @@ fn reports(game: &Game<'_>, now: u64) {
         if !near {
             continue;
         }
-        credit(&mut b, k.owner, &entry, book::weight(&b.file, spawner));
+        let w = book::weight(&b.file, spawner);
+        credit(&mut b, k.owner, &entry, w);
         if from_death {
             if let Some(d) = b.deaths.get_mut(&k.entity) {
                 d.credited.push(k.owner);
