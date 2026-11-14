@@ -76,6 +76,11 @@ try {
     Save-Shot $bot 'stage_message_studied'
     C 'sc book sc_a meet stalker'
     C 'sc book sc_a kill brute 8'
+    # Vanilla rows (round 14 (2)): the zombie row at «Знаток» (its own model, the engine's numbers
+    # and Г2's growth, the lunge's strip), the slime row at «Убит» (numbers by size), the hoglin met.
+    C 'sc book sc_a kill zombie 15'
+    C 'sc book sc_a kill slime 1'
+    C 'sc book sc_a meet hoglin'
     Start-Sleep -Seconds 1
 
     # The pages: the studied revenant (first attack playing, its strip), the met stalker, the
@@ -99,8 +104,22 @@ try {
     Save-Shot $bot 'book_brute_expert'
     Click $bot (& $l.Row 4)
     Save-Shot $bot 'book_shrike_locked'
-    Click $bot (& $l.Row 7)
+    Click $bot (& $l.Row 8)
     Save-Shot $bot 'book_vanilla_locked'
+    # The zombie row (7): an attack strip first, then rest and walk; the types take turns (80 ticks).
+    Click $bot (& $l.Row 7)
+    Save-Shot $bot 'book_vanilla_zombie_expert'
+    Start-Sleep -Milliseconds 400
+    Save-Shot $bot 'book_vanilla_zombie_expert_later'
+    Click $bot (& $l.Clip 1)
+    Save-Shot $bot 'book_vanilla_zombie_walk'
+    Click $bot (& $l.Clip 0)
+    Start-Sleep -Seconds 4
+    Save-Shot $bot 'book_vanilla_husk_idle'
+    Click $bot (& $l.Row 16)
+    Save-Shot $bot 'book_vanilla_slime_killed'
+    Click $bot (& $l.Row 14)
+    Save-Shot $bot 'book_vanilla_hoglin_met'
     Click $bot (& $l.Tab 1)
     Save-Shot $bot 'book_altar_locked'
     Click $bot (& $l.Tab 2)
