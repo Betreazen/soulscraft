@@ -146,9 +146,46 @@ pub fn menu_lines(m: &Menu) -> Vec<String> {
     out
 }
 
+/// Lines wrapped to `max` wide by `width` (the font's measure): a line too wide breaks at its last
+/// space that fits, and its continuation keeps the line's indent plus two spaces. A word wider
+/// than `max` stays whole on its own line.
+pub fn wrap(lines: &[String], max: f32, width: impl Fn(&str) -> f32) -> Vec<String> {
+    let mut out = Vec::new();
+    for line in lines {
+        let indent: String = line.chars().take_while(|c| *c == ' ').collect();
+        let cont = format!("{indent}  ");
+        let mut cur = indent.clone();
+        let mut empty = true;
+        for word in line.trim_start().split(' ') {
+            let next = if empty { format!("{cur}{word}") } else { format!("{cur} {word}") };
+            if !empty && width(&next) > max {
+                out.push(cur);
+                cur = format!("{cont}{word}");
+            } else {
+                cur = next;
+            }
+            empty = false;
+        }
+        out.push(cur);
+    }
+    out
+}
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn long_menu_lines_wrap_at_spaces_with_their_indent() {
+        // One unit a character.
+        let w = |s: &str| s.chars().count() as f32;
+        let lines = vec!["Учащённый спавн: ×4 попыток в секторе".to_owned(), "  род: нежить — 25% волны".to_owned(), "коротко".to_owned()];
+        let out = wrap(&lines, 20.0, w);
+        assert_eq!(out, ["Учащённый спавн: ×4", "  попыток в секторе", "  род: нежить — 25%", "    волны", "коротко"]);
+        assert!(out.iter().all(|l| w(l) <= 20.0));
+        // A word wider than the panel stays whole.
+        assert_eq!(wrap(&["ааааааааааааааааааааааааа б".to_owned()], 10.0, w), ["ааааааааааааааааааааааааа", "  б"]);
+        assert!(wrap(&[], 10.0, w).is_empty());
+    }
 
     #[test]
     fn messages_round_trip() {

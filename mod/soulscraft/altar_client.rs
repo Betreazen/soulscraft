@@ -121,6 +121,11 @@ fn layout(screen: &NativeScreenView<'_>, lines: usize) -> ([f32; 4], [[f32; 4]; 
     ([px, py, PANEL_W, ph], [b(0.0), b(1.0), b(2.0)])
 }
 
+/// The menu's lines wrapped to the panel's text width (a long line, the spawn boost's, breaks).
+fn wrapped(game: &Game<'_>, menu: &view::Menu) -> Vec<String> {
+    view::wrap(&view::menu_lines(menu), PANEL_W - 16.0, |s| game.native_text_width(s))
+}
+
 fn inside(r: [f32; 4], at: [f32; 2]) -> bool {
     at[0] >= r[0] && at[0] <= r[0] + r[2] && at[1] >= r[1] && at[1] <= r[1] + r[3]
 }
@@ -131,7 +136,7 @@ pub(super) fn draw_screen(game: &Game<'_>, batch: &mut HudBatch, screen: &Native
         return;
     }
     let Some(menu) = client().menu.clone() else { return };
-    let lines = view::menu_lines(&menu);
+    let lines = wrapped(game, &menu);
     let (panel, buttons) = layout(screen, lines.len() + 1);
     game.native_fill(batch, panel, 0xE01A_1714);
     game.native_fill(batch, [panel[0], panel[1], panel[2], 1.0], 0xFF9C_F5E4);
@@ -157,7 +162,7 @@ pub(super) fn on_screen_press(game: &Game<'_>, screen: &NativeScreenView<'_>, bu
     }
     let mut c = client();
     let Some(menu) = c.menu.clone() else { return };
-    let (_, buttons) = layout(screen, view::menu_lines(&menu).len() + 1);
+    let (_, buttons) = layout(screen, wrapped(game, &menu).len() + 1);
     let Some(i) = buttons.iter().position(|b| inside(*b, screen.mouse)) else { return };
     *canceled = true;
     match i {
