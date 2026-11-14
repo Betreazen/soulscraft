@@ -169,9 +169,36 @@ pub fn xp_tag_sized(base: f64, scaled: f64, share: f64) -> String {
     format!("{XP_TAG_PREFIX}{}", xp_percent_sized(mult, share))
 }
 
+/// A mob's health after its maximum went from `old_max` to `new_max` (Г2 on an adopted vanilla
+/// mob): the same fraction of the new maximum, never above it. A mob another mod hurt or set low
+/// stays as low in proportion (RustCraft's test spider at 2 of 16 stays at 2 with P 0); a fresh,
+/// full mob is full at its grown maximum. A broken maximum keeps the health as it was, capped.
+pub fn kept_health(health: f32, old_max: f32, new_max: f32) -> f32 {
+    if !(old_max > 0.0 && new_max > 0.0 && health.is_finite()) {
+        return if new_max > 0.0 { health.min(new_max) } else { health };
+    }
+    (health * new_max / old_max).min(new_max)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn adoption_keeps_the_health_fraction() {
+        // RustCraft's test spider: 2 of 16 at P 0 stays 2; at P 1 (× 1.9) it is 2 of 30.4 → 3.8.
+        assert_eq!(kept_health(2.0, 16.0, 16.0), 2.0);
+        assert!((kept_health(2.0, 16.0, 30.4) - 3.8).abs() < 1e-5);
+        // A fresh, full zombie is full at its grown maximum.
+        assert_eq!(kept_health(20.0, 20.0, 38.0), 38.0);
+        // Never above the new maximum, never raised past its proportion.
+        assert_eq!(kept_health(25.0, 20.0, 20.0), 20.0);
+        assert_eq!(kept_health(10.0, 20.0, 10.0), 5.0);
+        // Broken maxima: as it was, capped.
+        assert_eq!(kept_health(7.0, 0.0, 20.0), 7.0);
+        assert_eq!(kept_health(30.0, 0.0, 20.0), 20.0);
+        assert_eq!(kept_health(7.0, 20.0, 0.0), 7.0);
+    }
 
     #[test]
     fn xp_tag_for_pct() {

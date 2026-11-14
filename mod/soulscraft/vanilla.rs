@@ -4,8 +4,9 @@
 //   - its P (Г1, Г5: the players near, or its tag `soulscraft.p=`), kept as that tag;
 //   - Г2's growth as attribute modifiers `soulscraft:power` on its own vanilla base (health, damage,
 //     speed) and armour on its type's (`armor_attributes`, as the server half does for its own);
-//     health full on the first adoption; Path-of-craft-tree's `pct.xpNNN` from its vanilla health,
-//     so PCT pays the vanilla kind by its own table times Г3's bonus;
+//     health keeps its fraction of the maximum (a fresh mob is full); Path-of-craft-tree's
+//     `pct.xpNNN` from its vanilla health, so PCT pays the vanilla
+//     kind by its own table times Г3's bonus;
 //   - a mob within `spawner_radius_blocks` of a spawner grows but gets no moves (Г4: farms keep
 //     working), tag `soulscraft.spawner`;
 //   - a wave mob of an altar's event (tag `soulscraft.wave`) is the event's and is left alone.
@@ -277,7 +278,7 @@ fn adopt(game: &mut Game<'_>, dim: &str, now: u64, m: &Seen, g: &VanillaDef, pla
     } else {
         tags.iter().any(|t| t == TAG_SPAWNER)
     };
-    let base = apply_power(game, m.id, p, fresh);
+    let base = apply_power(game, m.id, p);
     if let Some((base_health, max)) = base {
         crate::game::soulscraft_server::set_xp_tag(game, m.id, base_health, max);
     }
@@ -332,18 +333,19 @@ fn spawner_near(game: &Game<'_>, at: V3, radius: i32) -> bool {
 
 /// Г2 on a vanilla mob: modifiers on its own base (a slime's size², a baby's speed stay its own),
 /// armour on its type's. Returns (base health, scaled max health) for PCT's tag.
-fn apply_power(game: &mut Game<'_>, id: u32, p: f64, fresh: bool) -> Option<(f64, f64)> {
+fn apply_power(game: &mut Game<'_>, id: u32, p: f64) -> Option<(f64, f64)> {
     let i = game.mobs.iter().position(|m| m.id == id)?;
     let base_armor = f64::from(game.mobs[i].kind.armor);
     let kind = game.mobs[i].kind.id.to_string();
     {
         let m = &mut game.mobs[i];
+        let old_max = m.attrs.max_health;
         finalize::add_modifier(m, Attr::MaxHealth, POWER_MOD, 0.9 * p, Op::AddMultipliedBase);
         finalize::add_modifier(m, Attr::AttackDamage, POWER_MOD, 0.6 * p, Op::AddMultipliedBase);
         finalize::add_modifier(m, Attr::MovementSpeed, POWER_MOD, 0.10 * p, Op::AddMultipliedBase);
-        if fresh || m.health > m.attrs.max_health {
-            m.health = m.attrs.max_health;
-        }
+        // The same fraction of the grown maximum: a mob set low by another mod (RustCraft's test
+        // spider at 2 health) stays low, a fresh full one is full; never above its proportion.
+        m.health = scale::kept_health(m.health, old_max, m.attrs.max_health);
         m.needs_sync = true;
     }
     if p > 0.0 {
@@ -484,7 +486,14 @@ fn tick_mob(
     if let Some(idx) = tick.cue {
         cue(game, dim, now, m, g, idx);
     }
-    drive(game, dim, now, m, &tick);
+    // A cube in its windup stands still: what is left of its own hop along the ground stops.
+    let in_windup = || {
+        let s = state();
+        let run = s.mobs.get(&m.id).and_then(|v| v.brain.as_ref()?.attack(now));
+        run.is_some_and(|(i, t)| g.attacks.get(i).is_some_and(|a| t < a.def.windup))
+    };
+    let slide = g.behavior() == Behavior::Cube && m.on_ground && tick.launch.is_none() && in_windup();
+    drive(game, dim, now, m, &tick, slide);
     for strike in &tick.strikes {
         deal(game, dim, now, m, g, strike, target);
     }
@@ -539,7 +548,7 @@ fn hold(game: &mut Game<'_>, dim: &str, id: u32, tick: &VTick) {
 }
 
 /// The mind's order as the engine's calls, only while it holds the mob.
-fn drive(game: &mut Game<'_>, dim: &str, now: u64, m: &Seen, tick: &VTick) {
+fn drive(game: &mut Game<'_>, dim: &str, now: u64, m: &Seen, tick: &VTick, slide: bool) {
     if let Some(v) = tick.launch {
         set_velocity(game, m.id, v, true);
     }
@@ -552,9 +561,7 @@ fn drive(game: &mut Game<'_>, dim: &str, now: u64, m: &Seen, tick: &VTick) {
     let path = state().mobs.get(&m.id).and_then(|v| v.path);
     let path = match tick.order {
         Order::Stay => {
-            if path.is_some() {
-                game.native_mob_stop(dim, m.id);
-            }
+            stand(game, dim, m.id, slide);
             None
         }
         Order::Walk { to, speed } => {
@@ -567,9 +574,7 @@ fn drive(game: &mut Game<'_>, dim: &str, now: u64, m: &Seen, tick: &VTick) {
             }
         }
         Order::Dash { dir, per_tick } => {
-            if path.is_some() {
-                game.native_mob_stop(dim, m.id);
-            }
+            stand(game, dim, m.id, false);
             set_velocity(game, m.id, geom::scale(dir, per_tick), false);
             None
         }
@@ -577,6 +582,23 @@ fn drive(game: &mut Game<'_>, dim: &str, now: u64, m: &Seen, tick: &VTick) {
     };
     if let Some(v) = state().mobs.get_mut(&m.id) {
         v.path = path;
+    }
+}
+
+/// Holds a mob where it is for this tick: its path ends and its move control waits (a vanilla goal
+/// that ran before the gate took its slot may have set both; the gate holds from the next full
+/// goal tick). Each tick, because vanilla's goals of the mob may still be ticking this one. `slide`
+/// also stops what is left of a cube's own hop along the ground.
+fn stand(game: &mut Game<'_>, dim: &str, id: u32, slide: bool) {
+    game.native_mob_stop(dim, id);
+    let Some(m) = game.mobs.iter_mut().find(|m| m.id == id) else { return };
+    m.ai.mov.operation = horizon_client::mobs::control::Operation::Wait;
+    m.ai.zza = 0.0;
+    m.ai.xxa = 0.0;
+    if slide && (m.velocity.x != 0.0 || m.velocity.z != 0.0) {
+        m.velocity.x = 0.0;
+        m.velocity.z = 0.0;
+        m.needs_sync = true;
     }
 }
 
@@ -709,7 +731,16 @@ fn throw(game: &mut Game<'_>, dim: &str, m: &Seen, tg: &Target, kind: &str, dama
         Ok((crate::mod_api::Tag::Compound(c), _)) => c,
         _ => return false,
     };
-    game.native_summon(dim, entity, from, nbt).is_some()
+    if game.native_summon(dim, entity, from, nbt).is_some() {
+        return true;
+    }
+    // The engine gives no id back for a projectile (`native_summon` finds its root among mobs and a
+    // few kinds only, game/native_entities.rs:259-265): look for it where it was thrown.
+    let probe = format!(
+        "execute in {dim} if entity @e[type={entity},x={:.2},y={:.2},z={:.2},distance=..2.5]",
+        from[0], from[1], from[2]
+    );
+    game.native_run_command_captured(&probe).result > 0
 }
 
 /// Vanilla's witch picks by the target (`Witch.performRangedAttack`); without the target's effects

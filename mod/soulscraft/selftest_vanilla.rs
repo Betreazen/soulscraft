@@ -53,6 +53,9 @@ struct Case {
     golem: Option<u32>,
     started: Option<u64>,
     forced: bool,
+    /// The tick the move was forced: a mob may start the same move on its own just before, and that
+    /// earlier run is not the one measured.
+    forced_at: u64,
     from: [f64; 3],
     /// The phantom's swoop flag on each tick after the start: (tick, flag).
     flags: Vec<(u64, bool)>,
@@ -314,12 +317,19 @@ fn timing(game: &mut Game<'_>, now: u64, rest: &str, c: &mut Case) -> Option<Res
             return Some(Err("not forced".into()));
         }
         c.forced = true;
+        c.forced_at = now;
         return None;
     }
     let line = Timeline::of(&a);
     let s = vanilla::state();
-    let mine = |r: &&vanilla::VRecord| r.mob == id && r.attack == a.id;
-    let Some(start) = s.phases.iter().filter(mine).find(|r| r.t == 0).map(|r| r.tick) else { return None };
+    let since = c.forced_at;
+    let started = |r: &&vanilla::VRecord| r.mob == id && r.attack == a.id && r.tick >= since;
+    // The forced run begins on the next tick of the mind (this one or the next): the latest start
+    // in that window, so a run of its own that began on the same tick is passed over.
+    let Some(start) = s.phases.iter().filter(started).filter(|r| r.t == 0 && r.tick <= since + 2).map(|r| r.tick).max() else { return None };
+    // The forced run only: from its start to its end (a later run of its own is not counted).
+    let end = s.phases.iter().filter(started).find(|r| r.tick >= start && r.phase.is_some_and(|p| p.label() == "end")).map(|r| r.tick);
+    let mine = |r: &&vanilla::VRecord| started(r) && r.tick >= start && end.is_none_or(|e| r.tick <= e);
     let behavior = g.behavior();
     if c.started.is_none() {
         c.started = Some(start);
