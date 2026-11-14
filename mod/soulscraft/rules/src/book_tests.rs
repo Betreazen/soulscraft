@@ -228,12 +228,32 @@ fn the_hit_log_keeps_each_players_last_hit_for_the_window() {
 #[test]
 fn turret_reports_read_as_rustcraft_writes_them() {
     let owner = 0x26a5132a990442e59cfd2cccd5083fa8u128;
-    assert_eq!(turret_report("pct-machine kill 26a5132a990442e59cfd2cccd5083fa8 42 soulscraft:revenant"), Some((owner, 42, "soulscraft:revenant".into())));
-    assert_eq!(turret_report("/pct-machine kill 00000000000000000000000000000001 7 minecraft:zombie"), Some((1, 7, "minecraft:zombie".into())));
-    assert_eq!(turret_report("pct-machine break 1 minecraft:overworld 1 2 3 x axe"), None);
-    assert_eq!(turret_report("pct-machine kill zz 7 minecraft:zombie"), None);
-    assert_eq!(turret_report("pct-machine kill 1 7"), None);
-    assert_eq!(turret_report("say hi"), None);
+    let old = |owner, entity, kind: &str| Some(MachineKill { machine: Machine::Turret, owner, entity, kind: kind.into(), at: None });
+    assert_eq!(machine_kill("pct-machine kill 26a5132a990442e59cfd2cccd5083fa8 42 soulscraft:revenant"), old(owner, 42, "soulscraft:revenant"));
+    assert_eq!(machine_kill("/pct-machine kill 00000000000000000000000000000001 7 minecraft:zombie"), old(1, 7, "minecraft:zombie"));
+    assert_eq!(machine_kill("pct-machine break 1 minecraft:overworld 1 2 3 x axe"), None);
+    assert_eq!(machine_kill("pct-machine kill zz 7 minecraft:zombie"), None);
+    assert_eq!(machine_kill("pct-machine kill 1 7"), None);
+    assert_eq!(machine_kill("say hi"), None);
+}
+
+#[test]
+fn soulscraft_kill_reads_turrets_and_guards_alike() {
+    let owner = 0x26a5132a990442e59cfd2cccd5083fa8u128;
+    let line = "soulscraft-kill turret 26a5132a990442e59cfd2cccd5083fa8 42 minecraft:zombie -501 100 -7";
+    let want = MachineKill { machine: Machine::Turret, owner, entity: 42, kind: "minecraft:zombie".into(), at: Some([-501, 100, -7]) };
+    assert_eq!(machine_kill(line), Some(want.clone()));
+    let guard = machine_kill(&line.replace("turret", "guard")).unwrap();
+    assert_eq!(guard, MachineKill { machine: Machine::Guard, ..want.clone() });
+    assert_eq!(machine_kill(&format!("/{line}")), Some(want));
+    // Broken: an unknown source, no position, a position that is not whole, a long owner.
+    assert_eq!(machine_kill(&line.replace("turret", "golem")), None);
+    assert_eq!(machine_kill("soulscraft-kill turret 1 42 minecraft:zombie"), None);
+    assert_eq!(machine_kill("soulscraft-kill turret 1 42 minecraft:zombie 1.5 2 3"), None);
+    assert_eq!(machine_kill("soulscraft-kill turret 1 -4 minecraft:zombie 1 2 3"), None);
+    assert_eq!(machine_kill(&format!("soulscraft-kill guard {}0 1 minecraft:zombie 1 2 3", "f".repeat(32))), None);
+    assert_eq!(machine_kill("soulscraft-kill"), None);
+    assert_eq!(Machine::Guard.name(), "guard");
 }
 
 #[test]

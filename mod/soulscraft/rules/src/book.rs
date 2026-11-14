@@ -484,16 +484,66 @@ pub fn weight(book: &BookFile, from_spawner: bool) -> f64 {
     if from_spawner { book.credit.spawner_weight } else { 1.0 }
 }
 
-/// RustCraft's report of a turret's kill to Path-of-craft-tree, which this mod also hears on the
-/// console: `pct-machine kill <owner, 32 hex> <entity id> <type>`.
-pub fn turret_report(line: &str) -> Option<(u128, u32, String)> {
-    let mut w = line.trim_start_matches('/').split_whitespace();
-    if w.next()? != "pct-machine" || w.next()? != "kill" {
-        return None;
+/// SoulsCraft's own console command for a machine's kill (docs/research/integration.md, «Убийства
+/// машин RustCraft»): `soulscraft-kill <source> <owner, 32 hex> <entity id> <type> <x> <y> <z>`.
+pub const KILL_COMMAND: &str = "soulscraft-kill";
+
+/// What killed the mob for its owner: both are credited the same way.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Machine {
+    Turret,
+    Guard,
+}
+
+impl Machine {
+    pub fn name(self) -> &'static str {
+        match self {
+            Machine::Turret => "turret",
+            Machine::Guard => "guard",
+        }
     }
-    let owner = u128::from_str_radix(w.next()?, 16).ok()?;
+}
+
+/// A machine's kill, from either report.
+#[derive(Clone, Debug, PartialEq)]
+pub struct MachineKill {
+    pub machine: Machine,
+    pub owner: u128,
+    pub entity: u32,
+    pub kind: String,
+    /// The victim's block at its death: only `soulscraft-kill` gives it.
+    pub at: Option<[i32; 3]>,
+}
+
+/// A machine's kill report as RustCraft writes it on the console: SoulsCraft's own
+/// `soulscraft-kill turret|guard <owner> <entity> <type> <x> <y> <z>` (RustCraft 0.10.0 on), or
+/// its older report to Path-of-craft-tree, `pct-machine kill <owner> <entity> <type>` (a turret's,
+/// sent only while PCT is in the build). Anything else, or a broken one: None.
+pub fn machine_kill(line: &str) -> Option<MachineKill> {
+    let line = line.trim_start_matches('/');
+    let mut w = line.split_whitespace();
+    let (machine, own) = match w.next()? {
+        KILL_COMMAND => match w.next()? {
+            "turret" => (Machine::Turret, true),
+            "guard" => (Machine::Guard, true),
+            _ => return None,
+        },
+        "pct-machine" if w.next()? == "kill" => (Machine::Turret, false),
+        _ => return None,
+    };
+    let owner = w.next().filter(|h| h.len() <= 32).and_then(|h| u128::from_str_radix(h, 16).ok())?;
     let entity = w.next()?.parse().ok()?;
-    Some((owner, entity, w.next()?.to_owned()))
+    let kind = w.next()?.to_owned();
+    let at = if own {
+        let mut c = [0i32; 3];
+        for v in &mut c {
+            *v = w.next()?.parse().ok()?;
+        }
+        Some(c)
+    } else {
+        None
+    };
+    Some(MachineKill { machine, owner, entity, kind, at })
 }
 
 // ---- The message to the client ----

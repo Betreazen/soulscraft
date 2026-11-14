@@ -27,7 +27,7 @@ use horizon_client::items::ItemStack;
 use horizon_client::mobs::{Mob, Who};
 use soulscraft_rules::{
     altar::AltarFile,
-    book::{self, BookFile, BookMsg, Catalog, Held, HitLog, Progress, Unlock},
+    book::{self, BookFile, BookMsg, Catalog, Held, HitLog, MachineKill, Progress, Unlock},
     geom::{self, V3},
 };
 use std::collections::{HashMap, HashSet};
@@ -90,7 +90,10 @@ struct Book {
     hits: HitLog,
     ages: HashMap<u32, i64>,
     deaths: HashMap<u32, Death>,
-    reports: Vec<(u128, u32, String, u64)>,
+    /// Machine kill reports waiting for their death: (report, the tick it came).
+    reports: Vec<(MachineKill, u64)>,
+    /// (entity, owner) credited from a report without a death heard: a second report of it is not.
+    machine_credited: HashSet<(u32, u128)>,
     spawner_ids: HashSet<u32>,
     untagged: Vec<u32>,
     meets: Vec<(String, u128)>,
@@ -115,6 +118,7 @@ static BOOK: LazyLock<Mutex<Book>> = LazyLock::new(|| {
         ages: HashMap::new(),
         deaths: HashMap::new(),
         reports: Vec::new(),
+        machine_credited: HashSet::new(),
         spawner_ids: HashSet::new(),
         untagged: Vec::new(),
         meets: Vec::new(),
@@ -182,11 +186,17 @@ pub(super) fn on_spawner_planned(ids: &HashMap<u32, u32>) {
     }
 }
 
-/// Every console line: RustCraft's turret kill reports.
-pub(super) fn on_console(line: &str) {
-    if let Some((owner, entity, kind)) = book::turret_report(line) {
-        book().reports.push((owner, entity, kind, 0));
+/// Every console line: RustCraft's machine kill reports, its turrets' and (later) its guards',
+/// by `soulscraft-kill` or the older `pct-machine kill`. True when the line is this mod's own
+/// command (the console's `ran`); a `pct-machine` line is Path-of-craft-tree's and stays its.
+pub(super) fn on_console(line: &str) -> bool {
+    let own = line.trim_start_matches('/').split_whitespace().next() == Some(book::KILL_COMMAND);
+    match book::machine_kill(line) {
+        Some(k) => book().reports.push((k, 0)),
+        None if own => log::warn!("soulscraft: book: unreadable report `{line}`"),
+        None => {}
     }
+    own
 }
 
 /// `native_use_item`: the book opens.
@@ -446,7 +456,9 @@ fn note(p: &mut Player, file: &BookFile, lines: &mut Vec<String>, u: &Unlock) {
     p.unsent = true;
 }
 
-/// RustCraft's turret kills: the owner within 32 blocks of the death gets it.
+/// RustCraft's machine kills (turret or guard, either report): the owner within 32 blocks of the
+/// death gets it, once per death whichever reports come. A report waits `DEATH_KEEP` ticks for its
+/// death; a `soulscraft-kill` one whose death was never heard is then credited at its own block.
 fn reports(game: &Game<'_>, now: u64) {
     let pending = std::mem::take(&mut book().reports);
     if pending.is_empty() {
@@ -455,24 +467,45 @@ fn reports(game: &Game<'_>, now: u64) {
     let owners: HashMap<u128, V3> = game.native_server_players().into_iter().map(|p| (p.uuid, p.position)).collect();
     let mut b = book();
     let mut keep = Vec::new();
-    for (owner, entity, kind, first) in pending {
+    for (k, first) in pending {
         let first = if first == 0 { now } else { first };
-        let Some(entry) = b.catalog.by_key(&kind).cloned() else { continue };
-        let Some(d) = b.deaths.get(&entity).cloned() else {
-            if now - first < DEATH_KEEP {
-                keep.push((owner, entity, kind, first));
+        let Some(entry) = b.catalog.by_key(&k.kind).cloned() else { continue };
+        let (died_at, spawner, from_death) = match b.deaths.get(&k.entity) {
+            Some(d) if d.credited.contains(&k.owner) => continue,
+            Some(d) => (d.pos, d.spawner, true),
+            None if now - first < DEATH_KEEP => {
+                keep.push((k, first));
+                continue;
             }
-            continue;
+            None => match k.at {
+                Some(c) if !b.machine_credited.contains(&(k.entity, k.owner)) => {
+                    ([f64::from(c[0]) + 0.5, f64::from(c[1]), f64::from(c[2]) + 0.5], b.spawner_ids.contains(&k.entity), false)
+                }
+                _ => continue,
+            },
         };
-        let owner_at = owners.get(&owner).copied().or_else(|| stand_in_pos(game, &b.players, owner));
-        let near = book::owner_credited(&b.file, owner_at, d.pos);
-        log::info!("soulscraft: book credit mob={} id={entity} owner={owner:032x} near={near} how=turret", entry.id);
-        if near && !d.credited.contains(&owner) {
-            let w = book::weight(&b.file, d.spawner);
-            credit(&mut b, owner, &entry, w);
-            if let Some(d) = b.deaths.get_mut(&entity) {
-                d.credited.push(owner);
+        let owner_at = owners.get(&k.owner).copied().or_else(|| stand_in_pos(game, &b.players, k.owner));
+        let near = book::owner_credited(&b.file, owner_at, died_at);
+        log::info!(
+            "soulscraft: book credit mob={} id={} owner={:032x} near={near} how={}",
+            entry.id,
+            k.entity,
+            k.owner,
+            k.machine.name()
+        );
+        if !near {
+            continue;
+        }
+        credit(&mut b, k.owner, &entry, book::weight(&b.file, spawner));
+        if from_death {
+            if let Some(d) = b.deaths.get_mut(&k.entity) {
+                d.credited.push(k.owner);
             }
+        } else {
+            if b.machine_credited.len() > 4096 {
+                b.machine_credited.clear();
+            }
+            b.machine_credited.insert((k.entity, k.owner));
         }
     }
     b.reports.extend(keep);
@@ -676,6 +709,7 @@ pub(super) fn clear_stand_ins() {
     b.levels.clear();
     b.deaths.clear();
     b.reports.clear();
+    b.machine_credited.clear();
     b.meets.clear();
     b.ended.clear();
 }
@@ -733,6 +767,12 @@ pub(super) fn reset(name: &str) -> String {
 /// The usage `native_register_commands` gets.
 pub(super) fn on_register_commands(commands: &mut Vec<crate::mod_api::NativeCommand>) {
     commands.push(crate::mod_api::NativeCommand::op("sc book <player:word> [action:text]", 2));
+    // RustCraft's machine kills (`on_console`); level 4: only the console and the mods run it. The
+    // type has a colon, which a `word` does not take: the rest of the line is one `text`.
+    commands.push(crate::mod_api::NativeCommand::op(
+        &format!("{} <source:word> <owner:word> <entity:integer> <kind_and_block:text>", book::KILL_COMMAND),
+        4,
+    ));
 }
 
 /// `/sc book <player> [reset | open | meet <mob> | kill <mob> [n]]`: the player's book, a reset,

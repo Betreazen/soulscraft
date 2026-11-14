@@ -22,6 +22,7 @@ pub(super) const CASES: &[(&str, u64)] = &[
     ("book_spawner_weight", 40),
     ("book_met_trigger", 60),
     ("book_turret_report", 40),
+    ("book_kill_command", 40),
     ("book_persist", 10),
     ("book_altar_levels", 120),
     ("book_event_entries", 400),
@@ -42,6 +43,7 @@ pub(super) fn step(game: &mut Game<'_>, now: u64, t: u64, name: &str, c: &mut Ca
         "book_spawner_weight" => spawner(game, t, c),
         "book_met_trigger" => met(game, t, c),
         "book_turret_report" => turret(game, t, c),
+        "book_kill_command" => kill_command(game, t, c),
         "book_persist" => Some(persist()),
         "book_altar_levels" => altar_levels(game, now, t, c),
         "book_event_entries" => event_entries(game, now, t, c),
@@ -257,6 +259,58 @@ fn turret(game: &mut Game<'_>, t: u64, c: &mut Case) -> Option<Result<(), String
     }
     let (a, b) = (stage_of(A, "revenant").1, stage_of(B, "revenant").1);
     Some(if a == 1.0 && b == 0.0 { Ok(()) } else { Err(format!("owner near {a} kills, owner far {b}, wanted 1 and 0")) })
+}
+
+/// The machine kill command (`soulscraft-kill`, round 14 (1)) run on the console as RustCraft runs
+/// it: registered (RustCraft looks for it with `native_command_info`), a turret's kill credited to
+/// its owner within 32 blocks and not to one 35 blocks away, a guard's the same way; a death
+/// reported by both `soulscraft-kill` and the older `pct-machine kill` is credited once.
+fn kill_command(game: &mut Game<'_>, t: u64, c: &mut Case) -> Option<Result<(), String>> {
+    if t == 1 {
+        stand_in(game, A, "stand_a", [-10, 0, 0])?;
+        stand_in(game, B, "stand_b", [17, 0, 0])?;
+        let ids: Vec<String> = [[-18, 0, 4], [-18, 0, -4], [-14, 0, 0]]
+            .into_iter()
+            .filter_map(|cell| mob(game, "revenant", cell, ""))
+            .map(|x| x.to_string())
+            .collect();
+        c.note = ids.join(",");
+        return None;
+    }
+    let ids: Vec<u32> = c.note.split(',').filter_map(|s| s.parse().ok()).collect();
+    if ids.len() != 3 {
+        return Some(Err("summon refused".into()));
+    }
+    if t == 3 {
+        if game.native_command_info(rb::KILL_COMMAND).is_none() {
+            return Some(Err(format!("{} is not registered", rb::KILL_COMMAND)));
+        }
+        let blocks: Vec<[i32; 3]> = ids
+            .iter()
+            .filter_map(|id| game.mobs.iter().find(|m| m.id == *id))
+            .map(|m| [m.position.x.floor() as i32, m.position.y.floor() as i32, m.position.z.floor() as i32])
+            .collect();
+        if blocks.len() != 3 {
+            return Some(Err("a revenant is gone before its death".into()));
+        }
+        for id in &ids {
+            hit(game, *id, None, 1000.0);
+        }
+        let line = |source: &str, owner: u128, i: usize| {
+            let b = blocks[i];
+            format!("{} {source} {owner:032x} {} soulscraft:revenant {} {} {}", rb::KILL_COMMAND, ids[i], b[0], b[1], b[2])
+        };
+        let ran = [line("turret", A, 0), line("turret", B, 1), line("guard", A, 2)].map(|l| game.native_run_mod_command(&l));
+        if !ran.iter().all(|r| *r) {
+            return Some(Err(format!("the console did not take the command: {ran:?}")));
+        }
+        book::on_console(&format!("pct-machine kill {A:032x} {} soulscraft:revenant", ids[2]));
+    }
+    if t < 8 {
+        return None;
+    }
+    let (a, b) = (stage_of(A, "revenant").1, stage_of(B, "revenant").1);
+    Some(if a == 2.0 && b == 0.0 { Ok(()) } else { Err(format!("owner near {a} kills, owner far {b}, wanted 2 and 0")) })
 }
 
 /// The progress in a persistent-data compound beside another mod's key, read back (a relog or a

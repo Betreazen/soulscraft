@@ -43,9 +43,9 @@
     "soulscraft_weight": 10,
     "kin_weight": 2.0,
     "kin_vanilla": {
-      "undead": ["minecraft:zombie", "minecraft:skeleton", "minecraft:husk", "minecraft:stray", "minecraft:bogged", "minecraft:zombie_villager", "minecraft:drowned"],
-      "beasts": ["minecraft:spider", "minecraft:cave_spider"],
-      "slimes": ["minecraft:slime"],
+      "undead": ["minecraft:zombie", "minecraft:skeleton", "minecraft:husk", "minecraft:stray", "minecraft:bogged", "minecraft:zombie_villager", "minecraft:drowned", "minecraft:wither_skeleton", "minecraft:zoglin"],
+      "beasts": ["minecraft:spider", "minecraft:cave_spider", "minecraft:hoglin", "minecraft:zoglin"],
+      "slimes": ["minecraft:slime", "minecraft:magma_cube"],
       "flyers": ["minecraft:phantom"],
       "water": ["minecraft:drowned", "minecraft:guardian"]
     }

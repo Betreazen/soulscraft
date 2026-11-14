@@ -46,6 +46,7 @@ pub(super) const CASES: &[(&str, u64)] = &[
     ("event_nobody_fails", 120),
     ("event_drain_fails", 700),
     ("event_path_rebuild", 120),
+    ("event_wave_no_vanilla_moves", 200),
     ("defense_intercept", 400),
     ("defense_intercept_not_through_walls", 300),
     ("defense_curse", 400),
@@ -210,6 +211,7 @@ pub(super) fn step(game: &mut Game<'_>, now: u64, name: &str, first: bool) -> Op
         "event_nobody_fails" => nobody(game, now, t, c),
         "event_drain_fails" => drain_fails(game, now, t, c),
         "event_path_rebuild" => rebuild(game, now, t, c),
+        "event_wave_no_vanilla_moves" => wave_no_moves(game, now, t, c),
         "defense_intercept" => intercept(game, now, t, c),
         "defense_intercept_not_through_walls" => intercept_walled(game, now, t, c),
         "defense_curse" => curse(game, now, t, c),
@@ -950,4 +952,52 @@ fn intercept_walled(game: &mut Game<'_>, now: u64, t: u64, c: &mut Case) -> Opti
         _ => {}
     }
     None
+}
+
+/// Round 14 (4): the event leads its wave. Three wave zombies on a stand-in next to their spawns
+/// for 60 ticks: none is adopted by the vanilla mind (no lunge, no flank, no cue), each is left alone.
+fn wave_no_moves(game: &mut Game<'_>, now: u64, t: u64, c: &mut Case) -> Option<Result<(), String>> {
+    const WATCH: u64 = 60;
+    if t == 1 {
+        build(game, 1);
+        return None;
+    }
+    if t == 4 {
+        level(game, now)?;
+        c.golem = golem(game, STAND_IN);
+        let ov = Overrides {
+            waves: Some(vec![zombies(3)]),
+            telegraph_ticks: Some(TEST_TELEGRAPH),
+            rest_ticks: Some(TEST_REST),
+            power: Some(0.0),
+            stand_ins: c.golem.into_iter().collect(),
+            ..Overrides::default()
+        };
+        return start(game, now, ov).err().map(Err);
+    }
+    if t < 5 {
+        return None;
+    }
+    let ids = event::wave_ids(DIM, CORE);
+    if ids.is_empty() {
+        return (c.since != 0).then(|| Err("the wave was gone before the watch ended".into()));
+    }
+    if c.since == 0 {
+        c.since = now;
+    }
+    let v = crate::game::soulscraft_vanilla::state();
+    let mine = |m: &u32| ids.contains(m);
+    if let Some(id) = ids.iter().find(|id| v.mobs.contains_key(id)) {
+        return Some(Err(format!("wave zombie {id} adopted by the vanilla mind")));
+    }
+    let moved = v.phases.iter().any(|r| mine(&r.mob)) || v.strikes.iter().any(|r| mine(&r.mob));
+    let flanked = v.flanks.iter().any(|f| mine(&f.0)) || v.cues.iter().any(|q| mine(&q.0));
+    if moved || flanked {
+        return Some(Err(format!("wave zombies used vanilla moves: phases/strikes {moved}, flanks/cues {flanked}")));
+    }
+    if now - c.since < WATCH {
+        return None;
+    }
+    let left = ids.iter().all(|id| v.skipped.contains(id));
+    Some(if left && ids.len() == 3 { Ok(()) } else { Err(format!("{} zombies, all left alone {left}", ids.len())) })
 }

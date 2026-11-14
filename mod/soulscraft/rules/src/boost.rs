@@ -199,6 +199,18 @@ mod tests {
         assert_eq!((d.sector_radius_chunks, d.start_chunks, d.drift_ticks), (1, 6, 6000));
         assert_eq!(d.foreign.len(), 5);
         assert!(d.kin_vanilla["undead"].contains(&"minecraft:zombie".to_owned()));
+        // Round 14 (3): the nether's changed mobs have their kin too; the zoglin is both.
+        let mobs = MobsFile::embedded();
+        for (kind, kins) in [
+            ("minecraft:magma_cube", &["slimes"][..]),
+            ("minecraft:wither_skeleton", &["undead"][..]),
+            ("minecraft:hoglin", &["beasts"][..]),
+            ("minecraft:zoglin", &["undead", "beasts"][..]),
+        ] {
+            for kin in ["undead", "beasts", "slimes", "flyers", "water"] {
+                assert_eq!(of_kin(kind, kin, &d, &mobs), kins.contains(&kin), "{kind} {kin}");
+            }
+        }
         assert!(BoostDef::of("{}").is_err());
         assert!(BoostDef::of(&crate::altar::EMBEDDED.replace("\"extra_passes\": [1, 1, 2, 3]", "\"extra_passes\": [1]")).unwrap_err().contains("levels"));
         assert!(BoostDef::of(&crate::altar::EMBEDDED.replace("\"drift_ticks\": 6000", "\"drift_ticks\": 0")).is_err());

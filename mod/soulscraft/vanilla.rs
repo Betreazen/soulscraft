@@ -96,7 +96,7 @@ pub(super) struct VRecord {
 pub(super) struct VState {
     pub mobs: HashMap<u32, VMob>,
     /// Mobs seen and left alone (wave mobs).
-    skipped: HashSet<u32>,
+    pub skipped: HashSet<u32>,
     /// The self-test's targets: mob → entity.
     pub targets: HashMap<u32, u32>,
     pub phases: Vec<VRecord>,
