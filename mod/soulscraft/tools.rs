@@ -148,6 +148,7 @@ fn info(game: &mut Game<'_>) {
         )
     };
     say(game, line);
+    say(game, crate::game::soulscraft_vanilla::summary());
 }
 
 /// П5: mob cost sampling (`native_mob_cost_sampling`, game/native_diagnostics.rs:144-160) and

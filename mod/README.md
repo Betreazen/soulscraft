@@ -37,6 +37,8 @@ mod/
     spawn_boost.rs            учащённый спавн алтаря: сектор, его смещение, лишние проходы спавна и список спавна сектора
     selftest_trophy.rs        сценарии трофеев, награды, знамён рода и учащённого спавна (`trophy_`, `reward_`, `kin_`, `boost_`)
     selftest_turret.rs        совместные сценарии с турелями RustCraft (`run turret`)
+    vanilla.rs                ванильные мобы (07-vanilla-mobs.md): принятие, рост Г2 на ванильной базе, метка PCT, Г4, ворота целей, приёмы
+    selftest_vanilla.rs       сценарии ванильных мобов (`vanilla_`, `vtiming_`, `vskeleton_`; медленные — `run vslow`)
     hook_*.rs                 тонкие хелперы: одна строка, вызов модуля
 ```
 
@@ -62,6 +64,7 @@ mod/
 | `view` | сообщения алтаря клиенту и кнопки меню серверу (JSON) |
 | `trophy` | файлы трофеев (`<моб>.trophy.json`, копии в `data/trophy/`), какой блок чей, поворот головы и диорамы при установке, коробки частиц по `facing`, частота частиц, фаза клипа фигурки |
 | `boost` | учащённый спавн: сектор и его смещение к алтарю, сила по уровню и знамёнам, лишние кандидаты-чанки, список спавна сектора, строка меню |
+| `vanilla` | `data/mobs.json` `vanilla`: группы, приёмы, сигналы замаха, проверки; мозг ванильного моба (`VBrain`): когда он берёт моба и что приказывает |
 
 ## Команды
 
@@ -143,6 +146,17 @@ Trait-мод не нужен и в третьей итерации: `native_pote
 5. Удар — `native_hurt_entity` с типом `minecraft:mob_attack` от моба: броня, щит игрока, неуязвимость и хуки урона работают как у ванили. Болт стрелка — стрела со скоростью 3 и уроном удар/3.
 6. Клиент получает «клип и тик начала» только при смене и раз в 40 тиков всем; позу считает сам по тикам. Клиент только пишет заметки в свою таблицу (`client.rs`, `on_net`) и ничего не шлёт серверу и не ждёт ответа, поэтому в повторе записи LetsCam (заметки приходят в `net_from_server` в исходное время, без сервера) клипы и подписи показываются так же: начало клипа пересчитывается от `now` каждой пачки.
 
+## Как устроен ванильный моб
+
+Срез 8, [../prototypes/p8-vanilla.md](../prototypes/p8-vanilla.md).
+
+1. Тип ванили из `data/mobs.json` `vanilla.groups` принимается, когда тик уровня видит его впервые (после мобов SoulsCraft). Моб волны ивента (метка `soulscraft.wave` или список ивента) остаётся ивенту.
+2. P — как у своих мобов (метка `soulscraft.p=`, иначе игроки рядом). Рост Г2 — модификаторы `soulscraft:power` к здоровью, урону и скорости на ванильной базе (`mobs/finalize.rs`: `add_modifier`, `AddMultipliedBase`), броня — карта брони типа (как у своих мобов). Метка PCT `pct.xpNNN` — от ванильного здоровья. Флаги нежити, вид и теги не трогаются.
+3. Спавнер в `spawner_radius_blocks` при первом принятии — метка `soulscraft.spawner`: рост есть, мозга нет (Г4).
+4. Остальным в цели добавляются две цели-ворота с приоритетом раньше всех (`SoulscraftGate` — `MOVE | LOOK | JUMP`, `SoulscraftLeapGate` — `JUMP`), их не прерывают. Ворота срабатывают, пока мозг держит моба: так ванильные цели движения и атаки встают, и во время замаха ничего не бьёт. Флаг `goals.disabled` не подошёл: `riders::drive` снимает его каждый тик (`mobs/riders.rs:381-396`, из `server_ai_step`, `ai.rs:1959`).
+5. Мозг (`soulscraft_rules::vanilla::VBrain`) получает цель ванили (`m.ai.target`: провокация PCT её меняет — мозг идёт за ней), отдаёт приказ, взгляд, позу `aggressive`, удары, сигнал замаха и вопросы серверу (высокая точка, укрытие от взгляда цели). Удар — `native_mob_attack` (ванильный удар моба с его эффектами: голод кадавра, иссушение) с множителем приёма; снаряды — `native_summon` трезубца, взрывного зелья или стрелы.
+6. Фантом не берётся: мозг только держит его ванильное пике (`m.extra.flag`, `mobs/phantom.rs`) 10 тиков после решения и кричит.
+
 ## Строки лога
 
 ```text
@@ -153,6 +167,10 @@ soulscraft: mode mob=revenant id=12 mode=circle tick=4600
 soulscraft: blocked mob=revenant id=12 dmg=6.00->1.20
 soulscraft: death mob=revenant id=12 tick=4700
 soulscraft: selftest PASS timing_revenant_overhead
+soulscraft: vadopt mob=minecraft:zombie id=40 group=zombie p=0.00 spawner=false health=20.0 tick=900
+soulscraft: vphase mob=minecraft:zombie id=40 attack=lunge phase=hit t=10 tick=950
+soulscraft: vstrike mob=minecraft:zombie id=40 attack=lunge t=10 tick=950 hit=true target=sc_a
+soulscraft: vmode mob=minecraft:skeleton id=41 mode=retreat tick=960
 ```
 
 Их разбирает `prototypes/lib/log.ps1`.
