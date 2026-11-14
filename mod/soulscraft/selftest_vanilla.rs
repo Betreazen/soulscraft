@@ -293,7 +293,9 @@ fn adopt_p(game: &mut Game<'_>, c: &mut Case) -> Option<Result<(), String>> {
         let ok = (base_h - 20.0).abs() < 0.01
             && (max - want.0).abs() < 0.01
             && (dmg - want.1).abs() < 0.01
-            && (hp - max).abs() < 0.01
+            // Full at its grown maximum; a zombie may burn in the sun for a point before the check.
+            && hp <= max + 0.01
+            && max - hp <= 2.0
             && (armor - want.2).abs() < 0.01
             && xp == [xp_want];
         if !ok {
