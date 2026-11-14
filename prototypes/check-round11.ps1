@@ -51,17 +51,17 @@ try {
         C "tp sc_a $($ax + 0.5) $ay $($az + 4.5) 0 0"
         Invoke-Bot $bot 'key f5 tap' | Out-Null
         Invoke-Bot $bot 'key f5 tap' | Out-Null
+        # Each head from the front, the side and the back: the camera stays in front of the bot,
+        # the bot turns (yaw 0, 90, 180).
         foreach ($m in $Mobs) {
             C "item replace entity sc_a armor.head with soulscraft:$($m)_head"
-            Start-Sleep -Milliseconds 1500
-            Save-Shot $bot "worn_$($m)_head_front"
+            foreach ($view in @(@('front', 0), @('side', 90), @('back', 180))) {
+                C "tp sc_a $($ax + 0.5) $ay $($az + 4.5) $($view[1]) 0"
+                Start-Sleep -Milliseconds 1200
+                Save-Shot $bot "worn_$($m)_head_$($view[0])"
+            }
         }
-        C "tp sc_a $($ax + 0.5) $ay $($az + 4.5) 60 0"
-        Start-Sleep -Milliseconds 800
-        Save-Shot $bot 'worn_bog_slime_head_side'
-        C 'item replace entity sc_a armor.head with soulscraft:brute_head'
-        Start-Sleep -Milliseconds 1000
-        Save-Shot $bot 'worn_brute_head_side'
+        C "tp sc_a $($ax + 0.5) $ay $($az + 4.5) 0 0"
         Invoke-Bot $bot 'key f5 tap' | Out-Null
         C 'item replace entity sc_a armor.head with air'
         # The inventory: all seven heads in the hotbar, then the inventory screen.

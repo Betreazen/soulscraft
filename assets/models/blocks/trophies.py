@@ -43,6 +43,10 @@ _RECT = {
 _RIG_FACE = {'top': 'up', 'bottom': 'down', 'right': 'east', 'left': 'west', 'front': 'north', 'back': 'south'}
 _DIRS = {'east': (1, 0, 0), 'west': (-1, 0, 0), 'up': (0, 1, 0), 'down': (0, -1, 0), 'south': (0, 0, 1), 'north': (0, 0, -1)}
 _SNAP = (-45.0, -22.5, 0.0, 22.5, 45.0)
+# A worn head encloses the player's head (8 px) and its hat layer (8.5 px), with a little to spare.
+WORN_MIN_PX = 8.75
+# A cube belongs to the head's core when its longest side is at least this share of the biggest's.
+CORE_SHARE = 0.6
 # Item models may sit from -16 to 32 px (the game's element limit).
 _LIMIT = (-16.0, 32.0)
 
@@ -102,11 +106,23 @@ class HeadItem:
             m, t = world[p['name']]
             for c in p['cubes']:
                 self.cubes.append((m, t, c))
-        part, index = head['icon']
-        m, t = world[part]
-        c = parts[part]['cubes'][index]
-        centre = [c['origin'][i] + c['size'][i] / 2 for i in range(3)]
-        self.anchor = tuple(a + b for a, b in zip(t, _apply(m, centre)))
+        # The core: the box round the head's big cubes (each at least CORE_SHARE of the biggest
+        # cube's longest side) — the skull and helmet, the hood's plates, the slime's layers, not
+        # horns, beaks, roots or stalks. Worn, it is centred on the player's head and encloses it.
+        biggest = max(max(x[2]['size']) for x in self.cubes)
+        pts = []
+        for m, t, c in self.cubes:
+            if max(c['size']) < CORE_SHARE * biggest:
+                continue
+            g = _grow(c)
+            for corner in range(8):
+                local = [c['origin'][i] - g[i] + (c['size'][i] + 2 * g[i]) * ((corner >> i) & 1) for i in range(3)]
+                pts.append(tuple(a + b for a, b in zip(t, _apply(m, local))))
+        lo = [min(p[i] for p in pts) for i in range(3)]
+        hi = [max(p[i] for p in pts) for i in range(3)]
+        self.anchor = tuple((lo[i] + hi[i]) / 2 for i in range(3))
+        # The core's sizes in head px (model px times the floor scale): head_scale.
+        self.core = [(hi[i] - lo[i]) * self.scale for i in range(3)]
         self.elements = [e for e in (self._element(*x) for x in self.cubes) if e]
         lo = [min(min(e['from'][i], e['to'][i]) for e in self.elements) for i in range(3)]
         hi = [max(max(e['from'][i], e['to'][i]) for e in self.elements) for i in range(3)]
@@ -185,6 +201,14 @@ class HeadItem:
             out[face] = {'uv': [items.rnd(u0 * sx), items.rnd(v0 * sy), items.rnd(u1 * sx), items.rnd(v1 * sy)], 'texture': '#0'}
         return out
 
+    def head_scale(self):
+        """Worn: the core (`__init__`), centred on the player's head, must enclose it with its hat
+        layer on every side: its smallest size at least `WORN_MIN_PX` head px (the head item at
+        display.head scale 1 is the floor head's size, CustomHeadLayer's 0.625 undoing the item
+        frame's 1 / 0.625). Never smaller than the floor head."""
+        need = WORN_MIN_PX / min(self.core)
+        return items.rnd(math.ceil(max(1.0, need) * 1000) / 1000)
+
     def display(self):
         """The helmets' display; a head larger than a block is shown smaller in the inventory, on the
         ground, in a frame and in the hand (by its extent)."""
@@ -196,7 +220,7 @@ class HeadItem:
                  'firstperson_lefthand': {'rotation': [0, 225, 0], 'translation': [0, 0, 0], 'scale': [0.4, 0.4, 0.4]}}
         for ctx, d in list(items.HELMET.items()) + list(hands.items()):
             if ctx == 'head':
-                out[ctx] = d
+                out[ctx] = dict(d, scale=[self.head_scale()] * 3)
             else:
                 out[ctx] = dict(d, scale=[items.rnd(s * f) for s in d['scale']])
         return out
