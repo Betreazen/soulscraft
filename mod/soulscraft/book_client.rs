@@ -155,7 +155,7 @@ fn layout(screen: &NativeScreenView<'_>, tab: usize) -> Layout {
     let ph = (h - 16.0).min(260.0);
     let (px, py) = (x + (w - pw) / 2.0, y + (h - ph) / 2.0);
     let tw = 64.0;
-    let tab = |i: f32| [px + PAD + i * (tw + 4.0), py + PAD, tw, TAB_H];
+    let tab_rect = |i: f32| [px + PAD + i * (tw + 4.0), py + PAD, tw, TAB_H];
     let top = py + PAD + TAB_H + PAD;
     let body_h = ph - (top - py) - PAD;
     let list = [px + PAD, top, LIST_W, body_h];
@@ -170,7 +170,7 @@ fn layout(screen: &NativeScreenView<'_>, tab: usize) -> Layout {
     let arrows_y = top + body_h - 12.0;
     Layout {
         panel: [px, py, pw, ph],
-        tabs: [tab(0.0), tab(1.0), tab(2.0)],
+        tabs: [tab_rect(0.0), tab_rect(1.0), tab_rect(2.0)],
         list,
         model,
         clips,
@@ -262,7 +262,7 @@ pub(super) fn draw_screen(game: &Game<'_>, batch: &mut HudBatch, screen: &Native
     draw_text(game, batch, &l, &mut c, &page);
     if !c.logged {
         c.logged = true;
-        log::info!("soulscraft: book window drawn tab={} title={}", c.tab, page.title);
+        log::info!("soulscraft: book window drawn tab={} title={} screen={:?} panel={:?}", c.tab, page.title, screen.rect, l.panel);
     }
     // The scene draws the figure through the block entity hook, which reads SHOWN: no lock of
     // this window's state may be held then.
