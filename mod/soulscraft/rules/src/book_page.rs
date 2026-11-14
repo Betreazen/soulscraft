@@ -127,8 +127,21 @@ fn attacks(m: &Value) -> Vec<&Value> {
     m.get("attacks").and_then(Value::as_array).map(|v| v.iter().collect()).unwrap_or_default()
 }
 
-/// A mob's page at the player's stage (08-guide-book.md, «Ступени записи о враге»).
+/// A vanilla type's own numbers (`minecraft:zombie` → its health, damage and armour), as the
+/// engine has them (its `MobType`): the book shows a changed vanilla mob's real numbers without
+/// copying vanilla's table into the data.
+pub type VanillaStats<'a> = &'a dyn Fn(&str) -> Option<Stats>;
+
+/// A mob's page at the player's stage (08-guide-book.md, «Ступени записи о враге»), without
+/// vanilla numbers (a vanilla entry then says its numbers are vanilla's).
 pub fn mob_page(book: &BookFile, catalog: &Catalog, trophies: &Value, e: &Entry, m: &Value, p: &Progress) -> Page {
+    mob_page_with(book, catalog, trophies, e, m, p, &|_| None)
+}
+
+/// [`mob_page`] with each vanilla type's numbers from `vanilla`: a changed vanilla mob's page shows
+/// them as a SoulsCraft mob's are shown (health, damage, armour on «Убит»; Г2's growth from P 0 to
+/// P 1 on «Знаток»), one line per type of its row.
+pub fn mob_page_with(book: &BookFile, catalog: &Catalog, trophies: &Value, e: &Entry, m: &Value, p: &Progress, vanilla: VanillaStats<'_>) -> Page {
     let mp = p.mob(&e.id);
     let stage = book.stage(mp.met, mp.kills, e.elite);
     if stage == book::UNKNOWN {
@@ -155,24 +168,30 @@ pub fn mob_page(book: &BookFile, catalog: &Catalog, trophies: &Value, e: &Entry,
     }
     let mut page = Page { title: e.name.clone(), stage, moves: stage >= book::KILLED, ..Page::default() };
     if stage >= book::KILLED {
-        stats_lines(m, &mut lines);
+        stats_lines(e, m, vanilla, &mut lines);
     }
     if stage >= book::STUDIED {
         page.strips = attacks(m).into_iter().filter_map(strip).collect();
     }
     if stage >= book::EXPERT {
-        expert_lines(catalog, trophies, e, m, &mut lines);
+        expert_lines(catalog, trophies, e, m, vanilla, &mut lines);
     }
     page.lines = lines;
     page
 }
 
-fn stats_lines(m: &Value, lines: &mut Vec<Line>) {
+fn stats_lines(e: &Entry, m: &Value, vanilla: VanillaStats<'_>, lines: &mut Vec<Line>) {
     lines.push(line(Tone::Head, "Числа"));
-    // A changed vanilla mob keeps vanilla's numbers: the data gives none.
     if let Some(st) = m.get("stats").filter(|s| s.is_object()) {
         let f = |k: &str| st.get(k).and_then(Value::as_f64).unwrap_or(0.0);
         lines.push(line(Tone::Text, format!("Здоровье {} · урон {} · броня {}", num(f("health")), num(f("damage")), num(f("armor")))));
+    } else if e.vanilla {
+        // A changed vanilla mob keeps vanilla's numbers, which the data does not copy: the engine's.
+        let rows = vanilla_rows(e, m, vanilla, None);
+        if rows.is_empty() {
+            lines.push(line(Tone::Dim, "Числа ванильные."));
+        }
+        lines.extend(rows.into_iter().map(|t| line(Tone::Text, t)));
     }
     let names: Vec<&str> = attacks(m).into_iter().map(|a| s(a, "name")).filter(|n| !n.is_empty()).collect();
     if !names.is_empty() {
@@ -180,7 +199,7 @@ fn stats_lines(m: &Value, lines: &mut Vec<Line>) {
     }
 }
 
-fn expert_lines(catalog: &Catalog, trophies: &Value, e: &Entry, m: &Value, lines: &mut Vec<Line>) {
+fn expert_lines(catalog: &Catalog, trophies: &Value, e: &Entry, m: &Value, vanilla: VanillaStats<'_>, lines: &mut Vec<Line>) {
     if let Some(b) = m.get("behavior").and_then(Value::as_array).filter(|b| !b.is_empty()) {
         lines.push(line(Tone::Head, "Тактика"));
         lines.extend(b.iter().filter_map(Value::as_str).map(|t| line(Tone::Text, t)));
@@ -214,12 +233,78 @@ fn expert_lines(catalog: &Catalog, trophies: &Value, e: &Entry, m: &Value, lines
                 num(b.armor)
             ),
         ));
+    } else if e.vanilla {
+        let rows = vanilla_rows(e, m, vanilla, Some(1.0));
+        if !rows.is_empty() {
+            lines.push(line(Tone::Head, "Рост по силе P"));
+            lines.push(line(Tone::Dim, "От P = 0 до P = 1:"));
+            lines.extend(rows.into_iter().map(|t| line(Tone::Text, t)));
+        }
     }
     let events = event_links(catalog, e);
     if !events.is_empty() {
         lines.push(line(Tone::Head, "Ивенты"));
         lines.extend(events.into_iter().map(|t| line(Tone::Text, t)));
     }
+}
+
+/// A cube's own numbers at `size` (vanilla's `AbstractCubeMob.setSize`; the engine's
+/// mobs/cube.rs:50-68 and :263-272): health size², damage size (a magma cube's plus 2), a magma
+/// cube's armour size × 3. A cube's type numbers say nothing of its size.
+pub fn cube_stats(kind: &str, size: u32) -> Stats {
+    let s = f64::from(size);
+    let magma = kind == "minecraft:magma_cube";
+    Stats { health: s * s, damage: s + if magma { 2.0 } else { 0.0 }, armor: if magma { s * 3.0 } else { 0.0 }, ..Stats::default() }
+}
+
+/// The names of a vanilla row's types, in order: its name split at commas when it names each
+/// («Зомби, кадавр, утопленник, зомби-житель»), else the types' own ids.
+fn type_names(e: &Entry) -> Vec<String> {
+    let parts: Vec<&str> = e.name.split(", ").collect();
+    e.keys
+        .iter()
+        .enumerate()
+        .map(|(i, k)| {
+            let n = if parts.len() == e.keys.len() { parts[i] } else { k.trim_start_matches("minecraft:") };
+            let mut c = n.chars();
+            c.next().map_or(String::new(), |f| f.to_uppercase().chain(c).collect())
+        })
+        .collect()
+}
+
+/// One line per type of a vanilla row: its numbers (`grow` None), or Г2's growth to P `grow`
+/// («здоровье 20 → 38»), as a SoulsCraft mob's are shown. A cube by its sizes 4 and 2. Types the
+/// engine has no numbers for are left out.
+fn vanilla_rows(e: &Entry, m: &Value, vanilla: VanillaStats<'_>, grow: Option<f64>) -> Vec<String> {
+    let cube = s(m, "behavior") == "cube";
+    let mut out = Vec::new();
+    for (key, name) in e.keys.iter().zip(type_names(e)) {
+        let mut forms: Vec<(String, Stats)> = Vec::new();
+        if cube {
+            forms.extend([4, 2].map(|size| (format!("{name}, размер {size}"), cube_stats(key, size))));
+        } else if let Some(st) = vanilla(key) {
+            forms.push((name.clone(), st));
+        }
+        for (label, st) in forms {
+            let a = Scaled::at(&st, 0.0);
+            out.push(match grow {
+                None => format!("{label}: здоровье {} · урон {} · броня {}", num(a.max_health), num(a.damage), num(a.armor)),
+                Some(p) => {
+                    let b = Scaled::at(&st, p);
+                    format!(
+                        "{label}: здоровье {} → {}, урон {} → {}, броня {} → {}",
+                        num(a.max_health),
+                        num(b.max_health),
+                        num(a.damage),
+                        num(b.damage),
+                        num(a.armor),
+                        num(b.armor)
+                    )
+                }
+            });
+        }
+    }
+    out
 }
 
 /// The events whose waves bring this mob: «name: волны 2, 4».

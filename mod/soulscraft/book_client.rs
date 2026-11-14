@@ -53,6 +53,8 @@ struct Figure {
     /// Its ticks and the rest after (0: hold the clip as it loops itself).
     period: f32,
     silhouette: bool,
+    /// A vanilla figure's attack playing (its phases pose the procedural figure).
+    strip: Option<book_page::Strip>,
 }
 
 struct Data {
@@ -181,14 +183,14 @@ fn layout(screen: &NativeScreenView<'_>, tab: usize) -> Layout {
 }
 
 /// The page of the section and entry chosen.
-fn page_of(c: &BookClient) -> Page {
+fn page_of(game: &Game<'_>, c: &BookClient) -> Page {
     let d = &*DATA;
     let p = c.progress.clone().unwrap_or_default();
     match c.tab {
         1 => book_page::altar_page(&d.book, &d.altar, &p),
         2 => book_page::events_page(&d.book, &d.catalog, &d.trophies, &p),
         _ => match d.catalog.entries.get(c.sel) {
-            Some((e, m)) => book_page::mob_page(&d.book, &d.catalog, &d.trophies, e, m, &p),
+            Some((e, m)) => book_page::mob_page_with(&d.book, &d.catalog, &d.trophies, e, m, &p, &|k| crate::game::soulscraft_book::engine_stats(game, k)),
             None => Page::default(),
         },
     }
@@ -250,7 +252,7 @@ pub(super) fn draw_screen(game: &Game<'_>, batch: &mut HudBatch, screen: &Native
         let tw = game.native_text_width(TABS[i]);
         game.native_text(batch, TABS[i], [r[0] + (r[2] - tw) / 2.0, r[1] + 3.0], 0xFFFFFF, true);
     }
-    let page = page_of(&c);
+    let page = page_of(game, &c);
     let scene = if c.tab == 0 {
         draw_list(game, batch, &l, &c, screen);
         draw_enemy(game, batch, &l, &mut c, &page)
@@ -308,20 +310,15 @@ fn list_arrows(l: &Layout) -> ([f32; 4], [f32; 4]) {
     ([l.list[0], y, 16.0, 12.0], [l.list[0] + 18.0, y, 16.0, 12.0])
 }
 
-/// The model in its clip, the clip buttons and the phase strip of the attack playing.
-fn draw_enemy(game: &Game<'_>, batch: &mut HudBatch, l: &Layout, c: &mut BookClient, page: &Page) -> Option<&'static Value> {
+/// The model in its clip, the clip buttons and the phase strip of the attack playing. The figure's
+/// (height, width) in blocks for the scene's view, None for no scene.
+fn draw_enemy(game: &Game<'_>, batch: &mut HudBatch, l: &Layout, c: &mut BookClient, page: &Page) -> Option<(f32, f32)> {
     let d: &'static Data = &DATA;
     let (e, m) = d.catalog.entries.get(c.sel)?;
     game.native_fill(batch, l.model, 0x60_0C0A08);
     let now = game.world.game_time;
     if e.vanilla {
-        c.figure = None;
-        let at = [l.model[0] + l.model[2] / 2.0 - 16.0, l.model[1] + l.model[3] / 2.0 - 16.0];
-        let egg = format!("{}_spawn_egg", e.keys[0]);
-        if page.silhouette || !game.native_item_model(batch, &egg, &egg, at, 32.0) {
-            game.native_text(batch, "?", [at[0] + 14.0, at[1] + 12.0], 0x8C8478, true);
-        }
-        None
+        draw_vanilla_enemy(game, batch, l, c, page, e, m, now)
     } else {
         let (clips, pick) = clips_for(game, &e.id, page);
         if c.clip == usize::MAX || c.clip >= clips.len().max(1) {
@@ -333,22 +330,74 @@ fn draw_enemy(game: &Game<'_>, batch: &mut HudBatch, l: &Layout, c: &mut BookCli
         let strip = page.strips.iter().find(|s| s.clip == clip && !clip.is_empty());
         let len = ticks.max(strip.map_or(0.0, |s| s.ticks() as f32));
         let period = if looped && strip.is_none() { 0.0 } else { len + REST_TICKS };
-        c.figure = Some(Figure { mob: e.id.clone(), clip: clip.clone(), start: c.started, period, silhouette: page.silhouette });
-        for (i, (label, _)) in clips.iter().enumerate() {
-            let r = clip_button(l, i);
-            if r[1] + r[3] > l.clips[1] + l.clips[3] - 18.0 {
-                break;
-            }
-            game.native_fill(batch, r, if i == c.clip { 0xFF5A_4630 } else { 0xFF34_2A20 });
-            game.native_text(batch, label, [r[0] + 3.0, r[1] + 1.5], 0xE8E0D0, true);
-        }
+        c.figure = Some(Figure { mob: e.id.clone(), clip: clip.clone(), start: c.started, period, silhouette: page.silhouette, strip: None });
+        draw_clip_buttons(game, batch, l, clips.iter().map(|x| x.0.as_str()), c.clip);
         if let Some(s) = strip {
             let t = (now - c.started) as f32 + game.clock.fraction() as f32;
             let at = if period > 0.0 { t % period } else { t };
             draw_strip(game, batch, [l.clips[0], l.clips[1] + l.clips[3] - 14.0, l.clips[2], 6.0], s, at);
         }
-        Some(m)
+        let hb = &m["hitbox"];
+        Some((hb["height"].as_f64().unwrap_or(2.0) as f32, hb["width"].as_f64().unwrap_or(0.6) as f32))
     }
+}
+
+fn draw_clip_buttons<'a>(game: &Game<'_>, batch: &mut HudBatch, l: &Layout, labels: impl Iterator<Item = &'a str>, sel: usize) {
+    for (i, label) in labels.enumerate() {
+        let r = clip_button(l, i);
+        if r[1] + r[3] > l.clips[1] + l.clips[3] - 18.0 {
+            break;
+        }
+        game.native_fill(batch, r, if i == sel { 0xFF5A_4630 } else { 0xFF34_2A20 });
+        game.native_text(batch, label, [r[0] + 3.0, r[1] + 1.5], 0xE8E0D0, true);
+    }
+}
+
+/// A changed vanilla mob's figure: its own vanilla model (`draw_vanilla_figure`), each type of
+/// its row in turn, posed by hand (rest, a walk, an attack's phases), with the same buttons and
+/// phase strips as ours. A type whose model would not draw shows its spawn egg instead.
+#[allow(clippy::too_many_arguments)]
+fn draw_vanilla_enemy(game: &Game<'_>, batch: &mut HudBatch, l: &Layout, c: &mut BookClient, page: &Page, e: &book::Entry, m: &Value, now: i64) -> Option<(f32, f32)> {
+    let mut clips: Vec<(String, &str, Option<book_page::Strip>)> = Vec::new();
+    if !page.silhouette && page.stage >= book::MET {
+        clips.push(("Покой".into(), "idle", None));
+        if page.moves {
+            clips.push(("Шаг".into(), "walk", None));
+        }
+        clips.extend(page.strips.iter().map(|s| (s.name.clone(), "attack", Some(s.clone()))));
+    }
+    let pick = if page.strips.is_empty() { 0 } else { clips.len().saturating_sub(page.strips.len()) };
+    if c.clip == usize::MAX || c.clip >= clips.len().max(1) {
+        c.clip = pick;
+    }
+    let (clip, strip) = clips.get(c.clip).map_or(("idle", None), |x| (x.1, x.2.clone()));
+    let period = strip.as_ref().map_or(0.0, |s| s.ticks() as f32 + REST_TICKS);
+    let shown_for = ((now - c.started).max(0) / VANILLA_TYPE_TICKS) as usize;
+    let kind = e.keys[shown_for % e.keys.len()].clone();
+    draw_clip_buttons(game, batch, l, clips.iter().map(|x| x.0.as_str()), c.clip);
+    if let Some(s) = &strip {
+        let t = (now - c.started) as f32 + game.clock.fraction() as f32;
+        draw_strip(game, batch, [l.clips[0], l.clips[1] + l.clips[3] - 14.0, l.clips[2], 6.0], s, t % period);
+    }
+    if vanilla_failed(&kind) {
+        c.figure = None;
+        let at = [l.model[0] + l.model[2] / 2.0 - 16.0, l.model[1] + l.model[3] / 2.0 - 16.0];
+        let egg = format!("{kind}_spawn_egg");
+        if page.silhouette || !game.native_item_model(batch, &egg, &egg, at, 32.0) {
+            game.native_text(batch, "?", [at[0] + 14.0, at[1] + 12.0], 0x8C8478, true);
+        }
+        return None;
+    }
+    c.figure = Some(Figure { mob: kind.clone(), clip: clip.to_owned(), start: c.started, period, silhouette: page.silhouette, strip });
+    if s_of(m, "behavior") == "cube" {
+        // The model is a size-1 cube's (vanilla scales it by size when it draws it).
+        return Some((0.52, 0.52));
+    }
+    vanilla_size(game, &kind).or(Some((2.0, 0.6)))
+}
+
+fn s_of<'a>(v: &'a Value, key: &str) -> &'a str {
+    v.get(key).and_then(Value::as_str).unwrap_or("")
 }
 
 fn clip_button(l: &Layout, i: usize) -> [f32; 4] {
@@ -356,11 +405,8 @@ fn clip_button(l: &Layout, i: usize) -> [f32; 4] {
 }
 
 /// The figure: one barrier block (no faces) with the book's figure entity, seen from the front.
-fn draw_scene(game: &Game<'_>, batch: &mut HudBatch, rect: [f32; 4], m: &Value) {
+fn draw_scene(game: &Game<'_>, batch: &mut HudBatch, rect: [f32; 4], (height, width): (f32, f32)) {
     let Some(state) = game.pack.assets.registry.default_state("minecraft:barrier") else { return };
-    let hb = &m["hitbox"];
-    let height = hb["height"].as_f64().unwrap_or(2.0) as f32;
-    let width = hb["width"].as_f64().unwrap_or(0.6) as f32;
     let span = height.max(width * 1.6).max(0.6);
     let view = NativeSceneView { center: [0.5, height / 2.0, 0.5], yaw: 160.0, pitch: 12.0, scale: rect[3] * 0.78 / span };
     let blocks = [NativeSceneBlock { pos: [0, 0, 0], state, entity: Some(&*ENTITY) }];
@@ -490,9 +536,130 @@ pub(super) fn draw_figure(game: &Game<'_>, entity: &ModBlockEntity, draw: &mut B
     draw.push();
     draw.translate([0.5, 0.0, 0.5]);
     let (tint, items) = if f.silhouette { (0, false) } else { (0xFF_FFFF, true) };
-    let flags: [&str; 0] = [];
-    client::draw_rig_with(game, &f.mob, || client::load_rig(game, &f.mob), &f.clip, t, &flags, draw, 7, tint, items);
+    if f.mob.starts_with("minecraft:") {
+        draw_vanilla_figure(game, &f, t, tint, draw);
+    } else {
+        let flags: [&str; 0] = [];
+        client::draw_rig_with(game, &f.mob, || client::load_rig(game, &f.mob), &f.clip, t, &flags, draw, 7, tint, items);
+    }
     draw.pop();
     true
 }
 
+
+// ---- A changed vanilla mob's figure (round 14 (2)) ----
+//
+// Vanilla's renderer for an entity cannot be called from a screen or a scene: `native_draw_scene`
+// draws blocks and calls `native_block_entity_submit` for a block entity (native_scene.rs:155-166),
+// and the engine's mob drawing (`native_mob_submit`, game/native_mob_draw.rs) runs for mobs in the
+// world only. What a block entity's draw can do is draw a model part tree with a texture
+// (`native_draw_model_part`, native_block_entity_draw.rs:727) — and a vanilla type's own model is
+// such a tree: its `MobType.model` and `MobType.texture` (mobs.rs:415-416, the same layers
+// `native_bake_layer` bakes, :752-762). So the book draws the vanilla mob's real model and skin,
+// posed here by hand (rest, a walk, an attack's phases): not vanilla's own animation or its extra
+// layers (a drowned's or a stray's clothes, armour, held items).
+
+/// A vanilla type's model tree and skin, made once.
+struct VanillaFigure {
+    tree: horizon_client::mobs::model_layers::ModelPart,
+    /// A slime's outer cube, drawn over the inner one.
+    outer: Option<horizon_client::mobs::model_layers::ModelPart>,
+    texture: String,
+}
+
+/// Each type of a row shows this long in turn.
+const VANILLA_TYPE_TICKS: i64 = 80;
+
+static VANILLA: LazyLock<Mutex<std::collections::HashMap<String, Option<VanillaFigure>>>> = LazyLock::new(Mutex::default);
+
+fn vanilla_figures() -> MutexGuard<'static, std::collections::HashMap<String, Option<VanillaFigure>>> {
+    VANILLA.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
+/// The type's model would not draw (no type, or its skin is not in the atlas): the window shows
+/// its spawn egg.
+fn vanilla_failed(kind: &str) -> bool {
+    vanilla_figures().get(kind).is_some_and(Option::is_none)
+}
+
+/// The type's (height, width) in blocks.
+fn vanilla_size(game: &Game<'_>, kind: &str) -> Option<(f32, f32)> {
+    let t = game.res.mob_types().get(kind)?;
+    Some((t.height as f32, t.width as f32))
+}
+
+fn make_vanilla(game: &Game<'_>, kind: &str) -> Option<VanillaFigure> {
+    use horizon_client::mobs::model_layers::ModelPart;
+    let t = game.res.mob_types().get(kind)?;
+    let path = kind.trim_start_matches("minecraft:");
+    let outer = t.layers.get(&format!("{path}#outer")).filter(|_| path == "slime").map(|p| ModelPart::from_part(p));
+    Some(VanillaFigure { tree: ModelPart::from_part(&t.model), outer, texture: t.texture.clone() })
+}
+
+/// Draws the vanilla type `f.mob` in its pose at `t` ticks, from the draw's frame at the feet.
+fn draw_vanilla_figure(game: &Game<'_>, f: &Figure, t: f32, tint: u32, draw: &mut BlockEntityDraw) {
+    let mut all = vanilla_figures();
+    if !all.contains_key(&f.mob) {
+        let made = make_vanilla(game, &f.mob);
+        if made.is_none() {
+            log::warn!("soulscraft: book: no vanilla model for {}", f.mob);
+        }
+        all.insert(f.mob.clone(), made);
+    }
+    let Some(v) = all.get_mut(&f.mob).and_then(Option::as_mut) else { return };
+    pose_vanilla(&mut v.tree, &f.clip, t, f.strip.as_ref());
+    draw.push();
+    draw.scale([1.0, -1.0, -1.0]);
+    draw.translate([0.0, -1.501, 0.0]);
+    let drawn = game.native_draw_model_part(draw, &v.tree, &v.texture, tint);
+    if let Some(outer) = &v.outer {
+        game.native_draw_model_part(draw, outer, &v.texture, tint);
+    }
+    draw.pop();
+    if !drawn {
+        log::warn!("soulscraft: book: the skin {} of {} is not in the atlas", v.texture, f.mob);
+        all.insert(f.mob.clone(), None);
+    }
+}
+
+/// A hand-made pose on the model's top parts by their vanilla names: at rest the head looks round;
+/// a walk swings legs (and arms against them); an attack raises arms or lowers the head in its
+/// windup and hold, and strikes in its hit.
+fn pose_vanilla(tree: &mut horizon_client::mobs::model_layers::ModelPart, clip: &str, t: f32, strip: Option<&book_page::Strip>) {
+    use book_page::Seg;
+    tree.reset_all_poses();
+    let swing = (t * 0.45).sin();
+    // How far the attack is: raised 0..1 in its windup, 1 in its hold, struck in its hit.
+    let (raise, strike) = match strip.and_then(|s| seg_progress(s, t)) {
+        Some((Seg::Windup, k)) => (k, 0.0),
+        Some((Seg::Hold, _)) => (1.0, 0.0),
+        Some((Seg::Hit, k)) => (1.0 - k, k),
+        Some((Seg::Window, k)) => (0.0, 1.0 - k),
+        None => (0.0, 0.0),
+    };
+    for (name, p) in tree.children_mut() {
+        let left = name.starts_with("left");
+        let side = if left ^ name.contains("hind") { 1.0 } else { -1.0 };
+        match clip {
+            "walk" if name.ends_with("_leg") => p.x_rot += swing * 0.7 * side,
+            "walk" if name.ends_with("_arm") => p.x_rot -= swing * 0.6 * side,
+            "idle" if name == "head" => p.y_rot += (t * 0.05).sin() * 0.35,
+            "attack" if name.ends_with("_arm") || name == "arms" => p.x_rot += -2.4 * raise - 1.2 * strike,
+            "attack" if name == "head" => p.x_rot += 0.45 * raise - 0.35 * strike,
+            _ => {}
+        }
+    }
+}
+
+/// The phase at tick `t` of an attack and how far into it (0..1).
+fn seg_progress(s: &book_page::Strip, t: f32) -> Option<(book_page::Seg, f32)> {
+    let mut at = t.max(0.0);
+    for (seg, n) in &s.segs {
+        let n = *n as f32;
+        if at < n {
+            return Some((*seg, at / n.max(1.0)));
+        }
+        at -= n;
+    }
+    None
+}

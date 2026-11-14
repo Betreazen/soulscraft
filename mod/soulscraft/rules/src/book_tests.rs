@@ -420,3 +420,43 @@ fn the_events_page_opens_the_description_then_the_waves() {
     assert!(all.contains("Волна 1:"), "{all}");
     assert!(all.contains("Награда:"));
 }
+
+#[test]
+fn a_vanilla_page_shows_the_engines_numbers_grown_like_ours() {
+    use crate::data::Stats;
+    let (b, c, t) = (book(), Catalog::embedded(), trophies());
+    // What the engine's MobType gives (vanilla 26.3: a zombie 20 health, 3 damage, 2 armour).
+    let engine = |k: &str| match k {
+        "minecraft:zombie" | "minecraft:husk" | "minecraft:drowned" | "minecraft:zombie_villager" => {
+            Some(Stats { health: 20.0, damage: 3.0, armor: 2.0, ..Stats::default() })
+        }
+        _ => None,
+    };
+    let (e, m) = c.get("zombie").unwrap().clone();
+    let mut p = Progress::default();
+    p.kill(&b, &e, 1.0);
+    let killed = texts(&book_page::mob_page_with(&b, &c, &t, &e, &m, &p, &engine));
+    assert!(killed.contains("Зомби: здоровье 20 · урон 3 · броня 2"), "{killed}");
+    assert!(killed.contains("Зомби-житель: здоровье 20"), "{killed}");
+    assert!(!killed.contains("Рост по силе P"));
+    for _ in 0..14 {
+        p.kill(&b, &e, 1.0);
+    }
+    let expert = texts(&book_page::mob_page_with(&b, &c, &t, &e, &m, &p, &engine));
+    // Г2 as for our mobs: health × 1.9, damage × 1.6, armour + 6 at P 1.
+    assert!(expert.contains("Утопленник: здоровье 20 → 38, урон 3 → 4.8, броня 2 → 8"), "{expert}");
+    // Without the engine's numbers: said so, no made-up ones.
+    let plain = texts(&book_page::mob_page(&b, &c, &t, &e, &m, &p));
+    assert!(plain.contains("Числа ванильные."), "{plain}");
+    assert!(!plain.contains("здоровье 20"));
+
+    // Cubes by their size, whatever the engine's type says.
+    let (e, m) = c.get("slime").unwrap().clone();
+    let mut p = Progress::default();
+    p.kill(&b, &e, 1.0);
+    let cube = texts(&book_page::mob_page_with(&b, &c, &t, &e, &m, &p, &engine));
+    assert!(cube.contains("Слизень, размер 4: здоровье 16 · урон 4 · броня 0"), "{cube}");
+    assert!(cube.contains("Магмовый куб, размер 4: здоровье 16 · урон 6 · броня 12"), "{cube}");
+    assert!(cube.contains("Слизень, размер 2: здоровье 4 · урон 2 · броня 0"), "{cube}");
+    assert_eq!(book_page::cube_stats("minecraft:magma_cube", 1).armor, 3.0);
+}

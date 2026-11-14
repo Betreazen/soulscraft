@@ -23,6 +23,7 @@ pub(super) const CASES: &[(&str, u64)] = &[
     ("book_met_trigger", 60),
     ("book_turret_report", 40),
     ("book_kill_command", 40),
+    ("book_vanilla_numbers", 10),
     ("book_persist", 10),
     ("book_altar_levels", 120),
     ("book_event_entries", 400),
@@ -44,6 +45,7 @@ pub(super) fn step(game: &mut Game<'_>, now: u64, t: u64, name: &str, c: &mut Ca
         "book_met_trigger" => met(game, t, c),
         "book_turret_report" => turret(game, t, c),
         "book_kill_command" => kill_command(game, t, c),
+        "book_vanilla_numbers" => Some(vanilla_numbers(game)),
         "book_persist" => Some(persist()),
         "book_altar_levels" => altar_levels(game, now, t, c),
         "book_event_entries" => event_entries(game, now, t, c),
@@ -311,6 +313,34 @@ fn kill_command(game: &mut Game<'_>, t: u64, c: &mut Case) -> Option<Result<(), 
     }
     let (a, b) = (stage_of(A, "revenant").1, stage_of(B, "revenant").1);
     Some(if a == 2.0 && b == 0.0 { Ok(()) } else { Err(format!("owner near {a} kills, owner far {b}, wanted 2 and 0")) })
+}
+
+/// Round 14 (2), the data side: a changed vanilla mob's page shows the engine's own numbers for
+/// each type of its row, grown by Г2 as ours are (the zombie: 20 health, 3 damage, 2 armour; at
+/// P 1 38, 4.8, 8), and a cube's by its size.
+fn vanilla_numbers(game: &Game<'_>) -> Result<(), String> {
+    let file = BookFile::embedded();
+    let catalog = rb::Catalog::embedded();
+    let trophies: serde_json::Value = serde_json::from_str(soulscraft_rules::event::TROPHIES).map_err(|e| e.to_string())?;
+    let stats = |k: &str| book::engine_stats(game, k);
+    let page_text = |id: &str, kills: f64| -> Result<String, String> {
+        let (e, m) = catalog.get(id).ok_or(format!("no entry {id}"))?.clone();
+        let mut p = Progress::default();
+        p.kill(&file, &e, kills);
+        let page = soulscraft_rules::book_page::mob_page_with(&file, &catalog, &trophies, &e, &m, &p, &stats);
+        Ok(page.lines.iter().map(|l| l.text.as_str()).collect::<Vec<_>>().join(" | "))
+    };
+    let killed = page_text("zombie", 1.0)?;
+    let expert = page_text("zombie", 15.0)?;
+    let cube = page_text("slime", 1.0)?;
+    let want = [
+        (&killed, "Зомби: здоровье 20 · урон 3 · броня 2"),
+        (&killed, "Кадавр: здоровье 20 · урон 3 · броня 2"),
+        (&expert, "Зомби: здоровье 20 → 38, урон 3 → 4.8, броня 2 → 8"),
+        (&cube, "Магмовый куб, размер 4: здоровье 16 · урон 6 · броня 12"),
+    ];
+    let missing: Vec<&str> = want.iter().filter(|(text, line)| !text.contains(line)).map(|(_, line)| *line).collect();
+    if missing.is_empty() { Ok(()) } else { Err(format!("missing {missing:?} in: {killed} || {expert} || {cube}")) }
 }
 
 /// The progress in a persistent-data compound beside another mod's key, read back (a relog or a

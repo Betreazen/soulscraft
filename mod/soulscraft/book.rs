@@ -822,3 +822,16 @@ fn fixture(name: &str, mob: &str, kills: Option<f64>) -> String {
     }
     format!("{name}: {mob} {}", kills.map_or("met".to_owned(), |n| format!("+{n} kills")))
 }
+
+/// A vanilla type's own numbers as the engine has them (its `MobType`: max health, attack damage,
+/// armour), for the book's pages of changed vanilla mobs (soulscraft_rules::book_page::VanillaStats)
+/// on the client, and for the self-test on the server.
+pub(super) fn engine_stats(game: &Game<'_>, kind: &str) -> Option<soulscraft_rules::data::Stats> {
+    let t = game.res.mob_types().get(kind)?;
+    Some(soulscraft_rules::data::Stats {
+        health: f64::from(t.max_health),
+        damage: f64::from(t.attack_damage),
+        armor: f64::from(t.armor),
+        ..Default::default()
+    })
+}
