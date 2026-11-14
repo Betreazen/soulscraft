@@ -91,8 +91,10 @@ def main():
             model = json.load(f)
         if model.get('parent', '').startswith('soulscraft:block/'):
             continue  # a block item: the block itself is in blocks_<set>.glb
-        # A sprite names its texture (a wall head shows the icon of its head item).
-        layer = model.get('textures', {}).get('layer0', 'soulscraft:item/' + item_id)
+        # A sprite names its texture as layer0, a model of elements as 0 (a wall head's item shows
+        # its head item's model and texture).
+        textures = model.get('textures', {})
+        layer = textures.get('layer0') or textures.get('0') or 'soulscraft:item/' + item_id
         tex = os.path.join(NS, 'textures', 'item', layer.split('/', 1)[1] + '.png')
         display = model.get('display') or PARENT_DISPLAY[model['parent']]
         lines.append('SC.item(%s, %s);' % (js(item_id), js({'model': model, 'texture': 'data:image/png;base64,' + b64(tex), 'display': display})))

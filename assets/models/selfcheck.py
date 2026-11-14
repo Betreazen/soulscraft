@@ -358,8 +358,10 @@ def block_files_check():
             if parent.split('/', 1)[1] not in models:
                 failures.append('item %s: no block model %s' % (name, parent))
         else:
-            # A sprite names its texture; a wall head shows the icon of its head item.
-            layer = item.get('textures', {}).get('layer0', 'soulscraft:item/' + name[:-5])
+            # A sprite names its texture as layer0, a model of elements as 0 (a wall head's item
+            # shows its head item).
+            tex = item.get('textures', {})
+            layer = tex.get('layer0') or tex.get('0') or 'soulscraft:item/' + name[:-5]
             if not os.path.exists(os.path.join(ns, 'textures', 'item', layer.split('/', 1)[1] + '.png')):
                 failures.append('item %s: no sprite PNG %s' % (name, layer))
     m = blocks.Model('probe')
