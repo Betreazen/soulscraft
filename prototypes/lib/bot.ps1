@@ -29,6 +29,11 @@ function Start-Bot([string]$Name, [switch]$Still) {
     $dir = Join-Path $script:Scratch "bots\$Name"
     New-Item -ItemType Directory -Force $dir | Out-Null
     $socket = Join-Path $dir 'ctl.sock'
+    # Owner's rule: bots play without sound. Volume lives in the player dir's options.txt (a fresh
+    # one starts at 1.0): the master volume is set to 0 there before every launch.
+    $options = Join-Path $dir 'options.txt'
+    $lines = if (Test-Path $options) { @(Get-Content $options | Where-Object { $_ -notmatch '^soundCategory_master:' }) } else { @() }
+    [IO.File]::WriteAllLines($options, [string[]](@($lines) + 'soundCategory_master:0.0'), [Text.UTF8Encoding]::new($false))
     if ($Still) { $env:HORIZON_STILL = '1' } else { Remove-Item Env:HORIZON_STILL -ErrorAction SilentlyContinue }
     $reply = & $script:Ctl --socket $socket launch --game (Get-JointClient) --offscreen --home $script:Instance `
         --game-dir $script:Instance --player-dir $dir --name $Name --server "127.0.0.1:$script:BenchPort" 2>&1
