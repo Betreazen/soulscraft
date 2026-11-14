@@ -394,6 +394,8 @@ struct Run {
     ends_at: Option<u32>,
     airborne_since: Option<u64>,
     landed_jump: bool,
+    /// The tick of the attack a cube came down: its recovery counts from there.
+    landed_at: Option<u32>,
 }
 
 /// One vanilla mob's mind, as long as the mob is in memory.
@@ -529,6 +531,7 @@ impl VBrain {
             ends_at: None,
             airborne_since: None,
             landed_jump: false,
+            landed_at: None,
         });
         out.events.push(Event::AttackStart { attack: idx });
         out.events.push(Event::Phase { attack: idx, phase: Phase::Windup, t: 0 });
@@ -546,6 +549,15 @@ impl VBrain {
         let mut phase = line.phase_at(t);
         if run.ends_at.is_some_and(|end| t >= end) {
             phase = Phase::Done;
+        }
+        if self.behavior == Behavior::Cube && run.airborne_since.is_some() {
+            // A cube's jump lasts as long as its flight: the hit phase holds until it is down, the
+            // recovery counts from the landing.
+            phase = match run.landed_at {
+                None => Phase::Hit,
+                Some(l) if t < l + a.recover => Phase::Recover,
+                Some(_) => Phase::Done,
+            };
         }
         if phase != run.phase {
             run.phase = phase;
@@ -694,6 +706,7 @@ impl VBrain {
         if (up >= 3 && s.on_ground) || up >= LANDING_TIMEOUT {
             run.landed_jump = true;
             run.landed += 1;
+            run.landed_at = Some((s.now - run.start) as u32);
             let radius = landing_radius(a, s.size);
             let hit = s.target.is_some_and(|tg| geom::dist(s.pos, tg) <= radius);
             if hit {

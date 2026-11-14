@@ -131,7 +131,9 @@ fn every_vanilla_move_lands_on_its_data_tick() {
             let phantom = g.behavior() == Behavior::Phantom;
             let ended = ticks.iter().position(|t| t.events.iter().any(|e| matches!(e, Event::AttackEnd { attack, .. } if *attack == i)));
             let ended = ended.unwrap_or_else(|| panic!("{} {} never ended", g.id, a.id));
-            assert!(ended <= line.end() as usize, "{} {} ended late", g.id, a.id);
+            // A cube recovers from its landing (3 ticks after the leap here), not from the hit tick.
+            let late = if g.behavior() == Behavior::Cube { 1 } else { 0 };
+            assert!(ended <= line.end() as usize + late, "{} {} ended late", g.id, a.id);
             assert!(ticks[..ended].iter().all(|t| t.control != phantom), "{} {}: control", g.id, a.id);
             let hit = line.hit_start() as usize;
             let s = strike_ticks(&ticks);
@@ -369,6 +371,19 @@ fn a_cube_jumps_only_from_size_two() {
     assert!(starts(&[tick(1)]).is_empty());
     assert_eq!(starts(&[tick(2)]), vec![(0, 0)]);
     assert!((landing_radius(&g.attacks[0].def, 4) - 3.0).abs() < 1e-9);
+}
+
+#[test]
+fn a_cube_holds_its_hit_phase_while_it_flies() {
+    let g = group("slime");
+    let mut b = VBrain::new(&g, "minecraft:slime", 1, 0);
+    b.force(0);
+    // Up in the air from the leap (tick 10) until tick 28.
+    let ticks = run(&mut b, &g, 0, 45, |now| VSenses { size: 2, on_ground: !(10..28).contains(&now), ..senses(now, 5.0) });
+    assert_eq!(strike_ticks(&ticks), vec![28]);
+    assert!(ticks[11..28].iter().all(|t| t.label.starts_with("high_jump:hit")), "{:?}", ticks[20].label);
+    let end = ticks.iter().position(|t| t.events.iter().any(|e| matches!(e, Event::AttackEnd { .. }))).unwrap();
+    assert_eq!(end, 28 + 10);
 }
 
 #[test]
