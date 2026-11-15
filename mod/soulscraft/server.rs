@@ -232,6 +232,7 @@ pub(super) fn on_level_tick(game: &mut Game<'_>, dimension: &str) {
     crate::game::soulscraft_trophy::on_level_tick(game, dimension, now);
     crate::game::soulscraft_spawn_boost::on_level_tick(dimension, now);
     crate::game::soulscraft_natural::on_level_tick(game, dimension, now);
+    crate::game::soulscraft_relic::on_level_tick(game, dimension, now);
     if dimension == "minecraft:overworld" {
         let online = game.native_server_players();
         crate::game::soulscraft_power::refresh(game, &online, now);

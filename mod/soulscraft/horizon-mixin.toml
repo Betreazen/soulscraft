@@ -648,6 +648,14 @@ bindings = [
 
 # ---- 0.6: summoning items in the world and the tiers' rewards (docs/design/11-summons-rewards.md) ----
 
+# The tier items' bonuses the engine leaves out: the Abyss Heart's +4 max health in the off hand,
+# held through the `attribute` command (relic.rs explains why).
+[[module]]
+id = "relic"
+file = "crates/horizon-client/src/game.rs"
+name = "soulscraft_relic"
+source = "relic.rs"
+
 # The loot crate: chest horns and shards, zombies' Rotten Horn (data/loot.json, copied in by
 # mod/sync.ps1). Its helper compiles inside horizon-world, so the crate is horizon-world's.
 [[crate]]

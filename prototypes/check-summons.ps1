@@ -1,14 +1,13 @@
 # The summons slice in game (docs/design/11-summons-rewards.md) with the bot sc_a on the joint server:
-#   1. chests: each tier's structure tables rolled through `/loot give`, the horns and shards the
-#      bot got counted (Г17), and no horn of another tier;
+#   1. chests: in the bench self-test chest_loot (`loot give` drops nothing on this engine);
 #   2. tier items: the Revenant's Blade, the Brute's Maul and the Abyss Heart in hand, the
 #      player's attributes read back (armour, attack damage, max health), shots of each in hand;
 #   3. the brute still holds its 3D maul (the item model falls back to it without a holder).
 # Shots and the console's answers go to prototypes/evidence/summons/.
 # Needs the joint server running offline with a client that has this build:
 #   .\joint.ps1 open; .\joint.ps1 serve -Owner "soulscraft session"   (and stop, close after)
-# Run through `pwsh -Command "& .\prototypes\check-summons.ps1 -Only chests"` for scene lists.
-param([string[]]$Only, [int]$Rolls = 40)
+# Run through `pwsh -Command "& .\prototypes\check-summons.ps1 -Only items,brute"` for scene lists.
+param([string[]]$Only)
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'lib\bot.ps1')
 $Out = Join-Path $PSScriptRoot 'evidence\summons'
@@ -50,23 +49,8 @@ try {
     C 'time set noon' | Out-Null
     C "tp sc_a $($ax + 0.5) $ay $($az + 0.5) 0 0" | Out-Null
 
-    if (Scene 'chests') {
-        $tables = [ordered]@{
-            'minecraft:chests/simple_dungeon' = 'soulscraft:rotten_horn'
-            'minecraft:chests/desert_pyramid' = 'soulscraft:grave_horn'
-            'minecraft:chests/woodland_mansion' = 'soulscraft:storm_horn'
-            'minecraft:chests/bastion_treasure' = 'soulscraft:abyss_horn'
-            'minecraft:chests/village/village_weaponsmith' = ''
-        }
-        foreach ($t in $tables.Keys) {
-            C 'clear sc_a' | Out-Null
-            for ($i = 0; $i -lt $Rolls; $i++) { C "loot give sc_a loot $t" | Out-Null }
-            $got = foreach ($h in $horns) { "$h=$(Count-Item $h)" }
-            $shards = Count-Item 'soulscraft:soul_shard'
-            Note "$t x$Rolls (its horn: $(if ($tables[$t]) { $tables[$t] } else { 'none' }))" (@($got) + "soulscraft:soul_shard=$shards")
-        }
-        C 'clear sc_a' | Out-Null
-    }
+    # The chests: `loot give` to a player drops nothing on Horizon 7e4e421 ("Dropped 0 items", vanilla
+    # tables too), so the bench self-test chest_loot rolls each tier's table with `loot spawn`.
 
     if (Scene 'items') {
         C 'clear sc_a' | Out-Null
@@ -82,7 +66,8 @@ try {
                          @{ id = 'soulscraft:abyss_heart'; slot = 'weapon.offhand' })) {
             C 'clear sc_a' | Out-Null
             C "item replace entity sc_a $($i.slot) with $($i.id)" | Out-Null
-            Start-Sleep -Milliseconds 800
+            # The Abyss Heart's health comes from the server's relic check, twice a second.
+            Start-Sleep -Milliseconds 1500
             $lines = @(
                 "armor: $((C 'attribute sc_a minecraft:armor get') -join ' ')",
                 "attack damage: $((C 'attribute sc_a minecraft:attack_damage get') -join ' ')",
@@ -100,7 +85,7 @@ try {
         Invoke-Bot $bot 'open-inventory' | Out-Null
         Start-Sleep -Seconds 1
         Save-Shot $bot 'inventory_rewards'
-        Invoke-Bot $bot 'close-screen' | Out-Null
+        Invoke-Bot $bot 'key esc tap' | Out-Null
         C 'gamemode creative sc_a' | Out-Null
         C 'clear sc_a' | Out-Null
     }
