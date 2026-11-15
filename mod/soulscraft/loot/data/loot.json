@@ -1,0 +1,27 @@
+{
+  "format": "soulscraft-loot",
+  "version": 1,
+  "source": "docs/design/11-summons-rewards.md; Г17 (сундуки), Г18 (ванильные зомби); все шансы — гипотезы до плейтеста",
+  "chests": [
+    { "table": "minecraft:chests/simple_dungeon", "item": "soulscraft:rotten_horn", "chance": 0.25 },
+    { "table": "minecraft:chests/abandoned_mineshaft", "item": "soulscraft:rotten_horn", "chance": 0.10 },
+    { "table": "minecraft:chests/desert_pyramid", "item": "soulscraft:grave_horn", "chance": 0.20 },
+    { "table": "minecraft:chests/jungle_temple", "item": "soulscraft:grave_horn", "chance": 0.20 },
+    { "table": "minecraft:chests/pillager_outpost", "item": "soulscraft:grave_horn", "chance": 0.15 },
+    { "table": "minecraft:chests/woodland_mansion", "item": "soulscraft:storm_horn", "chance": 0.25 },
+    { "table": "minecraft:chests/stronghold_corridor", "item": "soulscraft:storm_horn", "chance": 0.10 },
+    { "table": "minecraft:chests/bastion_other", "item": "soulscraft:storm_horn", "chance": 0.10 },
+    { "table": "minecraft:chests/bastion_bridge", "item": "soulscraft:storm_horn", "chance": 0.10 },
+    { "table": "minecraft:chests/ancient_city", "item": "soulscraft:abyss_horn", "chance": 0.10 },
+    { "table": "minecraft:chests/bastion_treasure", "item": "soulscraft:abyss_horn", "chance": 0.20 },
+    { "table": "minecraft:chests/end_city_treasure", "item": "soulscraft:abyss_horn", "chance": 0.10 }
+  ],
+  "chest_shards": { "item": "soulscraft:soul_shard", "chance": 0.5, "count": [1, 4] },
+  "killed_by_player": [
+    {
+      "tables": ["minecraft:entities/zombie", "minecraft:entities/husk", "minecraft:entities/drowned", "minecraft:entities/zombie_villager"],
+      "item": "soulscraft:rotten_horn",
+      "chance": 0.005
+    }
+  ]
+}

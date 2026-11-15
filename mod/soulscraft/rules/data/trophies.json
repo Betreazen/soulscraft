@@ -22,5 +22,12 @@
     "head": {"event": "гарантированно за победу: голова одного из мобов ивента, плюс по одной за каждое знамя «сложнее»", "world": 0.01, "world_elite": 0.03},
     "armor": {"event": 0.3, "world": "как в бестиарии"},
     "diorama": {"event": "только за победу на алтаре 3-го уровня и выше: диорама одного моба ивента", "min_altar_level": 3, "world": null}
-  }
+  },
+  "tiers_text": "награда ступени ивента сверх трофеев (docs/design/11-summons-rewards.md, Г19): осколки всегда, предмет ступени с шансом × множитель знамён, не больше 1",
+  "tiers": [
+    {"tier": 1, "shards": 6},
+    {"tier": 2, "shards": 8, "item": "soulscraft:revenant_blade", "chance": 0.5},
+    {"tier": 3, "shards": 10, "item": "soulscraft:brute_maul", "chance": 0.4},
+    {"tier": 4, "shards": 12, "item": "soulscraft:abyss_heart", "chance": 0.35}
+  ]
 }

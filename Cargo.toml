@@ -2,4 +2,4 @@
 # (mod/soulscraft/horizon-mixin.toml, [[crate]]) and takes versions from Horizon's Cargo.lock.
 [workspace]
 resolver = "3"
-members = ["mod/soulscraft/rules"]
+members = ["mod/soulscraft/rules", "mod/soulscraft/loot"]

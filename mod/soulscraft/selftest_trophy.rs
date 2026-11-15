@@ -23,6 +23,7 @@ pub(super) const CASES: &[(&str, u64)] = &[
     ("trophy_wall_head", 20),
     ("trophy_owner", 20),
     ("natural_lists", 10),
+    ("chest_loot", 20),
     ("trophy_particles", 260),
     ("reward_seeded_win", 300),
     ("kin_wave", 60),
@@ -40,6 +41,7 @@ pub(super) fn step(game: &mut Game<'_>, now: u64, t: u64, name: &str, c: &mut Ca
         "trophy_wall_head" => wall_head(game, t),
         "trophy_owner" => owner(game, t),
         "natural_lists" => natural_lists(game, t),
+        "chest_loot" => chest_loot(game, t),
         "trophy_particles" => particles(game, t, c),
         "reward_seeded_win" => seeded_win(game, now, t, c),
         "kin_wave" => kin_wave(game, now, t, c),
@@ -272,16 +274,23 @@ fn seeded_win(game: &mut Game<'_>, now: u64, t: u64, c: &mut Case) -> Option<Res
         let effects = ra::effects(&file, &["weight".to_owned(), "horde".to_owned()]);
         let data = crate::game::soulscraft_server::state().data.clone();
         let kinds = vec!["minecraft:zombie".to_owned(), "soulscraft:revenant".to_owned()];
-        let want = rev::rewards(&kinds, &data, &effects, 3, &rev::TrophyChances::embedded(), &mut Rng::new(SEED));
+        // The test event is tier 1: its reward adds its shards (11-summons-rewards.md, Г19).
+        let tier = data.events.iter().find(|e| e.item == "soulscraft:rotten_horn").map_or(1, |e| e.tier);
+        let want = rev::rewards(&kinds, &data, &effects, 3, tier, &rev::TrophyChances::embedded(), &mut Rng::new(SEED));
         let mut counts: Vec<(String, u32)> = Vec::new();
-        for item in want.iter().filter_map(Trophy::item) {
+        for t in &want {
+            let Some(item) = t.item() else { continue };
             match counts.iter_mut().find(|x| x.0 == item) {
-                Some(x) => x.1 += 1,
-                None => counts.push((item, 1)),
+                Some(x) => x.1 += t.count(),
+                None => counts.push((item, t.count())),
             }
         }
         let heads: usize = want.iter().filter(|x| matches!(x, Trophy::Head(_))).count();
         let diorama = want.contains(&Trophy::Diorama("soulscraft:revenant".into()));
+        let shards = counts.iter().any(|x| x.0 == rev::SOUL_SHARD && x.1 > 0);
+        if !shards {
+            return Some(Err(format!("roll {want:?}: no shards of the tier's reward")));
+        }
         for (item, n) in &counts {
             let got = items_near(game, [0, 1, 0], item, 4.0);
             if got != *n {
@@ -445,4 +454,35 @@ fn boost_sector(game: &mut Game<'_>, now: u64, t: u64, c: &mut Case) -> Option<R
     altar::set_boost(DIM, core, false);
     c.phase = 1;
     None
+}
+
+/// Rolls of a structure chest's table on the platform (`loot spawn`, through the loaded tables).
+const CHEST_ROLLS: u32 = 40;
+/// Where they land: a free corner of the platform.
+const CHEST_SPOT: [i32; 3] = [-14, 1, 14];
+
+/// The loot tables as the server loaded them (11-summons-rewards.md, Г17): a woodland mansion's
+/// chest rolled 40 times gives Storm Horns (25% a chest) and soul shards (50%), and no horn of
+/// another tier. The chance of no horn at all in 40 rolls is 0.75^40, about 1e-5.
+fn chest_loot(game: &mut Game<'_>, t: u64) -> Option<Result<(), String>> {
+    let p = at(CHEST_SPOT);
+    if t == 1 {
+        for _ in 0..CHEST_ROLLS {
+            game.native_run_command(&format!("loot spawn {} {} {} loot minecraft:chests/woodland_mansion", p[0], p[1] + 1, p[2]));
+        }
+        return None;
+    }
+    if t < 5 {
+        return None;
+    }
+    let count = |item: &str| items_near(game, CHEST_SPOT, item, 6.0);
+    let storm = count("soulscraft:storm_horn");
+    let shards = count("soulscraft:soul_shard");
+    let others: u32 = ["soulscraft:rotten_horn", "soulscraft:grave_horn", "soulscraft:abyss_horn"].iter().map(|i| count(i)).sum();
+    game.native_run_command(&format!("kill @e[type=minecraft:item,x={},y={},z={},distance=..8]", p[0], p[1], p[2]));
+    Some(if storm > 0 && shards > 0 && others == 0 && storm <= CHEST_ROLLS {
+        Ok(())
+    } else {
+        Err(format!("{CHEST_ROLLS} mansion chests: storm horns {storm}, shards {shards}, other horns {others}"))
+    })
 }

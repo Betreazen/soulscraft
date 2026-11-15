@@ -10,12 +10,14 @@
 // - The lurker: zombie placement never puts a mob in water, so every `every_ticks` each player in
 //   a deep ocean may get one lurker, with `chance`, in water below `max_y` between the radii,
 //   if fewer than `near_cap` lurkers are near.
-// - Shards: the book's deaths (soulscraft_book::deaths) hand over each credited kill of a
-//   SoulsCraft mob; the drops are summoned here, outside the book's lock.
+// - World drops (Г15, Г18; docs/design/11-summons-rewards.md): the book's deaths
+//   (soulscraft_book::deaths) hand over each credited kill of a SoulsCraft mob; its shards, horn,
+//   head and armour are summoned here, outside the book's lock.
 //
 // Log lines:
 //   soulscraft: natural lurker at=x,y,z near=player tick=..
 //   soulscraft: shard drop mob=revenant count=1 at=x,y,z
+//   soulscraft: world drop mob=revenant item=soulscraft:grave_horn at=x,y,z
 use crate::game::Game;
 use horizon_client::biome::SpawnEntry;
 use soulscraft_rules::data::MobsFile;
@@ -24,6 +26,8 @@ use std::sync::{LazyLock, Mutex, PoisonError};
 
 /// The data as built: spawn lists are asked often, no copy of the live data each time.
 static MOBS: LazyLock<MobsFile> = LazyLock::new(MobsFile::embedded);
+/// The head's world chances (data/trophies.json).
+static CHANCES: LazyLock<soulscraft_rules::event::TrophyChances> = LazyLock::new(soulscraft_rules::event::TrophyChances::embedded);
 static RNG: LazyLock<Mutex<Rng>> = LazyLock::new(|| Mutex::new(Rng::new(0x5EED_50_11)));
 /// Lists extended since the last read (the self-test and the cost line).
 static EXTENDED: Mutex<u64> = Mutex::new(0);
@@ -96,19 +100,20 @@ fn water_column(game: &Game<'_>, x: i32, z: i32, max_y: i32) -> Option<i32> {
     (-60..=max_y).rev().find(|&y| water(y) && water(y + 1))
 }
 
-/// The shards credited kills drop, from the book's deaths: (mob key, where).
-pub(super) fn drop_shards(game: &mut Game<'_>, dim: &str, kills: &[(String, [f64; 3])]) {
-    let s = &MOBS.soul_shard;
+/// What credited kills drop in the world, from the book's deaths: (mob key, where). Shards, now
+/// and then a horn, the head, armour pieces (soulscraft_rules::natural::world_drops).
+pub(super) fn drop_loot(game: &mut Game<'_>, dim: &str, kills: &[(String, [f64; 3])]) {
     for (kind, at) in kills {
         let Some(def) = MOBS.mob(kind) else { continue };
-        let n = s.drop(def.elite, roll());
-        if n == 0 {
-            continue;
-        }
-        let snbt = format!("{{Item:{{id:\"{}\",count:{n}}},PickupDelay:10}}", s.item);
-        if let Ok((crate::mod_api::Tag::Compound(nbt), _)) = crate::mod_api::parse_snbt(&snbt) {
+        for (item, n) in soulscraft_rules::natural::world_drops(&MOBS, &CHANCES, def, roll) {
+            let snbt = format!("{{Item:{{id:\"{item}\",count:{n}}},PickupDelay:10}}");
+            let Ok((crate::mod_api::Tag::Compound(nbt), _)) = crate::mod_api::parse_snbt(&snbt) else { continue };
             game.native_summon(dim, "minecraft:item", [at[0], at[1] + 0.3, at[2]], nbt);
-            log::log!(crate::game::soulscraft_server::chatty(), "soulscraft: shard drop mob={} count={n} at={:.0},{:.0},{:.0}", def.id, at[0], at[1], at[2]);
+            if item == MOBS.soul_shard.item {
+                log::log!(crate::game::soulscraft_server::chatty(), "soulscraft: shard drop mob={} count={n} at={:.0},{:.0},{:.0}", def.id, at[0], at[1], at[2]);
+            } else {
+                log::info!("soulscraft: world drop mob={} item={item} at={:.0},{:.0},{:.0}", def.id, at[0], at[1], at[2]);
+            }
         }
     }
 }

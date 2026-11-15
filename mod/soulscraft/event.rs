@@ -906,21 +906,23 @@ fn restore(game: &mut Game<'_>, dim: &str, b: &mut Breaches) {
 }
 
 /// The win's reward (09-trophies.md, data/trophies.json; soulscraft_rules::event::rewards with the
-/// banners the run started with), dropped over the core: heads, armour pieces, a diorama.
+/// banners the run started with), dropped over the core: heads, armour pieces, a diorama, and the
+/// event tier's shards and item (11-summons-rewards.md, Г19).
 fn reward(game: &mut Game<'_>, r: &mut EventRun, now: u64) {
     let chances = rev::TrophyChances::embedded();
     let data = server::state().data.clone();
-    let trophies = rev::rewards(&r.kinds, &data, &r.plan.effects, r.level, &chances, &mut Rng::new(r.reward_seed));
+    let tier = data.events.iter().find(|e| e.id == r.event).map_or(0, |e| e.tier);
+    let trophies = rev::rewards(&r.kinds, &data, &r.plan.effects, r.level, tier, &chances, &mut Rng::new(r.reward_seed));
     let mut items = Vec::new();
     for t in &trophies {
         let Some(item) = t.item() else { continue };
         let c = core_centre(r.core);
         let at = [c[0], c[1] + 1.2, c[2]];
-        let snbt = format!("{{Item:{{id:\"{item}\",count:1}},PickupDelay:10}}");
+        let snbt = format!("{{Item:{{id:\"{item}\",count:{}}},PickupDelay:10}}", t.count());
         if let Ok((crate::mod_api::Tag::Compound(nbt), _)) = crate::mod_api::parse_snbt(&snbt) {
             game.native_summon(&r.dim, "minecraft:item", at, nbt);
         }
-        items.push(item);
+        items.push(if t.count() > 1 { format!("{item}x{}", t.count()) } else { item });
     }
     record(format!(
         "reward items=[{}] mult={:.2} trophies={trophies:?} tick={now}",

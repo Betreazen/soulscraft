@@ -352,6 +352,11 @@ fn each_stage_opens_what_the_table_says() {
     }
     let bp = book_page::mob_page(&b, &c, &t, &brute, &bm, &q);
     assert!(texts(&bp).contains("голова — 3%"));
+    // Shards and the summoning horn a credited kill drops (11-summons-rewards.md).
+    assert!(texts(&bp).contains("осколок души × 2 — 100%"), "{}", texts(&bp));
+    assert!(texts(&bp).contains("Горн бури — 3%"));
+    assert!(all.contains("осколок души — 35%"));
+    assert!(all.contains("Горн мертвецов — 0,5%") || all.contains("Горн мертвецов — 0.5%"), "{all}");
 }
 
 #[test]
@@ -419,6 +424,13 @@ fn the_events_page_opens_the_description_then_the_waves() {
     let all = texts(&book_page::events_page(&b, &c, &t, &p));
     assert!(all.contains("Волна 1:"), "{all}");
     assert!(all.contains("Награда:"));
+    // The tier's own reward (tier 1: shards only).
+    assert!(all.contains("Награда ступени: осколки души × 6"), "{all}");
+    p.event_tried(&b, &c, "grave_night");
+    p.event_won(&b, &c, "grave_night");
+    let all = texts(&book_page::events_page(&b, &c, &t, &p));
+    assert!(all.contains("призыв: Горн мертвецов"), "{all}");
+    assert!(all.contains("Клинок латника — 50%"), "{all}");
 }
 
 #[test]

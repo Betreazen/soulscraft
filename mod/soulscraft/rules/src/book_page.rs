@@ -213,6 +213,18 @@ fn expert_lines(catalog: &Catalog, trophies: &Value, e: &Entry, m: &Value, vanil
         let head = &trophies["drops"]["head"];
         let chance = head[if e.elite { "world_elite" } else { "world" }].as_f64().unwrap_or(0.0);
         loot.push(format!("голова — {}%", num(chance * 100.0)));
+        // Shards and the summoning horn (10-survival.md, 11-summons-rewards.md).
+        let shard = &catalog.world["soul_shard"];
+        let (chance, count) = if e.elite { ("elite_chance", "elite_count") } else { ("chance", "count") };
+        if let (Some(c), Some(n)) = (shard[chance].as_f64(), shard[count].as_u64()) {
+            let many = if n > 1 { format!(" × {n}") } else { String::new() };
+            loot.push(format!("осколок души{many} — {}%", num(c * 100.0)));
+        }
+        let horn = &catalog.world["horn_drop"];
+        let (item, chance) = if e.elite { ("elite_item", "elite_chance") } else { ("item", "chance") };
+        if let (Some(i), Some(c)) = (horn[item].as_str(), horn[chance].as_f64()) {
+            loot.push(format!("{} — {}%", piece_name(i), num(c * 100.0)));
+        }
     }
     if !loot.is_empty() {
         lines.push(line(Tone::Head, "Добыча"));
@@ -335,8 +347,29 @@ pub fn piece_name(id: &str) -> String {
         "altar_brazier" => "жаровня".into(),
         "altar_obelisk" => "обелиск".into(),
         "rotten_horn" => "Гнилой горн".into(),
+        "grave_horn" => "Горн мертвецов".into(),
+        "storm_horn" => "Горн бури".into(),
+        "abyss_horn" => "Горн бездны".into(),
+        "soul_shard" => "осколок души".into(),
+        "revenant_blade" => "Клинок латника".into(),
+        "brute_maul" => "Молот громилы".into(),
+        "abyss_heart" => "Сердце бездны".into(),
         other => other.to_owned(),
     }
+}
+
+/// The event tier's own reward for its page (data/trophies.json `tiers`, 11-summons-rewards.md).
+fn tier_reward_text(trophies: &Value, tier: u64) -> Option<String> {
+    let t = trophies["tiers"].as_array()?.iter().find(|t| t["tier"].as_u64() == Some(tier))?;
+    let mut parts = Vec::new();
+    if let Some(n) = t["shards"].as_u64().filter(|n| *n > 0) {
+        parts.push(format!("осколки души × {n}"));
+    }
+    if let Some(item) = t["item"].as_str() {
+        let chance = t["chance"].as_f64().unwrap_or(0.0) * 100.0;
+        parts.push(format!("{} — {}%, знамёна «сложнее» поднимают шанс", piece_name(item), num(chance)));
+    }
+    (!parts.is_empty()).then(|| format!("Награда ступени: {}", parts.join("; ")))
 }
 
 fn locked(lines: &mut Vec<Line>, title: &str, when: &str) {
@@ -429,6 +462,9 @@ pub fn events_page(book: &BookFile, catalog: &Catalog, trophies: &Value, p: &Pro
         }
         let d = &trophies["drops"];
         lines.push(line(Tone::Text, format!("Награда: {}; части брони — {}%; {}", s(&d["head"], "event"), num(d["armor"]["event"].as_f64().unwrap_or(0.0) * 100.0), s(&d["diorama"], "event"))));
+        if let Some(text) = tier_reward_text(trophies, tier) {
+            lines.push(line(Tone::Text, text));
+        }
     }
     Page { title: "Ивенты".into(), lines, ..Page::default() }
 }

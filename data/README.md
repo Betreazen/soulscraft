@@ -27,6 +27,7 @@
 | `spawn_fit` | место для рамки моба (раунд 9): `search_blocks` — на сколько блоков можно сдвинуть место появления |
 | `cover` | укрытие от стреляющих турелей: `turret_range_blocks` (дальность турели RustCraft), `search_blocks`, `hold_ticks`, `check_every_ticks` |
 | `vanilla` | изменения ванильных мобов ([07-vanilla-mobs.md](../docs/design/07-vanilla-mobs.md)), раздел «Ванильные мобы: `vanilla`» ниже |
+| `natural`, `soul_shard`, `horn_drop` | естественный спавн, осколок души и горн с врагов — разделы ниже |
 
 ## Моб
 
@@ -204,6 +205,10 @@
 
 `item`, `chance` и `count` — у обычного моба, `elite_chance` и `elite_count` — у элитного (гипотеза Г15). Роняет моб SoulsCraft, убийство которого книга засчитала игроку; мобы спавнеров не роняют.
 
+## Горн с врагов: `horn_drop`
+
+`item` и `chance` — горн обычного моба SoulsCraft (Горн мертвецов, 0,5%), `elite_item` и `elite_chance` — элитного (Горн бури, 3%; гипотеза Г18, раунд 3). Роняет та же засчитанная смерть, что и осколки, вместе с головой (`trophies.json`, `drops.head.world`) и частями брони из `loot` моба.
+
 ## Как добавить моба или поменять числа
 
 1. Поменять число здесь.
@@ -233,8 +238,19 @@
 | `diorama` | `name`, `text` (что это), `item` (как ставится), `plaque` (что на табличке), `view_blocks` (дальность отрисовки block entity), `particles_blocks` (дальность частиц) |
 | `rejected` | отвергнутые варианты чучела (раунд 6): `round`, `commit`, где они ещё есть, `text`, `variants` |
 | `drops` | `banner_step` — множитель награды знамён: шанс каждой части брони × `(1 + banner_step · (сложнее − проще))`, не меньше 0 (головы: +1 за «сложнее», −1 за «проще», не меньше одной); `head` (`event` текстом, `world` и `world_elite` — доли), `armor` (`event` — доля за победу на каждую часть брони мобов ивента из их `loot`), `diorama` (`event`, `min_altar_level`; только мобы SoulsCraft: у зомби диорамы нет) |
+| `tiers` | награда ступени ивента сверх трофеев ([11-summons-rewards.md](../docs/design/11-summons-rewards.md), Г19): `tier`, `shards` (осколков всегда), `item` и `chance` (предмет ступени; шанс × множитель знамён, не больше 1) |
 
 Какой моб элитный, задаёт `mobs.json`: поле `elite: true` (громила). Книга открывает такую запись быстрее, у головы свой шанс.
+
+## Лут структур: `loot.json`
+
+Что мод добавляет в ванильные таблицы лута, когда они грузятся (хук `native_loot_table_load`; [11-summons-rewards.md](../docs/design/11-summons-rewards.md), Г17 и Г18). Читает крейт `mod/soulscraft/loot` (копию пишет `mod/sync.ps1`). Пулы таблицы остаются, добавляются новые.
+
+| Поле | Что это |
+| --- | --- |
+| `chests` | `table` (`minecraft:chests/...`), `item` (горн), `chance` — горн в сундуке этой структуры |
+| `chest_shards` | `item`, `chance`, `count` [от, до] — осколки в каждом сундуке из `chests` |
+| `killed_by_player` | `tables` (таблицы мобов `minecraft:entities/...`), `item`, `chance` — только если моба убил игрок |
 
 ## Книга охотника: `book.json`
 

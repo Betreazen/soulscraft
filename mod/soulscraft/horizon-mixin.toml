@@ -645,3 +645,25 @@ bindings = [
   { name = "host", ty = "&mut crate::game::lan::LanHost", value = "&mut *host" },
   { name = "gi", ty = "usize", value = "gi" },
 ]
+
+# ---- 0.6: summoning items in the world and the tiers' rewards (docs/design/11-summons-rewards.md) ----
+
+# The loot crate: chest horns and shards, zombies' Rotten Horn (data/loot.json, copied in by
+# mod/sync.ps1). Its helper compiles inside horizon-world, so the crate is horizon-world's.
+[[crate]]
+id = "loot"
+path = "loot"
+dependent = "horizon-world"
+
+# Every loot table as it loads (horizon-world/src/loot.rs:589, API 75; docs/native-mods.md «Loot
+# tables»), on a server and a client: soulscraft_loot::apply adds the file's pools to the chests
+# and zombie tables it names, the same each time.
+[[injection]]
+id = "loot_table_load"
+target = "horizon_world::loot::native_loot_table_load"
+kind = "HEAD"
+helper = "hook_loot_table_load.rs"
+bindings = [
+  { name = "id", ty = "&str", value = "id" },
+  { name = "table", ty = "&mut serde_json::Value", value = "&mut *table" },
+]

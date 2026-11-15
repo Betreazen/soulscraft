@@ -376,7 +376,26 @@ pub struct TrophyChances {
     /// How much one «harder» banner raises (an «easier» one lowers) the armour chance: × (1 +
     /// step · (harder − easier)), never under 0 (`drops.banner_step`).
     pub banner_step: f64,
+    /// A credited kill's head in the world, an ordinary mob's and an elite's (`drops.head.world`,
+    /// `world_elite`; 11-summons-rewards.md, Г18).
+    pub head_world: f64,
+    pub head_world_elite: f64,
+    /// Each event tier's own reward (`tiers`, Г19).
+    pub tiers: Vec<TierReward>,
 }
+
+/// What a win of an event tier gives on top of its trophies: shards for sure, the tier's item by
+/// a chance the banners multiply.
+#[derive(Clone, Debug, PartialEq)]
+pub struct TierReward {
+    pub tier: u32,
+    pub shards: u32,
+    pub item: Option<String>,
+    pub chance: f64,
+}
+
+/// The item shards drop as (the altar's currency, 10-survival.md).
+pub const SOUL_SHARD: &str = "soulscraft:soul_shard";
 
 impl TrophyChances {
     pub fn embedded() -> Self {
@@ -385,11 +404,32 @@ impl TrophyChances {
     pub fn parse(text: &str) -> Self {
         let v: Value = serde_json::from_str(text).unwrap_or(Value::Null);
         let drops = &v["drops"];
+        let tiers = v["tiers"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|t| {
+                Some(TierReward {
+                    tier: t["tier"].as_u64()? as u32,
+                    shards: t["shards"].as_u64().unwrap_or(0) as u32,
+                    item: t["item"].as_str().map(str::to_owned),
+                    chance: t["chance"].as_f64().unwrap_or(0.0).clamp(0.0, 1.0),
+                })
+            })
+            .collect();
         Self {
             armor: drops["armor"]["event"].as_f64().unwrap_or(0.3),
             diorama_min_level: drops["diorama"]["min_altar_level"].as_u64().unwrap_or(3) as u32,
             banner_step: drops["banner_step"].as_f64().unwrap_or(0.25),
+            head_world: drops["head"]["world"].as_f64().unwrap_or(0.0),
+            head_world_elite: drops["head"]["world_elite"].as_f64().unwrap_or(0.0),
+            tiers,
         }
+    }
+
+    /// The reward of the event tier `tier`, if the file has one.
+    pub fn tier(&self, tier: u32) -> Option<&TierReward> {
+        self.tiers.iter().find(|t| t.tier == tier)
     }
 
     /// The reward multiplier of the banners: 1 + step · (harder − easier), not under 0.
@@ -413,13 +453,24 @@ pub enum Trophy {
     Armor(String),
     /// A diorama of a mob of the event (its entity type).
     Diorama(String),
+    /// A tier's own reward: an item and how many (shards, the tier's item).
+    Item(String, u32),
 }
 
 impl Trophy {
+    /// How many of [`Trophy::item`] drop in one stack.
+    pub fn count(&self) -> u32 {
+        match self {
+            Trophy::Item(_, n) => *n,
+            _ => 1,
+        }
+    }
+
     /// The item that drops: SoulsCraft's `<mob>_head` and `<mob>_trophy`, vanilla's heads for
     /// vanilla mobs (the test event's zombie head); none for a mob without a head or diorama.
     pub fn item(&self) -> Option<String> {
         match self {
+            Trophy::Item(item, n) => (*n > 0).then(|| item.clone()),
             Trophy::Head(kind) => match kind.strip_prefix("soulscraft:") {
                 Some(id) => Some(format!("soulscraft:{id}_head")),
                 None => vanilla_head(kind).map(str::to_owned),
@@ -445,8 +496,27 @@ pub fn vanilla_head(kind: &str) -> Option<&'static str> {
 /// The reward of a win (09-trophies.md; data/trophies.json): [`TrophyChances::heads`] heads of
 /// mobs of the event; each armour piece the event's SoulsCraft mobs drop (`loot`) by the event
 /// chance times the banners' [`TrophyChances::multiplier`]; on an altar of level 3 and up a
-/// diorama of one of the event's SoulsCraft mobs (none when the event had only vanilla mobs).
-pub fn rewards(kinds: &[String], mobs: &MobsFile, effects: &Effects, altar_level: u32, chances: &TrophyChances, rng: &mut Rng) -> Vec<Trophy> {
+/// diorama of one of the event's SoulsCraft mobs (none when the event had only vanilla mobs);
+/// then the event tier's own reward (11-summons-rewards.md, Г19): its shards, and its item by the
+/// tier's chance times the banners' multiplier. The tier's roll comes after the trophies', so a
+/// tier reward never changes which trophies a seed gives.
+pub fn rewards(kinds: &[String], mobs: &MobsFile, effects: &Effects, altar_level: u32, tier: u32, chances: &TrophyChances, rng: &mut Rng) -> Vec<Trophy> {
+    let mut out = trophies(kinds, mobs, effects, altar_level, chances, rng);
+    if let Some(t) = chances.tier(tier) {
+        if t.shards > 0 {
+            out.push(Trophy::Item(SOUL_SHARD.to_owned(), t.shards));
+        }
+        if let Some(item) = &t.item {
+            if rng.unit() < (t.chance * chances.multiplier(effects)).min(1.0) {
+                out.push(Trophy::Item(item.clone(), 1));
+            }
+        }
+    }
+    out
+}
+
+/// The trophies of a win: heads, armour pieces, a diorama ([`rewards`] without the tier's part).
+fn trophies(kinds: &[String], mobs: &MobsFile, effects: &Effects, altar_level: u32, chances: &TrophyChances, rng: &mut Rng) -> Vec<Trophy> {
     let mut out = Vec::new();
     if kinds.is_empty() {
         return out;
@@ -608,22 +678,22 @@ mod tests {
         let kinds = ids(&["minecraft:zombie"]);
         let heads = |t: &[Trophy]| t.iter().filter(|x| matches!(x, Trophy::Head(_))).count();
         let mut rng = Rng::new(1);
-        let plain = rewards(&kinds, &mobs, &Effects::default(), 1, &c, &mut rng);
+        let plain = rewards(&kinds, &mobs, &Effects::default(), 1, 0, &c, &mut rng);
         assert_eq!(plain, vec![Trophy::Head("minecraft:zombie".into())]);
         assert_eq!(plain[0].item().as_deref(), Some("minecraft:zombie_head"));
         let hard = effects(&altar, &ids(&["weight", "horde", "haste"]));
-        assert_eq!(heads(&rewards(&kinds, &mobs, &hard, 1, &c, &mut rng)), 4);
+        assert_eq!(heads(&rewards(&kinds, &mobs, &hard, 1, 0, &c, &mut rng)), 4);
         let easy = effects(&altar, &ids(&["mercy", "calm", "rest", "resilience"]));
-        assert_eq!(heads(&rewards(&kinds, &mobs, &easy, 1, &c, &mut rng)), 1);
+        assert_eq!(heads(&rewards(&kinds, &mobs, &easy, 1, 0, &c, &mut rng)), 1);
         // Only vanilla mobs: no diorama even on level 4, no armour.
-        let lvl4 = rewards(&kinds, &mobs, &hard, 4, &c, &mut rng);
+        let lvl4 = rewards(&kinds, &mobs, &hard, 4, 0, &c, &mut rng);
         assert!(lvl4.iter().all(|t| matches!(t, Trophy::Head(_))), "{lvl4:?}");
         // A SoulsCraft mob in the event: its diorama on level 3, not on level 2.
         let mixed = ids(&["minecraft:zombie", "soulscraft:revenant"]);
-        let lvl3 = rewards(&mixed, &mobs, &Effects::default(), 3, &c, &mut rng);
+        let lvl3 = rewards(&mixed, &mobs, &Effects::default(), 3, 0, &c, &mut rng);
         assert!(lvl3.contains(&Trophy::Diorama("soulscraft:revenant".into())), "{lvl3:?}");
-        assert!(!rewards(&mixed, &mobs, &Effects::default(), 2, &c, &mut rng).iter().any(|t| matches!(t, Trophy::Diorama(_))));
-        assert!(rewards(&[], &mobs, &hard, 4, &c, &mut rng).is_empty());
+        assert!(!rewards(&mixed, &mobs, &Effects::default(), 2, 0, &c, &mut rng).iter().any(|t| matches!(t, Trophy::Diorama(_))));
+        assert!(rewards(&[], &mobs, &hard, 4, 0, &c, &mut rng).is_empty());
         assert_eq!(rng.below(0), 0);
     }
 
@@ -632,7 +702,7 @@ mod tests {
         let (mobs, c) = (MobsFile::embedded(), TrophyChances::embedded());
         let mut rng = Rng::new(42);
         let n = 4000;
-        let hit = (0..n).filter(|_| rewards(kinds, &mobs, e, 1, &c, &mut rng).contains(&Trophy::Armor(item.into()))).count();
+        let hit = (0..n).filter(|_| rewards(kinds, &mobs, e, 1, 0, &c, &mut rng).contains(&Trophy::Armor(item.into()))).count();
         hit as f64 / f64::from(n)
     }
 
@@ -658,7 +728,7 @@ mod tests {
         assert_eq!(armour_rate(&ids(&["soulscraft:shrike"]), &Effects::default(), "soulscraft:rusty_helmet"), 0.0);
         let c = TrophyChances::embedded();
         assert_eq!((c.multiplier(&hard), c.multiplier(&easy), c.multiplier(&none)), (1.5, 0.5, 0.0));
-        assert_eq!(TrophyChances::parse("{}"), TrophyChances { armor: 0.3, diorama_min_level: 3, banner_step: 0.25 });
+        assert_eq!(TrophyChances::parse("{}"), TrophyChances { armor: 0.3, diorama_min_level: 3, banner_step: 0.25, head_world: 0.0, head_world_elite: 0.0, tiers: Vec::new() });
     }
 
     #[test]
@@ -711,5 +781,52 @@ mod tests {
         assert_eq!(bearer[0].kind, "minecraft:zombie");
         let p = plan(&event(), &mobs, &Effects::default(), 0.0);
         assert!(p.waves.iter().flatten().all(|m| m.kind == "minecraft:zombie"));
+    }
+
+    #[test]
+    fn each_tier_has_its_reward_and_events_use_those_tiers() {
+        let c = TrophyChances::embedded();
+        let mobs = MobsFile::embedded();
+        assert_eq!(c.tier(1).map(|t| (t.shards, t.item.clone())), Some((6, None)));
+        assert_eq!(c.tier(2).and_then(|t| t.item.clone()).as_deref(), Some("soulscraft:revenant_blade"));
+        assert_eq!(c.tier(3).and_then(|t| t.item.clone()).as_deref(), Some("soulscraft:brute_maul"));
+        assert_eq!(c.tier(4).and_then(|t| t.item.clone()).as_deref(), Some("soulscraft:abyss_heart"));
+        // Every event's tier has a reward, and higher tiers give more shards.
+        for e in &mobs.events {
+            assert!(c.tier(e.tier).is_some(), "{}", e.id);
+        }
+        let shards: Vec<u32> = (1..=4).map(|t| c.tier(t).unwrap().shards).collect();
+        assert!(shards.windows(2).all(|w| w[0] < w[1]), "{shards:?}");
+        assert_eq!((c.head_world, c.head_world_elite), (0.01, 0.03));
+    }
+
+    #[test]
+    fn a_win_adds_its_tier_shards_and_item_after_the_same_trophies() {
+        let c = TrophyChances::embedded();
+        let mobs = MobsFile::embedded();
+        let kinds = ids(&["soulscraft:revenant", "soulscraft:stalker"]);
+        let e = Effects::default();
+        // The tier's part comes after the trophies: the same seed gives the same trophies.
+        let base = rewards(&kinds, &mobs, &e, 3, 0, &c, &mut Rng::new(7));
+        let tier2 = rewards(&kinds, &mobs, &e, 3, 2, &c, &mut Rng::new(7));
+        assert_eq!(&tier2[..base.len()], &base[..]);
+        assert_eq!(tier2[base.len()], Trophy::Item(SOUL_SHARD.into(), 8));
+        assert_eq!(tier2[base.len()].item().as_deref(), Some(SOUL_SHARD));
+        assert_eq!(tier2[base.len()].count(), 8);
+        // The item's chance: about 50% for tier 2, more with «harder» banners, capped at 1.
+        let rate = |tier: u32, e: &Effects| {
+            let mut rng = Rng::new(11);
+            let n = 4000;
+            (0..n).filter(|_| rewards(&kinds, &mobs, e, 3, tier, &c, &mut rng).iter().any(|t| matches!(t, Trophy::Item(i, 1) if i != SOUL_SHARD))).count() as f64 / n as f64
+        };
+        assert!((rate(2, &e) - 0.5).abs() < 0.04, "{}", rate(2, &e));
+        assert!((rate(4, &e) - 0.35).abs() < 0.04, "{}", rate(4, &e));
+        let hard = Effects { more: 2, ..Effects::default() };
+        assert!((rate(2, &hard) - 0.75).abs() < 0.04, "{}", rate(2, &hard));
+        let easy = Effects { less: 4, ..Effects::default() };
+        assert_eq!(rate(3, &easy), 0.0);
+        // Tier 1 has no item; an unknown tier gives nothing extra.
+        assert_eq!(rate(1, &e), 0.0);
+        assert_eq!(rewards(&kinds, &mobs, &e, 3, 9, &c, &mut Rng::new(7)), base);
     }
 }

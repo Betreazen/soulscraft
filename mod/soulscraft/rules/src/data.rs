@@ -41,6 +41,9 @@ pub struct MobsFile {
     /// The soul shard a credited kill drops (Г15).
     #[serde(default)]
     pub soul_shard: crate::natural::ShardDef,
+    /// The summoning horn a credited kill drops now and then (11-summons-rewards.md, Г18).
+    #[serde(default)]
+    pub horn_drop: crate::natural::HornDropDef,
 }
 
 /// Room for a mob's box where it appears (owner's decision, round 9; crate::fit).

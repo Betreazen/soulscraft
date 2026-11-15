@@ -131,6 +131,51 @@ impl ShardDef {
     }
 }
 
+/// The summoning horn a credited kill drops now and then: an ordinary mob's of tier 2, an elite's
+/// of tier 3 (11-summons-rewards.md, «Добыча с врагов»; round 3 in 06-altar.md).
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct HornDropDef {
+    pub item: String,
+    pub chance: f64,
+    pub elite_item: String,
+    pub elite_chance: f64,
+}
+
+impl Default for HornDropDef {
+    fn default() -> Self {
+        Self { item: "soulscraft:grave_horn".into(), chance: 0.005, elite_item: "soulscraft:storm_horn".into(), elite_chance: 0.03 }
+    }
+}
+
+/// What a credited kill of the SoulsCraft mob `def` drops in the world (11-summons-rewards.md,
+/// Г15 and Г18), each stack once: its shards, now and then a horn, its head by the trophies'
+/// world chance, and each armour piece by its own bestiary chance (`loot`). `roll` gives a number
+/// in 0..1 for each chance, in that order, so a test can feed it.
+pub fn world_drops(file: &crate::data::MobsFile, chances: &crate::event::TrophyChances, def: &crate::data::MobDef, mut roll: impl FnMut() -> f64) -> Vec<(String, u32)> {
+    let mut out = Vec::new();
+    let shards = file.soul_shard.drop(def.elite, roll());
+    if shards > 0 {
+        out.push((file.soul_shard.item.clone(), shards));
+    }
+    let h = &file.horn_drop;
+    let (horn, horn_chance) = if def.elite { (&h.elite_item, h.elite_chance) } else { (&h.item, h.chance) };
+    if roll() < horn_chance && !horn.is_empty() {
+        out.push((horn.clone(), 1));
+    }
+    let head_chance = if def.elite { chances.head_world_elite } else { chances.head_world };
+    if roll() < head_chance {
+        let id = def.key.strip_prefix("soulscraft:").unwrap_or(&def.id);
+        out.push((format!("soulscraft:{id}_head"), 1));
+    }
+    for piece in &def.loot {
+        if roll() < piece.chance {
+            out.push((piece.item.clone(), 1));
+        }
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -228,5 +273,51 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn a_credited_kill_drops_shards_horn_head_and_armour_by_their_chances() {
+        let f = file();
+        let c = crate::event::TrophyChances::embedded();
+        let revenant = f.mob("revenant").unwrap();
+        let brute = f.mob("brute").unwrap();
+        // Every roll a hit: shards, the tier-2 horn, the head, each armour piece.
+        let all = world_drops(&f, &c, revenant, || 0.0);
+        let items: Vec<&str> = all.iter().map(|d| d.0.as_str()).collect();
+        assert_eq!(items[..3], ["soulscraft:soul_shard", "soulscraft:grave_horn", "soulscraft:revenant_head"]);
+        assert_eq!(items.len(), 3 + revenant.loot.len());
+        // The elite's horn is the tier-3 one, its shards two.
+        let elite = world_drops(&f, &c, brute, || 0.0);
+        assert_eq!(elite[0], ("soulscraft:soul_shard".into(), 2));
+        assert_eq!(elite[1].0, "soulscraft:storm_horn");
+        // Every roll a miss: nothing (the elite's shards are certain).
+        assert!(world_drops(&f, &c, revenant, || 0.999).is_empty());
+        assert_eq!(world_drops(&f, &c, brute, || 0.999), [("soulscraft:soul_shard".into(), 2)]);
+    }
+
+    #[test]
+    fn world_drop_rates_follow_the_data() {
+        let f = file();
+        let c = crate::event::TrophyChances::embedded();
+        let revenant = f.mob("revenant").unwrap();
+        let mut seed = 0x9e3779b97f4a7c15u64;
+        let mut roll = move || {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            (seed >> 11) as f64 / (1u64 << 53) as f64
+        };
+        let n = 200_000;
+        let mut count = |item: &str| -> f64 {
+            let mut hits = 0u32;
+            for _ in 0..n {
+                hits += world_drops(&f, &c, revenant, &mut roll).iter().filter(|d| d.0 == item).count() as u32;
+            }
+            f64::from(hits) / f64::from(n)
+        };
+        assert!((count("soulscraft:grave_horn") - 0.005).abs() < 0.001);
+        assert!((count("soulscraft:revenant_head") - 0.01).abs() < 0.0015);
+        let piece = &revenant.loot[0];
+        assert!((count(&piece.item) - piece.chance).abs() < 0.003, "{}", piece.item);
     }
 }

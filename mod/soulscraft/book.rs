@@ -420,7 +420,7 @@ fn deaths(game: &mut Game<'_>, dim: &str, now: u64) {
     }
     let at = positions(game, dim);
     let mut b = book();
-    // Credited kills of SoulsCraft's own mobs drop soul shards (10-survival.md, Г15).
+    // Credited kills of SoulsCraft's own mobs drop shards, horns, heads and armour (Г15, Г18).
     let mut shards: Vec<(String, V3)> = Vec::new();
     for mut d in fresh {
         let Some(entry) = b.catalog.by_key(&d.kind).cloned() else { continue };
@@ -439,7 +439,7 @@ fn deaths(game: &mut Game<'_>, dim: &str, now: u64) {
     }
     b.deaths.retain(|_, d| now.saturating_sub(d.tick) <= DEATH_KEEP);
     drop(b);
-    crate::game::soulscraft_natural::drop_shards(game, dim, &shards);
+    crate::game::soulscraft_natural::drop_loot(game, dim, &shards);
 }
 
 /// One kill for a player of the book (loaded, or a stand-in).

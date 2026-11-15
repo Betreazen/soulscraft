@@ -1,0 +1,13 @@
+# SoulsCraft's loot table changes: the bundle's crate for horizon-world ([[crate]] "loot" in
+# ../horizon-mixin.toml, dependent = "horizon-world"). The helper on
+# horizon_world::loot::native_loot_table_load compiles inside horizon-world, which can't reach
+# horizon-client or the rules crate, so the pools and their numbers (data/loot.json, copied here by
+# mod/sync.ps1) live here. Versions come from Horizon's Cargo.lock.
+[package]
+name = "soulscraft-loot"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+serde_json = "1"

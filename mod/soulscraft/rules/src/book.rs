@@ -151,6 +151,8 @@ pub struct Entry {
 pub struct Catalog {
     pub entries: Vec<(Entry, Value)>,
     pub events: Vec<Value>,
+    /// The world drops of SoulsCraft's mobs: mobs.json's soul_shard and horn_drop.
+    pub world: Value,
     by_key: HashMap<String, usize>,
 }
 
@@ -202,6 +204,7 @@ impl Catalog {
 
     pub fn from_value(root: &Value) -> Self {
         let mut c = Catalog::default();
+        c.world = serde_json::json!({ "soul_shard": root["soul_shard"], "horn_drop": root["horn_drop"] });
         let own = root.get("mobs").and_then(Value::as_array).cloned().unwrap_or_default();
         for (list, vanilla_list_flag) in [(own, false), (vanilla_list(root), true)] {
             for m in list {

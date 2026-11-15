@@ -578,5 +578,13 @@
     "elite_count": 2,
     "source": "10-survival.md, «Осколок души»; гипотеза Г15: роняет моб SoulsCraft, чьё убийство книга засчитала игроку",
     "assumed": ["chance", "count", "elite_chance", "elite_count"]
+  },
+  "horn_drop": {
+    "item": "soulscraft:grave_horn",
+    "chance": 0.005,
+    "elite_item": "soulscraft:storm_horn",
+    "elite_chance": 0.03,
+    "source": "11-summons-rewards.md, «Добыча с врагов»; раунд 3 (06-altar.md): 0,5% с обычного врага, 3% с элитного, ступень горна по ступени врага; гипотеза Г18",
+    "assumed": ["item", "elite_item"]
   }
 }
