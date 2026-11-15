@@ -1,0 +1,21 @@
+name: Идея или баланс · Idea or balance
+description: Новый моб или атака, правка баланса, удобство · A new mob or attack, a balance change, a convenience
+labels: [idea]
+body:
+  - type: input
+    id: subject
+    attributes:
+      label: О чём · Subject
+      placeholder: "Громила, удар сверху · Brute, overhead slam"
+  - type: textarea
+    id: idea
+    attributes:
+      label: Что предлагаете · The idea
+      description: Что изменить и почему, какой опыт в игре это улучшит · What to change and why
+    validations:
+      required: true
+  - type: textarea
+    id: numbers
+    attributes:
+      label: Числа · Numbers
+      description: "Если это баланс: что сейчас (замах, урон, здоровье) и сколько, по-вашему, должно быть. Числа атак — в `data/mobs.json` · For balance: what it is now and what you expect"

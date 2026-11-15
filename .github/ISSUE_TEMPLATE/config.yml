@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Витрина бестиария · Bestiary showcase
+    url: https://betreazen.github.io/soulscraft/showcase/
+    about: Модели, атаки, алтарь и трофеи в браузере · Models, attacks, the altar and trophies in the browser
+  - name: Horizon
+    url: https://github.com/horizon-rust/horizon
+    about: Вопросы о самом движке и лаунчере · Questions about the engine and launcher
