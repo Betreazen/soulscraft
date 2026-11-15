@@ -1,0 +1,6 @@
+chest_loot self-test, try 2026-11-16 01:05 at 0805a54 (soulscraft 87/87, rustcraft 139/139, pct 42/42); server log lines:
+  soulscraft: selftest chest_loot table=minecraft:chests/simple_dungeon rolls=50 horns=[("soulscraft:rotten_horn", 10), ("soulscraft:grave_horn", 0), ("soulscraft:storm_horn", 0), ("soulscraft:abyss_horn", 0)] shards=61 items=407
+  soulscraft: selftest chest_loot table=minecraft:chests/desert_pyramid rolls=50 horns=[("soulscraft:rotten_horn", 0), ("soulscraft:grave_horn", 7), ("soulscraft:storm_horn", 0), ("soulscraft:abyss_horn", 0)] shards=46 items=385
+  soulscraft: selftest chest_loot table=minecraft:chests/woodland_mansion rolls=50 horns=[("soulscraft:rotten_horn", 0), ("soulscraft:grave_horn", 0), ("soulscraft:storm_horn", 8), ("soulscraft:abyss_horn", 0)] shards=57 items=450
+  soulscraft: selftest chest_loot table=minecraft:chests/bastion_treasure rolls=50 horns=[("soulscraft:rotten_horn", 0), ("soulscraft:grave_horn", 0), ("soulscraft:storm_horn", 0), ("soulscraft:abyss_horn", 7)] shards=70 items=426
+  soulscraft: selftest chest_loot table=minecraft:chests/village/village_weaponsmith rolls=50 horns=[("soulscraft:rotten_horn", 0), ("soulscraft:grave_horn", 0), ("soulscraft:storm_horn", 0), ("soulscraft:abyss_horn", 0)] shards=0 items=275

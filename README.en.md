@@ -109,10 +109,10 @@ The launcher takes the [latest release](https://github.com/Betreazen/soulscraft/
 ### Dedicated server
 
 ```powershell
-git clone --branch v0.5.0 https://github.com/Betreazen/soulscraft
+git clone --branch v0.6.0 https://github.com/Betreazen/soulscraft
 horizon-launcher native-build soulscraft/mod/soulscraft `
-    --server-output C:\horizon-engines\soulscraft-0.5.0 --version <Horizon version> --trust-native-code
-horizon-server --dir <server folder> config set engine.path=C:\horizon-engines\soulscraft-0.5.0\horizon-engine.exe
+    --server-output C:\horizon-engines\soulscraft-0.6.0 --version <Horizon version> --trust-native-code
+horizon-server --dir <server folder> config set engine.path=C:\horizon-engines\soulscraft-0.6.0\horizon-engine.exe
 horizon-server --dir <server folder> restart
 ```
 
@@ -138,7 +138,7 @@ The `/sc` commands are for operators of level 2 and up and for the console.
 | `/sc power` · `/sc p <strength>` | Show the strength of players nearby · set enemy strength by hand |
 | `/sc info` | How many of the mod's mobs and changed vanilla mobs are in the world |
 | `/sc reload` | Re-read `config/soulscraft/mobs.json` in the server folder without a restart |
-| `soulscraft_selftest run [filter]` | Console only: the in-world self-test, 86 scenarios of attacks, the altar, events, trophies and the book |
+| `soulscraft_selftest run [filter]` | Console only: the in-world self-test, 87 scenarios of attacks, the altar, events, trophies and the book |
 
 ### Numbers without a rebuild
 

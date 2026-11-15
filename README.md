@@ -109,10 +109,10 @@ horizon-launcher native-build --trust-native-code
 ### Выделенный сервер
 
 ```powershell
-git clone --branch v0.5.0 https://github.com/Betreazen/soulscraft
+git clone --branch v0.6.0 https://github.com/Betreazen/soulscraft
 horizon-launcher native-build soulscraft/mod/soulscraft `
-    --server-output C:\horizon-engines\soulscraft-0.5.0 --version <версия Horizon> --trust-native-code
-horizon-server --dir <папка сервера> config set engine.path=C:\horizon-engines\soulscraft-0.5.0\horizon-engine.exe
+    --server-output C:\horizon-engines\soulscraft-0.6.0 --version <версия Horizon> --trust-native-code
+horizon-server --dir <папка сервера> config set engine.path=C:\horizon-engines\soulscraft-0.6.0\horizon-engine.exe
 horizon-server --dir <папка сервера> restart
 ```
 
@@ -138,7 +138,7 @@ horizon-server --dir <папка сервера> restart
 | `/sc power` · `/sc p <сила>` | Показать силу игроков рядом · задать силу врагов вручную |
 | `/sc info` | Сколько мобов мода и изменённых ванильных сейчас в мире |
 | `/sc reload` | Перечитать `config/soulscraft/mobs.json` в папке сервера без перезапуска |
-| `soulscraft_selftest run [фильтр]` | Только консоль: самотест в мире сервера, 86 сценариев атак, алтаря, ивента, трофеев и книги |
+| `soulscraft_selftest run [фильтр]` | Только консоль: самотест в мире сервера, 87 сценариев атак, алтаря, ивента, трофеев и книги |
 
 ### Числа без пересборки
 

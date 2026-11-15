@@ -42,19 +42,21 @@ $ax = -500; $ay = 101; $az = 500
 
 Set-Content $Text "summons checks, $(Get-Date -Format s)"
 $bot = Start-Bot sc_a
+# A bot that left dead comes back on the death screen: respawn first.
+if ((Invoke-Bot $bot 'state' | ConvertFrom-Json).screen -match 'dead|death') { Invoke-Bot $bot 'close' | Out-Null; Start-Sleep -Seconds 2 }
 try {
     C 'tick unfreeze' | Out-Null
     C 'gamemode creative sc_a' | Out-Null
     C 'gamerule advance_time false' | Out-Null
     C 'time set noon' | Out-Null
-    C "tp sc_a $($ax + 0.5) $ay $($az + 0.5) 0 0" | Out-Null
+    # On the ground (a fresh world has no arena at y 101): creative all along, attributes don't care.
+    C "spreadplayers $ax $az 0 1 false sc_a" | Out-Null
 
     # The chests: `loot give` to a player drops nothing on Horizon 7e4e421 ("Dropped 0 items", vanilla
     # tables too), so the bench self-test chest_loot rolls each tier's table with `loot spawn`.
 
     if (Scene 'items') {
         C 'clear sc_a' | Out-Null
-        C 'gamemode survival sc_a' | Out-Null
         $base = @{
             armor = (C 'attribute sc_a minecraft:armor get') -join ' '
             damage = (C 'attribute sc_a minecraft:attack_damage get') -join ' '
@@ -92,10 +94,11 @@ try {
 
     if (Scene 'brute') {
         C 'sc clear' | Out-Null
-        C "summon soulscraft:brute $($ax + 0.5) $ay $($az + 6.5) {NoAI:1b}" | Out-Null
-        C "tp sc_a $($ax + 3.5) $($ay + 1) $($az + 2.5)" | Out-Null
+        C "execute at sc_a run summon soulscraft:brute ~ ~ ~6 {NoAI:1b}" | Out-Null
+        C "execute at sc_a run tp sc_a ~3 ~ ~2" | Out-Null
         Start-Sleep -Seconds 2
-        Invoke-Bot $bot "look-at $($ax + 0.5) $($ay + 1.5) $($az + 6.5)" | Out-Null
+        $b = (Invoke-Bot $bot 'state' | ConvertFrom-Json).player.position
+        Invoke-Bot $bot "look-at $($b[0] - 3) $($b[1] + 1.5) $($b[2] + 4)" | Out-Null
         Start-Sleep -Seconds 1
         Save-Shot $bot 'brute_holds_its_maul'
         C 'sc clear' | Out-Null

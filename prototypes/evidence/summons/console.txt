@@ -1,0 +1,23 @@
+summons checks, 2026-11-16T01:23:15
+== bare hands
+  armor: The value of attribute Armor for entity sc_a is 0.0
+  attack damage: The value of attribute Attack Damage for entity sc_a is 1.0
+  max health: The value of attribute Max Health for entity sc_a is 20.0
+== soulscraft:revenant_blade in weapon.mainhand
+  armor: The value of attribute Armor for entity sc_a is 2.0
+  attack damage: The value of attribute Attack Damage for entity sc_a is 7.0
+  attack speed: The value of attribute Attack Speed for entity sc_a is 1.6
+  attack knockback: The value of attribute Attack Knockback for entity sc_a is 0.0
+  max health: The value of attribute Max Health for entity sc_a is 20.0
+== soulscraft:brute_maul in weapon.mainhand
+  armor: The value of attribute Armor for entity sc_a is 0.0
+  attack damage: The value of attribute Attack Damage for entity sc_a is 12.0
+  attack speed: The value of attribute Attack Speed for entity sc_a is 0.7999999999999998
+  attack knockback: The value of attribute Attack Knockback for entity sc_a is 1.0
+  max health: The value of attribute Max Health for entity sc_a is 20.0
+== soulscraft:abyss_heart in weapon.offhand
+  armor: The value of attribute Armor for entity sc_a is 0.0
+  attack damage: The value of attribute Attack Damage for entity sc_a is 1.0
+  attack speed: The value of attribute Attack Speed for entity sc_a is 4.0
+  attack knockback: The value of attribute Attack Knockback for entity sc_a is 0.0
+  max health: The value of attribute Max Health for entity sc_a is 24.0
