@@ -107,10 +107,10 @@ horizon-launcher native-build --trust-native-code
 ### Выделенный сервер
 
 ```powershell
-git clone --branch v0.4.0 https://github.com/Betreazen/soulscraft
+git clone --branch v0.5.0 https://github.com/Betreazen/soulscraft
 horizon-launcher native-build soulscraft/mod/soulscraft `
-    --server-output C:\horizon-engines\soulscraft-0.4.0 --version <версия Horizon> --trust-native-code
-horizon-server --dir <папка сервера> config set engine.path=C:\horizon-engines\soulscraft-0.4.0\horizon-engine.exe
+    --server-output C:\horizon-engines\soulscraft-0.5.0 --version <версия Horizon> --trust-native-code
+horizon-server --dir <папка сервера> config set engine.path=C:\horizon-engines\soulscraft-0.5.0\horizon-engine.exe
 horizon-server --dir <папка сервера> restart
 ```
 

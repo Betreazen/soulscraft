@@ -328,25 +328,38 @@ fn kin_wave(game: &mut Game<'_>, now: u64, t: u64, c: &mut Case) -> Option<Resul
     })
 }
 
-/// What the rules add to a monster list holding `listed` at `pos` of the site's dimension.
+/// What the rules add to a monster list holding `listed` at `pos` of the site's dimension. As in
+/// the hook, nothing where the chunk isn't loaded (no biome: `native_biome` gives None).
 fn natural_extras(game: &Game<'_>, pos: [i32; 3], listed: &[&str]) -> Vec<String> {
     let mobs = soulscraft_rules::data::MobsFile::embedded();
-    let biome = game.native_biome(pos).unwrap_or_default();
+    let Some(biome) = game.native_biome(pos) else { return Vec::new() };
     soulscraft_rules::natural::extras(&mobs.natural, &mobs, &biome, pos[1], listed).into_iter().map(|e| e.key).collect()
 }
 
-/// SoulsCraft's natural spawns through the engine's own hook point, far from any altar: a surface
-/// position and a cave one of the site's biome get what the rules give for that biome and height
-/// (the hook reads the biome from the game), and the overworld's list hook is on.
+/// How long `natural_lists` waits for an altar sector of another case to close (its budget is 10).
+const NATURAL_WAIT: u64 = 8;
+
+/// SoulsCraft's natural spawns through the engine's own hook point, outside any altar sector: a
+/// surface position and a cave one in a loaded chunk next to the site get what the rules give for
+/// that biome and height (the hook reads the biome from the game), and the overworld's list hook
+/// is on.
 fn natural_lists(game: &mut Game<'_>, t: u64) -> Option<Result<(), String>> {
     if t < 2 {
         return None;
     }
+    if !boost::sectors(DIM).is_empty() {
+        return (t > NATURAL_WAIT).then(|| Err("an altar sector stays open".into()));
+    }
     let site = at([0, 0, 0]);
     let mut why = Vec::new();
     for y in [site[1] + 2, 12] {
-        let pos = [site[0] + 300, y, site[2] + 300];
+        // Past the platform's edge (21), in the site's loaded chunks.
+        let pos = [site[0] + 24, y, site[2]];
         let want = natural_extras(game, pos, &["minecraft:zombie"]);
+        if want.is_empty() {
+            why.push(format!("at y {y} in {:?}: the rules give nothing, the check proves nothing", game.native_biome(pos)));
+            continue;
+        }
         let mut list = vec![SpawnEntry { entity: "minecraft:zombie".into(), weight: 95, min: 4, max: 4, constant: true }];
         boost::ask_engine(game, DIM, pos, &mut list);
         let got: Vec<String> = list.iter().skip(1).map(|e| e.entity.clone()).collect();
@@ -357,7 +370,7 @@ fn natural_lists(game: &mut Game<'_>, t: u64) -> Option<Result<(), String>> {
     // The other categories stay as they are.
     let mut creatures = vec![SpawnEntry { entity: "minecraft:cow".into(), weight: 10, min: 4, max: 4, constant: true }];
     let mut canceled = false;
-    game.native_potential_spawns(DIM, "creature", [site[0] + 300, site[1] + 2, site[2] + 300], &mut creatures, &mut canceled);
+    game.native_potential_spawns(DIM, "creature", [site[0] + 24, site[1] + 2, site[2]], &mut creatures, &mut canceled);
     if creatures.len() != 1 {
         why.push(format!("the creature list grew to {}", creatures.len()));
     }
