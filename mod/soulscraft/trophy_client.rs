@@ -72,5 +72,45 @@ pub(super) fn draw_block_entity(game: &Game<'_>, pos: [i32; 3], block: &str, dra
         }
     }
     draw.pop();
+    if let (Kind::Diorama(_), Some(plaque)) = (kind, f.diorama.plaque) {
+        draw_plaque(game, mob, trophy::turn(kind, rotation, &facing), plaque, draw);
+    }
     true
+}
+
+/// Engraved brass: dark letters lit by the block's light.
+const PLAQUE_INK: u32 = 0x3B_2A12;
+/// The letters stand this far (model pixels) in front of the plaque's face.
+const PLAQUE_LIFT: f32 = 0.02;
+
+/// The plaque's text (09-trophies.md, «Подставка»): the mob's name and the viewer's kills from the
+/// hunter's book, on the plaque's front face (north in the model, `plaque.from` z), as a sign's
+/// lines are drawn (`native_draw_text`, API draw_text).
+fn draw_plaque(game: &Game<'_>, mob: &str, turn: f32, plaque: trophy::PxBox, draw: &mut BlockEntityDraw) {
+    let Some((name, kills)) = crate::game::soulscraft_book_client::plaque(mob) else { return };
+    let lines = trophy::plaque_lines(&name, kills);
+    let widths: Vec<f32> = lines.iter().map(|l| game.native_text_width(l)).collect();
+    let size = [(plaque.to[0] - plaque.from[0]) as f32, (plaque.to[1] - plaque.from[1]) as f32];
+    let k = widths.iter().map(|w| trophy::plaque_scale(*w, size, lines.len())).fold(f32::INFINITY, f32::min);
+    if !k.is_finite() {
+        return;
+    }
+    let centre = [
+        (plaque.from[0] + plaque.to[0]) as f32 / 2.0,
+        (plaque.from[1] + plaque.to[1]) as f32 / 2.0,
+        plaque.from[2] as f32 - PLAQUE_LIFT,
+    ];
+    draw.push();
+    draw.translate([0.5, 0.0, 0.5]);
+    draw.rotate_about([0.0, 1.0, 0.0], turn, [0.0; 3]);
+    draw.translate([centre[0] / 16.0 - 0.5, centre[1] / 16.0, centre[2] / 16.0 - 0.5]);
+    // The text faces +z; the plaque faces north (−z), and its reader's right is −x.
+    draw.rotate_about([0.0, 1.0, 0.0], 180.0, [0.0; 3]);
+    draw.scale([k / 16.0, -k / 16.0, k / 16.0]);
+    let top = -(lines.len() as f32) * 9.0 / 2.0;
+    for (i, (line, w)) in lines.iter().zip(&widths).enumerate() {
+        let text = horizon_client::text::Text::literal(line.clone());
+        game.native_draw_text(draw, &text, [-w / 2.0, top + i as f32 * 9.0 + 0.5], PLAQUE_INK, false, 0);
+    }
+    draw.pop();
 }

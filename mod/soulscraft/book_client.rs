@@ -100,6 +100,14 @@ fn client_state() -> MutexGuard<'static, BookClient> {
     CLIENT.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
+/// A diorama plaque's mob: its name in the book, and this player's weighted kills of it (None until
+/// the server has sent the book).
+pub(super) fn plaque(mob: &str) -> Option<(String, Option<f64>)> {
+    let entry = DATA.catalog.by_key(&format!("soulscraft:{mob}"))?;
+    let kills = client_state().progress.as_ref().map(|p| p.mob(&entry.id).kills);
+    Some((entry.name.clone(), kills))
+}
+
 /// `native_net_from_server`: the player's progress, and «open the book».
 pub(super) fn on_net(game: &Game<'_>, channel: &str, data: &[u8]) {
     if channel != book::CHANNEL {

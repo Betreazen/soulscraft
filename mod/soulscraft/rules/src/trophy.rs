@@ -281,9 +281,46 @@ pub fn clip_tick(pos: [i32; 3], game_time: i64, partial: f32, ticks: u32) -> f32
     (game_time + phase).rem_euclid(i64::from(ticks)) as f32 + partial
 }
 
+/// The plaque's lines (09-trophies.md, «Подставка»): the mob's name, then the kills of the player
+/// looking at it from their hunter's book (a spawner's mob counts a part, so the count rounds down).
+/// No second line until the client has its book.
+pub fn plaque_lines(name: &str, kills: Option<f64>) -> Vec<String> {
+    let mut out = vec![name.to_owned()];
+    if let Some(k) = kills {
+        out.push(format!("убито вами: {}", k.max(0.0).floor() as u64));
+    }
+    out
+}
+
+/// Model pixels per font pixel for a line `width` font pixels wide on a plaque `plaque` wide and
+/// tall in model pixels, with `lines` lines: as large as the plaque lets the line be, with a margin
+/// of a tenth of its width and a line of 9 font pixels (8 for the glyph, 1 between).
+pub fn plaque_scale(width: f32, plaque: [f32; 2], lines: usize) -> f32 {
+    let by_width = if width > 0.0 { plaque[0] * 0.9 / width } else { f32::INFINITY };
+    let by_height = plaque[1] / (9.0 * lines.max(1) as f32);
+    by_width.min(by_height)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_plaque_shows_the_name_and_the_viewers_kills() {
+        assert_eq!(plaque_lines("Громила", None), ["Громила"]);
+        assert_eq!(plaque_lines("Громила", Some(12.75)), ["Громила", "убито вами: 12"]);
+        assert_eq!(plaque_lines("Громила", Some(0.25)), ["Громила", "убито вами: 0"]);
+    }
+
+    #[test]
+    fn plaque_text_fits_its_width_and_its_height() {
+        // Two lines on the 8 × 1.5 pixel plaque: a short line is held by the height.
+        assert_eq!(plaque_scale(20.0, [8.0, 1.5], 2), 1.5 / 18.0);
+        // A long one by the width: 0.9 of the plaque.
+        let s = plaque_scale(100.0, [8.0, 1.5], 2);
+        assert!((s * 100.0 - 7.2).abs() < 1e-5);
+        assert!(plaque_scale(0.0, [8.0, 1.5], 1).is_finite());
+    }
 
     pub(crate) const MOBS: [&str; 7] = ["revenant", "stalker", "marksman", "brute", "shrike", "lurker", "bog_slime"];
 
