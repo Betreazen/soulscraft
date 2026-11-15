@@ -28,7 +28,7 @@ SoulsCraft adds enemies you read rather than out-click. Every attack has a windu
 - **Enemies grow with you.** Enemy strength follows the players nearby: their armour, weapons and, with [Path-of-craft-tree](https://github.com/Betreazen/path-of-craft-tree) installed, their skill-tree levels.
 - **The summoning altar.** A build of up to 9 × 9 from a core, slabs, pillars, braziers and obelisks. Levels 1–4 come from its rings and an open sky. The Rotten Horn on the pedestal starts an event: waves walk to the altar from spawn points shown in advance and drain its power. Hold the altar until the waves run out.
 - **12 banner modifiers.** Weight and mercy, horde and calm, haste and rest, resilience and five kin banners. They change the enemies' strength, number and kind, the rests between waves and the reward.
-- **Trophies.** A win brings mob heads (on the floor, on a wall or on your head), pieces of their armour and, on a level-three altar, a diorama: a piece of the mob's home on a plinth, the mob in its trophy pose, its own light and particles. The brass plaque shows the mob's name and how many of them you have killed.
+- **Trophies.** A win brings mob heads (on the floor, on a wall or on your head), pieces of their armour and, on a level-three altar, a diorama: a piece of the mob's home on a plinth, the mob in its trophy pose, its own light and particles. The brass plaque shows the mob's name, the trophy's owner and how many of them they have killed.
 - **The hunter's book.** Entries open as you meet and kill: met, killed, studied, expert. The book plays the mob's live model through its attacks, and a phase strip shows when to strike.
 - **More spawns round the altar.** At night monsters of other biomes and SoulsCraft mobs come near an altar.
 - **Plays well with other mods.** Enemy strength reads the Path-of-craft-tree tree, and kills by RustCraft turrets and guards count in their owner's book. The `soulscraft:bleeding` effect is shared by both mods.
@@ -104,10 +104,10 @@ The launcher takes the [latest release](https://github.com/Betreazen/soulscraft/
 ### Dedicated server
 
 ```powershell
-git clone --branch v0.3.0 https://github.com/Betreazen/soulscraft
+git clone --branch v0.4.0 https://github.com/Betreazen/soulscraft
 horizon-launcher native-build soulscraft/mod/soulscraft `
-    --server-output C:\horizon-engines\soulscraft-0.3.0 --version <Horizon version> --trust-native-code
-horizon-server --dir <server folder> config set engine.path=C:\horizon-engines\soulscraft-0.3.0\horizon-engine.exe
+    --server-output C:\horizon-engines\soulscraft-0.4.0 --version <Horizon version> --trust-native-code
+horizon-server --dir <server folder> config set engine.path=C:\horizon-engines\soulscraft-0.4.0\horizon-engine.exe
 horizon-server --dir <server folder> restart
 ```
 

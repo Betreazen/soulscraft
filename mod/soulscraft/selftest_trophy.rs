@@ -21,6 +21,7 @@ pub(super) const CASES: &[(&str, u64)] = &[
     ("trophy_blocks", 30),
     ("trophy_placement", 20),
     ("trophy_wall_head", 20),
+    ("trophy_owner", 20),
     ("trophy_particles", 260),
     ("reward_seeded_win", 300),
     ("kin_wave", 60),
@@ -36,6 +37,7 @@ pub(super) fn step(game: &mut Game<'_>, now: u64, t: u64, name: &str, c: &mut Ca
         "trophy_blocks" => blocks(game, t),
         "trophy_placement" => placement(game, t),
         "trophy_wall_head" => wall_head(game, t),
+        "trophy_owner" => owner(game, t),
         "trophy_particles" => particles(game, t, c),
         "reward_seeded_win" => seeded_win(game, now, t, c),
         "kin_wave" => kin_wave(game, now, t, c),
@@ -158,6 +160,40 @@ fn wall_head(game: &mut Game<'_>, t: u64) -> Option<Result<(), String>> {
         Ok(())
     } else {
         Err(format!("{block} facing {facing:?} block entity {entity}"))
+    })
+}
+
+/// A diorama placed by a player's click takes them as its owner (name, UUID, their kills: none read,
+/// so 0) and sends the owner and the kills to clients; one placed without a click has no owner.
+fn owner(game: &mut Game<'_>, t: u64) -> Option<Result<(), String>> {
+    const UUID: u128 = 0x5EED_0000_0000_0000_0000_0000_0000_0042;
+    if t == 1 {
+        set(game, [7, 0, -6], "soulscraft:brute_trophy[facing=north]");
+        set(game, [9, 0, -6], "soulscraft:shrike_trophy[facing=north]");
+        // The click on the block under it, top face: the placed cell is beside the clicked one.
+        trophy::note_placer(DIM, at([7, -1, -6]), [0, 1, 0], UUID, "sc_selftest");
+        return None;
+    }
+    if t < 4 {
+        return None;
+    }
+    let (owned, plain) = (at([7, 0, -6]), at([9, 0, -6]));
+    let who = trophy::owner_uuid(game, owned);
+    let kills = trophy::stored_kills(game, owned);
+    let tag = game.native_mod_block_entity(owned).and_then(|e| {
+        let mut tag = None;
+        trophy::on_update_tag(&e, &mut tag);
+        tag
+    });
+    let sent = tag.as_ref().is_some_and(|c| {
+        matches!(c.get(&horizon_world::nbt::JavaString::from(rt::OWNER_KEY)), Some(horizon_world::nbt::Tag::String(s)) if s.to_string_lossy() == "sc_selftest")
+            && c.get(&horizon_world::nbt::JavaString::from(rt::KILLS_KEY)).is_some()
+    });
+    let unowned = trophy::owner_uuid(game, plain).is_none();
+    Some(if who == Some(UUID) && kills == Some(0.0) && sent && unowned {
+        Ok(())
+    } else {
+        Err(format!("owner {who:x?} kills {kills:?} tag sent {sent} the other unowned {unowned}"))
     })
 }
 

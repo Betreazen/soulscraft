@@ -1,6 +1,7 @@
-# The diorama plaque's text (09-trophies.md, «Подставка»): the mob's name and the bot's kills from
-# its hunter's book, on every diorama, close up by day and at night; then one revenant killed by
-# the bot (`damage … by sc_a`) and the revenant's plaque again, which should count it.
+# The diorama plaque's text (09-trophies.md, «Подставка»): the mob's name on every diorama (set by
+# command, so no owner), close up by day and at night; then a revenant diorama the bot places
+# itself, whose plaque names the bot and its kills, before and after it kills a revenant
+# (`damage … by sc_a`).
 # Shots go to prototypes/evidence/plaque/ (JPEG 960 wide; the PNGs stay in the scratchpad).
 # Needs the joint server running offline with a client that has this build:
 #   .\joint.ps1 serve -Owner "soulscraft session"   (and .\joint.ps1 stop after)
@@ -72,14 +73,29 @@ try {
     Start-Sleep -Seconds 2
     Plaque 'brute' 'plaque_brute_night'
     C 'time set noon'
-    # One revenant killed by the bot: the book credits it, the client gets the progress.
+    # The owner's kills (owner's choice, 2026-11-15): the bot places a revenant diorama itself, on a
+    # stone 6 blocks east of the row; its plaque names sc_a and its kills. The row's dioramas, set
+    # by command, have no owner and show the name alone.
+    $ox = $ax + 8
+    C "setblock $ox $ay $($az - 8) minecraft:stone"
+    C "item replace entity sc_a hotbar.0 with soulscraft:revenant_trophy"
+    Invoke-Bot $bot 'select 1' | Out-Null
+    $mark = Mark
+    View ($ox + 0.5) ($ay + 1) ($az - 6.0) ($ox + 0.5) ($ay + 1.0) ($az - 7.5)
+    Invoke-Bot $bot "interact $ox $ay $($az - 8)" | Out-Null
+    Start-Sleep -Seconds 2
+    Note 'owner' (Get-LogSince $mark 'soulscraft: trophy owner')
+    View ($ox + 0.5) $ay ($az - 6.1) ($ox + 0.5) ($ay + 1.09) ($az - 7.0)
+    Save-Shot $bot 'plaque_owned_before_kill'
+    # One revenant killed by the bot: the book credits it, the plaque follows within 2 s.
     $mark = Mark
     C "summon soulscraft:revenant $($ax + 0.5) $ay $($az - 2.5)"
     Start-Sleep -Seconds 2
     C "damage @e[type=soulscraft:revenant,limit=1,sort=nearest,x=$ax,y=$ay,z=$($az - 2)] 1000 minecraft:player_attack by sc_a"
-    Start-Sleep -Seconds 3
+    Start-Sleep -Seconds 4
     Note 'book credit' (Get-LogSince $mark 'soulscraft: book (credit|message)')
-    Plaque 'revenant' 'plaque_revenant_after_kill'
+    Save-Shot $bot 'plaque_owned_after_kill'
+    Plaque 'revenant' 'plaque_revenant_unowned'
 } finally {
     C 'gamerule doDaylightCycle true'
     Stop-Bot $bot

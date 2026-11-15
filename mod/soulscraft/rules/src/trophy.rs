@@ -281,15 +281,28 @@ pub fn clip_tick(pos: [i32; 3], game_time: i64, partial: f32, ticks: u32) -> f32
     (game_time + phase).rem_euclid(i64::from(ticks)) as f32 + partial
 }
 
-/// The plaque's lines (09-trophies.md, «Подставка»): the mob's name, then the kills of the player
-/// looking at it from their hunter's book (a spawner's mob counts a part, so the count rounds down).
-/// No second line until the client has its book.
-pub fn plaque_lines(name: &str, kills: Option<f64>) -> Vec<String> {
+/// The plaque's lines (09-trophies.md, «Подставка»; the owner chose the trophy owner's kills,
+/// 2026-11-15): the mob's name, then the player who placed the diorama and their kills of that
+/// mob from their hunter's book (a spawner's mob counts a part, so the count rounds down). A
+/// diorama with no owner (set by a command, or placed before 0.4) shows the name alone.
+pub fn plaque_lines(name: &str, owner: Option<(&str, f64)>) -> Vec<String> {
     let mut out = vec![name.to_owned()];
-    if let Some(k) = kills {
-        out.push(format!("убито вами: {}", k.max(0.0).floor() as u64));
+    if let Some((who, k)) = owner {
+        out.push(format!("{who} — убито {}", k.max(0.0).floor() as u64));
     }
     out
+}
+
+/// A diorama's owner in its block entity: the placer's name, their UUID (32 hex digits) and their
+/// kills of the mob as last read from their book (kept while they are offline).
+pub const OWNER_KEY: &str = "owner";
+pub const OWNER_UUID_KEY: &str = "owner_uuid";
+pub const KILLS_KEY: &str = "kills";
+
+/// Where a block placed by a click on `hit`'s `face` lands: the clicked cell when it is
+/// replaceable, else the one beside it on that face; the server looks in both.
+pub fn placement_cells(hit: [i32; 3], face: [i32; 3]) -> [[i32; 3]; 2] {
+    [hit, [hit[0] + face[0], hit[1] + face[1], hit[2] + face[2]]]
 }
 
 /// Model pixels per font pixel for a line `width` font pixels wide on a plaque `plaque` wide and
@@ -311,10 +324,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_plaque_shows_the_name_and_the_viewers_kills() {
+    fn the_plaque_shows_the_name_and_the_owners_kills() {
+        // No owner (placed by a command, or before 0.4): the name alone.
         assert_eq!(plaque_lines("Громила", None), ["Громила"]);
-        assert_eq!(plaque_lines("Громила", Some(12.75)), ["Громила", "убито вами: 12"]);
-        assert_eq!(plaque_lines("Громила", Some(0.25)), ["Громила", "убито вами: 0"]);
+        assert_eq!(plaque_lines("Громила", Some(("Betreazen", 12.75))), ["Громила", "Betreazen — убито 12"]);
+        assert_eq!(plaque_lines("Громила", Some(("sc_a", 0.25))), ["Громила", "sc_a — убито 0"]);
+        assert_eq!(plaque_lines("Громила", Some(("sc_a", -3.0))), ["Громила", "sc_a — убито 0"]);
+    }
+
+    #[test]
+    fn a_placed_diorama_is_looked_for_in_the_clicked_cell_and_beside_it() {
+        // Vanilla puts the block into the clicked cell when that is replaceable (grass), else on
+        // the clicked face.
+        assert_eq!(placement_cells([10, 64, -3], [0, 1, 0]), [[10, 64, -3], [10, 65, -3]]);
+        assert_eq!(placement_cells([0, 0, 0], [-1, 0, 0]), [[0, 0, 0], [-1, 0, 0]]);
     }
 
     #[test]

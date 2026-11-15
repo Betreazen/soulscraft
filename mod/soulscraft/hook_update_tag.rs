@@ -3,4 +3,5 @@ fn soulscraft_update_tag(
     tag: &mut Option<horizon_world::nbt::Compound>,
 ) {
     crate::game::soulscraft_altar::on_update_tag(entity, tag);
+    crate::game::soulscraft_trophy::on_update_tag(entity, tag);
 }

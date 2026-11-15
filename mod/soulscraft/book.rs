@@ -726,6 +726,15 @@ pub(super) fn progress_of(uuid: u128) -> Option<Progress> {
     book().players.get(&uuid).map(|p| p.progress.clone())
 }
 
+/// A player's kills on the book entry of `kind` (`soulscraft:brute`), while they are online and
+/// their book is read: a diorama's plaque (trophy.rs).
+pub(super) fn kills_of(uuid: u128, kind: &str) -> Option<f64> {
+    let b = book();
+    let p = b.players.get(&uuid).filter(|p| p.loaded)?;
+    let entry = b.catalog.by_key(kind)?;
+    Some(p.progress.mob(&entry.id).kills)
+}
+
 /// Machine kill reports heard so far: (`pct-machine kill`, `soulscraft-kill`).
 pub(super) fn reports_heard() -> (u32, u32) {
     let h = book().heard;

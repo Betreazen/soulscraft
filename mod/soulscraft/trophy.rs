@@ -25,7 +25,7 @@
 //   soulscraft: trophy particles dioramas=3 sent=12 tick=..   (every 200 ticks while any ticks)
 use crate::game::Game;
 use horizon_client::particles::ParticleOptions;
-use horizon_world::nbt::Compound;
+use horizon_world::nbt::{Compound, JavaString, Tag};
 use horizon_world::registry::BlockStateId;
 use soulscraft_rules::event::Rng;
 use soulscraft_rules::trophy::{self, Kind, TrophyFile};
@@ -33,9 +33,23 @@ use std::collections::HashMap;
 use std::sync::{LazyLock, Mutex, MutexGuard, PoisonError};
 
 const LOG_EVERY: u64 = 200;
+/// Level ticks a diorama click waits for its block to appear.
+const PLACER_TTL: u32 = 20;
+/// How often a diorama's owner's kills are read again from their book (while they are online).
+const KILLS_EVERY: u64 = 40;
+
+/// A player who right-clicked with a diorama: the block is looked for in `cells`.
+struct Placer {
+    dim: String,
+    cells: [[i32; 3]; 2],
+    uuid: u128,
+    name: String,
+    ttl: u32,
+}
 
 #[derive(Default)]
 struct Hub {
+    placers: Vec<Placer>,
     files: HashMap<String, Option<TrophyFile>>,
     /// Wall heads to put up in the level's tick: (dimension, cell, state).
     walls: Vec<(String, [i32; 3], String)>,
@@ -102,6 +116,13 @@ pub(super) fn on_right_click_block(game: &mut Game<'_>, pos: [i32; 3], face: [i3
         return;
     }
     let Some((item, _, _)) = game.native_held() else { return };
+    if let Some(Kind::Diorama(_)) = Kind::of(&item) {
+        // Vanilla places it after this hook: the level's tick finds it and names its owner.
+        if let Some(player) = game.native_acting_player() {
+            note_placer(&player.dimension, pos, face, player.uuid, &player.name);
+        }
+        return;
+    }
     let Some(mob) = trophy::head_item_mob(&item) else { return };
     let Some(facing) = trophy::wall_facing(face) else { return };
     let Some(player) = game.native_acting_player() else { return };
@@ -135,9 +156,15 @@ pub(super) fn on_level_tick(game: &mut Game<'_>, dim: &str, now: u64) {
     for (_, cell, state) in walls {
         crate::game::soulscraft_altar::setblock(game, dim, cell, &state, "keep");
     }
+    claim_placed(game, dim);
     let ticked: Vec<([i32; 3], String)> = std::mem::take(&mut *TICKED.lock().unwrap_or_else(PoisonError::into_inner));
     if ticked.is_empty() {
         return;
+    }
+    if now % KILLS_EVERY == 0 {
+        for (pos, block) in &ticked {
+            refresh_kills(game, *pos, block);
+        }
     }
     let mut sent = 0;
     for (pos, block) in &ticked {
@@ -149,6 +176,93 @@ pub(super) fn on_level_tick(game: &mut Game<'_>, dim: &str, now: u64) {
         log::log!(crate::game::soulscraft_server::chatty(), "soulscraft: trophy particles dioramas={} sent={} tick={now}", ticked.len(), h.sent_since_log);
         h.sent_since_log = 0;
     }
+}
+
+/// A click with a diorama on `hit`'s `face` by a player: the level's tick names them the owner of
+/// the diorama that appears there (the self-test calls it as the click hook does).
+pub(super) fn note_placer(dim: &str, hit: [i32; 3], face: [i32; 3], uuid: u128, name: &str) {
+    hub().placers.push(Placer { dim: dim.to_owned(), cells: trophy::placement_cells(hit, face), uuid, name: name.to_owned(), ttl: PLACER_TTL });
+}
+
+/// Dioramas placed since a click: the new block in one of the clicked cells, with no owner yet,
+/// takes the clicking player as its owner.
+fn claim_placed(game: &mut Game<'_>, dim: &str) {
+    let placers: Vec<Placer> = {
+        let mut h = hub();
+        let (here, rest) = h.placers.drain(..).partition(|p| p.dim == dim);
+        h.placers = rest;
+        here
+    };
+    for mut p in placers {
+        let found = p.cells.iter().copied().find(|c| matches!(Kind::of(&game.native_block(*c)), Some(Kind::Diorama(_))) && owner_uuid(game, *c).is_none());
+        if let Some(cell) = found {
+            set_owner(game, cell, p.uuid, &p.name);
+            continue;
+        }
+        p.ttl = p.ttl.saturating_sub(1);
+        if p.ttl > 0 {
+            hub().placers.push(p);
+        }
+    }
+}
+
+/// Names a diorama's owner and writes their kills (the self-test's way too).
+pub(super) fn set_owner(game: &mut Game<'_>, pos: [i32; 3], uuid: u128, name: &str) {
+    let block = game.native_block(pos);
+    let Some(Kind::Diorama(mob)) = Kind::of(&block) else { return };
+    let mob = mob.to_owned();
+    let kills = crate::game::soulscraft_book::kills_of(uuid, &format!("soulscraft:{mob}")).unwrap_or(0.0);
+    game.native_with_mod_block_entity(pos, |e| {
+        e.nbt.insert(JavaString::from(trophy::OWNER_KEY), Tag::String(JavaString::from(name)));
+        e.nbt.insert(JavaString::from(trophy::OWNER_UUID_KEY), Tag::String(JavaString::from(format!("{uuid:032x}").as_str())));
+        e.nbt.insert(JavaString::from(trophy::KILLS_KEY), Tag::Double(kills.to_bits()));
+    });
+    game.native_block_entity_sync(pos);
+    log::info!("soulscraft: trophy owner diorama={mob} at={},{},{} owner={name} kills={kills}", pos[0], pos[1], pos[2]);
+}
+
+/// The owner's UUID written in a diorama's block entity.
+pub(super) fn owner_uuid(game: &Game<'_>, pos: [i32; 3]) -> Option<u128> {
+    match game.native_mod_block_entity(pos)?.nbt.get(&JavaString::from(trophy::OWNER_UUID_KEY)) {
+        Some(Tag::String(s)) => u128::from_str_radix(&s.to_string_lossy(), 16).ok(),
+        _ => None,
+    }
+}
+
+/// The kills written in a diorama's block entity.
+pub(super) fn stored_kills(game: &Game<'_>, pos: [i32; 3]) -> Option<f64> {
+    match game.native_mod_block_entity(pos)?.nbt.get(&JavaString::from(trophy::KILLS_KEY)) {
+        Some(Tag::Double(k)) => Some(f64::from_bits(*k)),
+        _ => None,
+    }
+}
+
+/// While its owner is online, a diorama's kills follow their book; clients are told on a change.
+fn refresh_kills(game: &mut Game<'_>, pos: [i32; 3], block: &str) {
+    let Some(Kind::Diorama(mob)) = Kind::of(block) else { return };
+    let Some(uuid) = owner_uuid(game, pos) else { return };
+    let Some(kills) = crate::game::soulscraft_book::kills_of(uuid, &format!("soulscraft:{mob}")) else { return };
+    if stored_kills(game, pos) == Some(kills) {
+        return;
+    }
+    game.native_with_mod_block_entity(pos, |e| {
+        e.nbt.insert(JavaString::from(trophy::KILLS_KEY), Tag::Double(kills.to_bits()));
+    });
+    game.native_block_entity_sync(pos);
+}
+
+/// `native_block_entity_update_tag`: clients get a diorama's owner and kills for its plaque.
+pub(super) fn on_update_tag(entity: &horizon_client::containers::ModBlockEntity, tag: &mut Option<Compound>) {
+    if !matches!(Kind::of(&entity.id), Some(Kind::Diorama(_))) {
+        return;
+    }
+    let mut c = Compound::new();
+    for key in [trophy::OWNER_KEY, trophy::KILLS_KEY] {
+        if let Some(v) = entity.nbt.get(&JavaString::from(key)) {
+            c.insert(JavaString::from(key), v.clone());
+        }
+    }
+    *tag = Some(c);
 }
 
 /// One diorama's particles this tick; how many were queued.

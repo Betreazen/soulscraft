@@ -14,6 +14,8 @@
 use crate::game::Game;
 use crate::game::native_block_entity_draw::BlockEntityDraw;
 use crate::game::soulscraft_client as client;
+use horizon_client::containers::ModBlockEntity;
+use horizon_world::nbt::{JavaString, Tag};
 use soulscraft_rules::trophy::{self, Kind, TrophyFile};
 use std::collections::HashMap;
 use std::sync::{Arc, LazyLock, Mutex, PoisonError};
@@ -42,7 +44,7 @@ fn file(game: &Game<'_>, mob: &str) -> Option<Arc<TrophyFile>> {
 }
 
 /// `native_block_entity_submit` for a trophy block. False for any other block.
-pub(super) fn draw_block_entity(game: &Game<'_>, pos: [i32; 3], block: &str, draw: &mut BlockEntityDraw) -> bool {
+pub(super) fn draw_block_entity(game: &Game<'_>, pos: [i32; 3], block: &str, entity: &ModBlockEntity, draw: &mut BlockEntityDraw) -> bool {
     let Some(kind) = Kind::of(block) else { return false };
     let mob = kind.mob();
     let Some(f) = file(game, mob) else { return true };
@@ -73,7 +75,7 @@ pub(super) fn draw_block_entity(game: &Game<'_>, pos: [i32; 3], block: &str, dra
     }
     draw.pop();
     if let (Kind::Diorama(_), Some(plaque)) = (kind, f.diorama.plaque) {
-        draw_plaque(game, mob, trophy::turn(kind, rotation, &facing), plaque, draw);
+        draw_plaque(game, mob, plaque_owner(entity), trophy::turn(kind, rotation, &facing), plaque, draw);
     }
     true
 }
@@ -83,12 +85,25 @@ const PLAQUE_INK: u32 = 0x3B_2A12;
 /// The letters stand this far (model pixels) in front of the plaque's face.
 const PLAQUE_LIFT: f32 = 0.02;
 
-/// The plaque's text (09-trophies.md, «Подставка»): the mob's name and the viewer's kills from the
-/// hunter's book, on the plaque's front face (north in the model, `plaque.from` z), as a sign's
-/// lines are drawn (`native_draw_text`, API draw_text).
-fn draw_plaque(game: &Game<'_>, mob: &str, turn: f32, plaque: trophy::PxBox, draw: &mut BlockEntityDraw) {
-    let Some((name, kills)) = crate::game::soulscraft_book_client::plaque(mob) else { return };
-    let lines = trophy::plaque_lines(&name, kills);
+/// The diorama's owner and their kills, as the server sent them in its update tag (trophy.rs).
+fn plaque_owner(entity: &ModBlockEntity) -> Option<(String, f64)> {
+    let name = match entity.nbt.get(&JavaString::from(trophy::OWNER_KEY)) {
+        Some(Tag::String(s)) => s.to_string_lossy(),
+        _ => return None,
+    };
+    let kills = match entity.nbt.get(&JavaString::from(trophy::KILLS_KEY)) {
+        Some(Tag::Double(k)) => f64::from_bits(*k),
+        _ => 0.0,
+    };
+    Some((name, kills))
+}
+
+/// The plaque's text (09-trophies.md, «Подставка»): the mob's name and its owner's kills, on the
+/// plaque's front face (north in the model, `plaque.from` z), as a sign's lines are drawn
+/// (`native_draw_text`, API draw_text).
+fn draw_plaque(game: &Game<'_>, mob: &str, owner: Option<(String, f64)>, turn: f32, plaque: trophy::PxBox, draw: &mut BlockEntityDraw) {
+    let Some(name) = crate::game::soulscraft_book_client::mob_name(mob) else { return };
+    let lines = trophy::plaque_lines(&name, owner.as_ref().map(|(who, k)| (who.as_str(), *k)));
     let widths: Vec<f32> = lines.iter().map(|l| game.native_text_width(l)).collect();
     let size = [(plaque.to[0] - plaque.from[0]) as f32, (plaque.to[1] - plaque.from[1]) as f32];
     let k = widths.iter().map(|w| trophy::plaque_scale(*w, size, lines.len())).fold(f32::INFINITY, f32::min);
