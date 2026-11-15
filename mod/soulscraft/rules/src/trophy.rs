@@ -293,13 +293,18 @@ pub fn plaque_lines(name: &str, kills: Option<f64>) -> Vec<String> {
 }
 
 /// Model pixels per font pixel for a line `width` font pixels wide on a plaque `plaque` wide and
-/// tall in model pixels, with `lines` lines: as large as the plaque lets the line be, with a margin
-/// of a tenth of its width and a line of 9 font pixels (8 for the glyph, 1 between).
+/// tall in model pixels, with `lines` lines of 9 font pixels (8 for the glyph, 1 between): as large
+/// as the plaque lets the line be inside its cut border (the texture's `plaque_draw`: a pixel each
+/// side, a quarter pixel top and bottom), which an earlier fill of the whole face ran over.
 pub fn plaque_scale(width: f32, plaque: [f32; 2], lines: usize) -> f32 {
-    let by_width = if width > 0.0 { plaque[0] * 0.9 / width } else { f32::INFINITY };
-    let by_height = plaque[1] / (9.0 * lines.max(1) as f32);
+    let inner = [plaque[0] - PLAQUE_BORDER[0] * 2.0, plaque[1] - PLAQUE_BORDER[1] * 2.0];
+    let by_width = if width > 0.0 { inner[0] / width } else { f32::INFINITY };
+    let by_height = inner[1] / (9.0 * lines.max(1) as f32);
     by_width.min(by_height)
 }
+
+/// The plaque's cut border in model pixels, sides and top/bottom (dioramas.py `plaque_draw`).
+const PLAQUE_BORDER: [f32; 2] = [1.0, 0.25];
 
 #[cfg(test)]
 mod tests {
@@ -314,11 +319,12 @@ mod tests {
 
     #[test]
     fn plaque_text_fits_its_width_and_its_height() {
-        // Two lines on the 8 × 1.5 pixel plaque: a short line is held by the height.
-        assert_eq!(plaque_scale(20.0, [8.0, 1.5], 2), 1.5 / 18.0);
-        // A long one by the width: 0.9 of the plaque.
-        let s = plaque_scale(100.0, [8.0, 1.5], 2);
-        assert!((s * 100.0 - 7.2).abs() < 1e-5);
+        // Two lines on the 8 × 1.5 pixel plaque, inside its cut border (a pixel each side, a
+        // quarter pixel top and bottom): a short line is held by the 1 pixel of height left.
+        assert!((plaque_scale(20.0, [8.0, 1.5], 2) - 1.0 / 18.0).abs() < 1e-6);
+        // A long one by the 6 pixels of width left.
+        let s = plaque_scale(200.0, [8.0, 1.5], 2);
+        assert!((s * 200.0 - 6.0).abs() < 1e-5);
         assert!(plaque_scale(0.0, [8.0, 1.5], 1).is_finite());
     }
 

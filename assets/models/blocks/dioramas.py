@@ -552,16 +552,15 @@ def brass_corner_draw(f):
 
 
 def plaque_draw(f):
-    """The engraved plaque (x 4..12, rows 13.75..15.25 of the north face): a cut border and two
-    engraved lines either side of where the name is written."""
+    """The engraved plaque (x 4..12, rows 13.75..15.25 of the north face): a cut border round a
+    clean field, where the mod writes the mob's name and the kills (trophy::plaque_scale keeps
+    the text inside the border; the two dark marks that stood in the field covered the letters)."""
     f.rect(0, 0, 16, 16, ('brass', 3))
     for x in range(4, 12):
         f.px(x, 13, ('brass', 4))
         f.px(x, 15, ('brass', 1))
     for x in (4, 11):
         f.px(x, 14, ('brass', 1))
-    f.px(5, 14, ('brass', 0))
-    f.px(10, 14, ('brass', 0))
 
 
 def grave_draw(f):
