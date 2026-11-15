@@ -103,6 +103,10 @@ pub(super) fn on_command(game: &mut Game<'_>, player: Option<&NativeServerPlayer
             server::state().debug = on;
             say(game, format!("debug {}", if on { "on: labels over the mobs, creative players hunted" } else { "off" }));
         }
+        Cmd::Log(on) => {
+            server::set_chatty(on);
+            say(game, format!("log {}", if on { "on: per-mob lines at info" } else { "off: per-mob lines at debug" }));
+        }
         Cmd::Slowmo(rate) => queue(&dim, Task::Run(format!("tick rate {}", rate.unwrap_or(20.0)))),
         Cmd::Freeze(on) => queue(&dim, Task::Run(if on { "tick freeze".into() } else { "tick unfreeze".into() })),
         Cmd::Arena => queue(&dim, Task::Arena { who: player.map(|p| p.name.clone()) }),

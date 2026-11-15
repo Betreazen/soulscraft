@@ -41,6 +41,9 @@ function Start-Bot([string]$Name, [switch]$Still) {
     if ($LASTEXITCODE -ne 0) { throw "launch of ${Name} failed: $reply" }
     $bot = [pscustomobject]@{ Name = $Name; Socket = $socket; Dir = $dir }
     Invoke-Bot $bot 'wait-ready 120' | Out-Null
+    # The scripts read per-mob lines (adopt, phase, strike, boost, trophy particles) from the
+    # server log: since 0.3.0 they are at `debug` unless `/sc log on`.
+    Invoke-Console 'sc log on' | Out-Null
     $bot
 }
 

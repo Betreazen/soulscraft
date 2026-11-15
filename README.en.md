@@ -126,6 +126,7 @@ The `/sc` commands are for operators of level 2 and up and for the console.
 | `/sc spawn <mob> [strength] [count]` · `/sc clear` | Spawn SoulsCraft mobs nearby · remove the mod's mobs around |
 | `/sc force <attack>` | Make the nearest mob perform an attack, vanilla ones included |
 | `/sc debug on` · `off` | Attack phase labels over mobs |
+| `/sc log on` · `off` | A server log line for every mob's spawn, phase and blow. Off by default, so a live server's log stays clean |
 | `/sc altar <level> [banners]` | Build an altar of that level nearby for testing |
 | `/sc event` · `/sc event stop` | Start or stop the test event at the nearest altar |
 | `/sc book <player> [action]` | Show or change a player's hunter's book progress |

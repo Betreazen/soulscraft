@@ -103,7 +103,7 @@ pub(super) fn on_level_tick(dim: &str, now: u64) {
     }
     drop(t);
     for l in logs {
-        log::info!("soulscraft: boost {l}");
+        log::log!(crate::game::soulscraft_server::chatty(), "soulscraft: boost {l}");
     }
 }
 

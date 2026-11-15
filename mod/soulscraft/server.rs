@@ -137,6 +137,20 @@ pub(super) fn state() -> MutexGuard<'static, State> {
     STATE.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
+/// `/sc log on`: the per-mob lines at `info`, for bench checks and bot scripts that read the log.
+static CHATTY: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+pub(super) fn set_chatty(on: bool) {
+    CHATTY.store(on, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// The level of a line logged per mob or per few ticks (adoption, phases, blows, notes,
+/// particles): `debug` unless `/sc log on`. A live server spawns mobs by the second, and the owner
+/// asked for a quiet log (tidewill, 2026-11-15).
+pub(super) fn chatty() -> log::Level {
+    if CHATTY.load(std::sync::atomic::Ordering::Relaxed) { log::Level::Info } else { log::Level::Debug }
+}
+
 fn read_reload_file() -> Option<Result<MobsFile, String>> {
     let dir = Game::native_config_dir().ok()?;
     let path = dir.join(RELOAD_FILE);
@@ -539,7 +553,8 @@ fn adopt(game: &mut Game<'_>, dimension: &str, now: u64, m: &Seen, players: &[(N
         // Flyers and swimmers are steered by velocity: no gravity pulls them off their course.
         mob.no_gravity = true;
     }
-    log::info!(
+    log::log!(
+        chatty(),
         "soulscraft: adopt mob={id_str} id={} p={p:.2} size={size} fresh={fresh} health={:.1} tick={now}",
         m.id,
         m.health
@@ -803,7 +818,8 @@ fn log_events(def: &MobDef, id: u32, now: u64, tick: &Tick) {
         match e {
             Event::Phase { attack, phase, t } => {
                 let a = def.attacks.get(*attack).map_or("?", |a| a.id.as_str());
-                log::info!(
+                log::log!(
+                    chatty(),
                     "soulscraft: phase mob={} id={id} attack={a} phase={} t={t} tick={now}",
                     def.id,
                     phase.label()
@@ -878,7 +894,8 @@ fn deal(
         }
     }
     let who = target.map_or("-", |t| t.name.as_str());
-    log::info!(
+    log::log!(
+        chatty(),
         "soulscraft: strike mob={} id={} attack={} t={t} tick={now} hit={} dmg={blow:.2} target={who}",
         def.id,
         m.id,
@@ -1064,7 +1081,8 @@ fn send_notes(
             .as_ref()
             .map(|h| h.hub.guests.iter().map(|g| format!("{}:{}", g.name, g.brand)).collect())
             .unwrap_or_default();
-        log::info!(
+        log::log!(
+            chatty(),
             "soulscraft: notes tick={now} messages={} players={} errors={:?} brands={:?}",
             messages.len(),
             everyone.len(),

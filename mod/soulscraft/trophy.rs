@@ -146,7 +146,7 @@ pub(super) fn on_level_tick(game: &mut Game<'_>, dim: &str, now: u64) {
     let mut h = hub();
     h.sent_since_log += sent;
     if now % LOG_EVERY == 0 {
-        log::info!("soulscraft: trophy particles dioramas={} sent={} tick={now}", ticked.len(), h.sent_since_log);
+        log::log!(crate::game::soulscraft_server::chatty(), "soulscraft: trophy particles dioramas={} sent={} tick={now}", ticked.len(), h.sent_since_log);
         h.sent_since_log = 0;
     }
 }

@@ -12,6 +12,7 @@ pub const USAGES: &[&str] = &[
     "sc p <value:word>",
     "sc reload",
     "sc debug <on:word>",
+    "sc log <on:word>",
     "sc slowmo <rate:word>",
     "sc freeze <on:word>",
     "sc arena",
@@ -40,6 +41,9 @@ pub enum Cmd {
     /// Read mobs.json again from the config folder (numbers and timings live).
     Reload,
     Debug(bool),
+    /// The per-mob lines (adoption, phases, blows, periodic counts) at `info` for bench checks;
+    /// off, they go to `debug` and a live server's log stays quiet.
+    Log(bool),
     /// `/tick rate`: 20 is normal speed; None back to 20.
     Slowmo(Option<f64>),
     Freeze(bool),
@@ -127,6 +131,7 @@ fn parse_sc(w: Vec<&str>) -> Result<Cmd, String> {
         },
         Some("reload") => Ok(Cmd::Reload),
         Some("debug") => Ok(Cmd::Debug(on_off(arg(1))?)),
+        Some("log") => Ok(Cmd::Log(on_off(arg(1))?)),
         Some("slowmo") => match arg(1) {
             Some("off") | None => Ok(Cmd::Slowmo(None)),
             Some(v) => {
@@ -182,7 +187,7 @@ fn parse_sc(w: Vec<&str>) -> Result<Cmd, String> {
             x => x,
         }))?)),
         Some(x) => Err(format!("unknown: sc {x}")),
-        None => Err("sc spawn|p|reload|debug|slowmo|freeze|arena|wave|force|clear|info|bench|cost|power|pct|altar|horn|event".into()),
+        None => Err("sc spawn|p|reload|debug|log|slowmo|freeze|arena|wave|force|clear|info|bench|cost|power|pct|altar|horn|event".into()),
     }
 }
 
@@ -247,7 +252,10 @@ mod tests {
         assert!(parse("soulscraft_selftest").unwrap().is_err());
         assert_eq!(parse("tree"), None);
         assert_eq!(parse(""), None);
-        assert_eq!(USAGES.len(), 18);
+        assert_eq!(USAGES.len(), 19);
+        assert_eq!(ok("sc log on"), Cmd::Log(true));
+        assert_eq!(ok("sc log off"), Cmd::Log(false));
+        assert!(parse("sc log").unwrap().is_err());
         assert_eq!(ok("sc altar 3 banners"), Cmd::Altar { level: 3, banners: true });
         assert_eq!(ok("sc altar 0"), Cmd::Altar { level: 0, banners: false });
         assert!(parse("sc altar 5").unwrap().is_err());

@@ -306,7 +306,8 @@ fn adopt(game: &mut Game<'_>, dim: &str, now: u64, m: &Seen, g: &VanillaDef, pla
             label: String::new(),
         },
     );
-    log::info!(
+    log::log!(
+        crate::game::soulscraft_server::chatty(),
         "soulscraft: vadopt mob={} id={} group={} p={p:.2} spawner={spawner} health={:.1} tick={now}",
         m.kind,
         m.id,
@@ -668,7 +669,7 @@ fn deal(game: &mut Game<'_>, dim: &str, now: u64, m: &Seen, g: &VanillaDef, stri
         }
     }
     let who = target.map_or("-", |t| t.name.as_str());
-    log::info!("soulscraft: vstrike mob={} id={} attack={} t={t} tick={now} hit={landed} target={who}", m.kind, m.id, a.id);
+    log::log!(crate::game::soulscraft_server::chatty(), "soulscraft: vstrike mob={} id={} attack={} t={t} tick={now} hit={landed} target={who}", m.kind, m.id, a.id);
     let mut s = state();
     s.strikes.push(VRecord { mob: m.id, attack: a.id.clone(), phase: None, t, tick: now, hit: landed });
     let n = s.strikes.len();
@@ -796,7 +797,7 @@ fn log_events(g: &VanillaDef, m: &Seen, now: u64, tick: &VTick) {
         match e {
             Event::Phase { attack, phase, t } => {
                 let a = g.attacks.get(*attack).map_or("?", |a| a.def.id.as_str());
-                log::info!("soulscraft: vphase mob={} id={} attack={a} phase={} t={t} tick={now}", m.kind, m.id, phase.label());
+                log::log!(crate::game::soulscraft_server::chatty(), "soulscraft: vphase mob={} id={} attack={a} phase={} t={t} tick={now}", m.kind, m.id, phase.label());
                 s.phases.push(VRecord { mob: m.id, attack: a.to_owned(), phase: Some(*phase), t: *t, tick: now, hit: false });
             }
             Event::Mode(mode) => {
