@@ -1,3 +1,7 @@
-plaque checks, 2026-11-15T16:27:40
+plaque checks, 2026-11-15T19:34:55
+== owner
+  soulscraft: trophy owner diorama=revenant at=-492,101,493 owner=sc_a kills=0
 == book credit
-  soulscraft: book credit mob=revenant id=55 players=["sc_a"] weight=1 how=kill
+  soulscraft: book credit mob=revenant id=102 players=["sc_a"] weight=1 how=kill
+== data get block -492 101 493 (after the second kill)
+  {kills: 2.0d, owner: "sc_a", id: "soulscraft:revenant_trophy", owner_uuid: ...}

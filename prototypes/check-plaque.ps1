@@ -84,8 +84,13 @@ try {
     View ($ox + 0.5) ($ay + 1) ($az - 6.0) ($ox + 0.5) ($ay + 1.0) ($az - 7.5)
     Invoke-Bot $bot "interact $ox $ay $($az - 8)" | Out-Null
     Start-Sleep -Seconds 2
-    Note 'owner' (Get-LogSince $mark 'soulscraft: trophy owner')
-    View ($ox + 0.5) $ay ($az - 6.1) ($ox + 0.5) ($ay + 1.09) ($az - 7.0)
+    $owner = @(Get-LogSince $mark 'soulscraft: trophy owner')
+    Note 'owner' $owner
+    # The click may land on the stone's side: the diorama is where the server says, plaque south.
+    if ($owner -and $owner[0] -match 'at=(-?\d+),(-?\d+),(-?\d+)') {
+        $dx = [int]$matches[1]; $dy = [int]$matches[2]; $dz = [int]$matches[3]
+        View ($dx + 0.5) $dy ($dz + 1.9) ($dx + 0.5) ($dy + 0.09) ($dz + 1.0)
+    }
     Save-Shot $bot 'plaque_owned_before_kill'
     # One revenant killed by the bot: the book credits it, the plaque follows within 2 s.
     $mark = Mark
