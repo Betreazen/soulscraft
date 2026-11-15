@@ -19,6 +19,7 @@ mod/
   soulscraft/                 нативный бандл
     horizon-mixin.toml        хуки, модули, крейт; в шапке — места вызова хуков и ловушки
     rules/                    крейт soulscraft-rules без игры: вся логика, cargo test
+    loot/                     крейт soulscraft-loot для horizon-world: пулы лута из data/loot.json, cargo test
     server.rs                 сервер: учёт мобов, статы от P, мозг → навигация и урон, заметки клиентам
     tools.rs                  /sc, арена, волны, стенд П5
     power.rs                  сила игрока P: снаряжение и сводка PCT `pct:summary` (кэш на тике уровня)
@@ -150,6 +151,14 @@ cargo test                         # крейт rules, секунды (из ко
 | `perform_console_command` (тот же) | `game/native_server.rs:779` для `native_run_mod_command` | отчёты машин RustCraft: своя команда `soulscraft-kill` (регистрируется в `register_commands`, уровень 4) и `pct-machine kill` | нет |
 | `block_entity_submit` (тот же) | `game/native_scene.rs:155-166` из `native_draw_scene` | фигурка моба в окне книги (block entity `soulscraft:book_figure` на невидимом блоке сцены) | нет |
 | `tick`, `screen_render_post`, `screen_mouse_button_pressed_pre`, `net_from_server` (те же) | см. выше | окно книги (экран `soulscraft_book`) и сообщение `soulscraft:book` | нет |
+
+Хуки срезов выживания (0.5, [../docs/design/10-survival.md](../docs/design/10-survival.md)) и предметов призыва (0.6, [../docs/design/11-summons-rewards.md](../docs/design/11-summons-rewards.md)):
+
+| Хук | Где вызывается | Что делает мод | Ловушка `mods().is_empty()` |
+| --- | --- | --- | --- |
+| `potential_spawns` (тот же, теперь с игрой) | см. выше | естественный спавн: мобы SoulsCraft биома точки (`native_biome`); `spawn_hooks` истинна во всём верхнем мире | — |
+| `guest_die`, `HEAD` (по имени функции) | `game/lan_actions.rs:4340`, единственный путь смерти игрока | участник идущего ивента остаётся с 1 здоровьем: нет смерти, выпадения вещей и наблюдателя в хардкоре | именованный `living_death` за `mods().is_empty()` (`:4343`) |
+| `native_loot_table_load`, `HEAD` (свободная функция) | `horizon-world/src/loot.rs:589`, каждая таблица при загрузке, сервер и клиент (API 75) | горны и осколки в сундуках структур, Гнилой горн с зомби, убитых игроком (крейт `loot`, `dependent = "horizon-world"`, `data/loot.json`) | нет |
 
 Trait-мод не нужен и в третьей итерации: `native_potential_spawns` молчит не из-за хука, а из-за одной функции `spawn_hooks`, и бандл сам возвращает из неё истину там, где стоит активный алтарь. Охраняемые хуки движка (40 мест в 20 файлах) остаются выключенными, как у PCT и RustCraft. Подробно и цена — [../prototypes/p4-spawn.md](../prototypes/p4-spawn.md).
 
