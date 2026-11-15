@@ -11,8 +11,6 @@
 ![Horizon](https://img.shields.io/badge/Horizon-native%20mod-7c4dff)
 ![Minecraft](https://img.shields.io/badge/Minecraft-26.3-3c8527)
 ![Rust](https://img.shields.io/badge/Rust-2024-b7410e?logo=rust)
-[![Лицензия](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
-
 [Установка](#установка) · [Витрина бестиария](https://betreazen.github.io/soulscraft/showcase/) · [Как играть](#как-играть) · [Для серверов](#для-владельцев-серверов) · [Изменения](CHANGELOG.md) · [Концепт](docs/design/02-one-sheet.md)
 
 <img src="docs/images/altar_event_dusk.jpg" alt="Алтарь призыва четвёртого уровня в сумерках: знамёна, обелиски, волна мертвецов тянет из алтаря силу лучами" width="860">
@@ -172,6 +170,6 @@ cargo test     # правила без игры: атаки, мозг мобов
 | [Стыковка с модами](docs/research/integration.md) | что даёт Horizon, как мод работает с Path-of-craft-tree, RustCraft и LetsCam |
 | [Журнал разработки](docs/devlog.md) | что сделано по срезам и раундам |
 
-## Лицензия
+## Права
 
-[MIT](LICENSE). Minecraft — товарный знак Mojang Studios. SoulsCraft не связан с Mojang и Microsoft.
+Лицензия не выбрана: код открыт для чтения и для установки мода, все права у автора. Minecraft — товарный знак Mojang Studios. SoulsCraft не связан с Mojang и Microsoft.

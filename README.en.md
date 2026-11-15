@@ -11,8 +11,6 @@ Every enemy blow shows itself first: a windup, the blow, then a window to answer
 ![Horizon](https://img.shields.io/badge/Horizon-native%20mod-7c4dff)
 ![Minecraft](https://img.shields.io/badge/Minecraft-26.3-3c8527)
 ![Rust](https://img.shields.io/badge/Rust-2024-b7410e?logo=rust)
-[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
-
 [Install](#install) · [Bestiary showcase](https://betreazen.github.io/soulscraft/showcase/) · [How to play](#how-to-play) · [For servers](#for-server-owners) · [Changelog](CHANGELOG.md)
 
 <img src="docs/images/altar_event_dusk.jpg" alt="A level-four summoning altar at dusk: banners, obelisks, a wave of the dead draining the altar with beams" width="860">
@@ -157,6 +155,6 @@ cargo test     # the game-free rules: attacks, mob minds, the altar, events, the
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) to help out.
 
-## License
+## Rights
 
-[MIT](LICENSE). Minecraft is a trademark of Mojang Studios. SoulsCraft is not affiliated with Mojang or Microsoft.
+No license is chosen: the code is open to read and to install the mod from, and all rights stay with the author. Minecraft is a trademark of Mojang Studios. SoulsCraft is not affiliated with Mojang or Microsoft.
