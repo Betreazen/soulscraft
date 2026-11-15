@@ -35,6 +35,12 @@ pub struct MobsFile {
     /// The approved changes of vanilla mobs (07-vanilla-mobs.md; crate::vanilla).
     #[serde(default)]
     pub vanilla: crate::vanilla::VanillaSection,
+    /// The mobs in the natural spawn lists and the lurker's spawner (10-survival.md; crate::natural).
+    #[serde(default)]
+    pub natural: crate::natural::NaturalSection,
+    /// The soul shard a credited kill drops (Г15).
+    #[serde(default)]
+    pub soul_shard: crate::natural::ShardDef,
 }
 
 /// Room for a mob's box where it appears (owner's decision, round 9; crate::fit).

@@ -22,6 +22,7 @@ pub(super) const CASES: &[(&str, u64)] = &[
     ("trophy_placement", 20),
     ("trophy_wall_head", 20),
     ("trophy_owner", 20),
+    ("natural_lists", 10),
     ("trophy_particles", 260),
     ("reward_seeded_win", 300),
     ("kin_wave", 60),
@@ -38,6 +39,7 @@ pub(super) fn step(game: &mut Game<'_>, now: u64, t: u64, name: &str, c: &mut Ca
         "trophy_placement" => placement(game, t),
         "trophy_wall_head" => wall_head(game, t),
         "trophy_owner" => owner(game, t),
+        "natural_lists" => natural_lists(game, t),
         "trophy_particles" => particles(game, t, c),
         "reward_seeded_win" => seeded_win(game, now, t, c),
         "kin_wave" => kin_wave(game, now, t, c),
@@ -326,10 +328,47 @@ fn kin_wave(game: &mut Game<'_>, now: u64, t: u64, c: &mut Case) -> Option<Resul
     })
 }
 
+/// What the rules add to a monster list holding `listed` at `pos` of the site's dimension.
+fn natural_extras(game: &Game<'_>, pos: [i32; 3], listed: &[&str]) -> Vec<String> {
+    let mobs = soulscraft_rules::data::MobsFile::embedded();
+    let biome = game.native_biome(pos).unwrap_or_default();
+    soulscraft_rules::natural::extras(&mobs.natural, &mobs, &biome, pos[1], listed).into_iter().map(|e| e.key).collect()
+}
+
+/// SoulsCraft's natural spawns through the engine's own hook point, far from any altar: a surface
+/// position and a cave one of the site's biome get what the rules give for that biome and height
+/// (the hook reads the biome from the game), and the overworld's list hook is on.
+fn natural_lists(game: &mut Game<'_>, t: u64) -> Option<Result<(), String>> {
+    if t < 2 {
+        return None;
+    }
+    let site = at([0, 0, 0]);
+    let mut why = Vec::new();
+    for y in [site[1] + 2, 12] {
+        let pos = [site[0] + 300, y, site[2] + 300];
+        let want = natural_extras(game, pos, &["minecraft:zombie"]);
+        let mut list = vec![SpawnEntry { entity: "minecraft:zombie".into(), weight: 95, min: 4, max: 4, constant: true }];
+        boost::ask_engine(game, DIM, pos, &mut list);
+        let got: Vec<String> = list.iter().skip(1).map(|e| e.entity.clone()).collect();
+        if got != want {
+            why.push(format!("at y {y} in {:?}: {got:?}, the rules give {want:?}", game.native_biome(pos)));
+        }
+    }
+    // The other categories stay as they are.
+    let mut creatures = vec![SpawnEntry { entity: "minecraft:cow".into(), weight: 10, min: 4, max: 4, constant: true }];
+    let mut canceled = false;
+    game.native_potential_spawns(DIM, "creature", [site[0] + 300, site[1] + 2, site[2] + 300], &mut creatures, &mut canceled);
+    if creatures.len() != 1 {
+        why.push(format!("the creature list grew to {}", creatures.len()));
+    }
+    Some(if why.is_empty() { Ok(()) } else { Err(why.join("; ")) })
+}
+
 /// A level-2 altar's sector: active with one extra pass, three chunks out after three drift
 /// steps, its chunks among natural spawning's candidates coming again (outside chunks not), the
 /// spawn list's hook on in its dimension, and a monster position in it getting the other biomes'
-/// monsters and SoulsCraft's mobs through the engine's own hook point (outside: unchanged).
+/// monsters and SoulsCraft's mobs through the engine's own hook point (outside: only the biome's
+/// natural SoulsCraft mobs).
 fn boost_sector(game: &mut Game<'_>, now: u64, t: u64, c: &mut Case) -> Option<Result<(), String>> {
     let core = crate::game::soulscraft_selftest_altar::CORE;
     if t == 1 {
@@ -384,9 +423,11 @@ fn boost_sector(game: &mut Game<'_>, now: u64, t: u64, c: &mut Case) -> Option<R
     let mut away = base();
     boost::ask_engine(game, DIM, block(outside), &mut away);
     let has_kind = |l: &[SpawnEntry], k: &str| l.iter().any(|e| e.entity == k);
-    let ok = has_kind(&there, "minecraft:husk") && has_kind(&there, "soulscraft:revenant") && away.len() == 1;
+    // Outside the sector only the biome's natural SoulsCraft mobs come (10-survival.md).
+    let natural = natural_extras(game, block(outside), &["minecraft:zombie"]);
+    let ok = has_kind(&there, "minecraft:husk") && has_kind(&there, "soulscraft:revenant") && away.len() == 1 + natural.len();
     if !ok {
-        return Some(Err(format!("in the sector {} entries, outside {}", there.len(), away.len())));
+        return Some(Err(format!("in the sector {} entries, outside {} (natural {natural:?})", there.len(), away.len())));
     }
     altar::set_boost(DIM, core, false);
     c.phase = 1;

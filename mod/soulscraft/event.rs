@@ -356,7 +356,82 @@ pub(super) fn restore_orphans(game: &mut Game<'_>, dim: &str, core: [i32; 3]) {
     altar_srv::set_core_lines(game, core, altar_srv::BREACHED_KEY, &[]);
 }
 
+/// Participants whose death `guest_die` turned away since the last tick.
+static SPARED: Mutex<Vec<u128>> = Mutex::new(Vec::new());
+
+/// `guest_die` at its head (the hardcore guard; owner's decision, round 2): a participant of a
+/// running event whose health ran out does not die. True when the caller should keep them at 1
+/// health; the next tick takes them out of the event, heals them and puts them outside the zone.
+/// Nothing drops and no death screen comes, so hardcore never makes them a spectator.
+pub(super) fn spare_death(uuid: u128) -> bool {
+    let joined = EVENTS.lock().unwrap_or_else(PoisonError::into_inner).values().any(|r| r.joined.contains_key(&uuid) && !r.out.contains(&uuid));
+    if joined {
+        SPARED.lock().unwrap_or_else(PoisonError::into_inner).push(uuid);
+    }
+    joined
+}
+
+/// The spared participants of this dimension's events: out of the event, healed, outside the zone.
+fn take_spared(game: &mut Game<'_>, dim: &str, now: u64) {
+    let spared: Vec<u128> = std::mem::take(&mut *SPARED.lock().unwrap_or_else(PoisonError::into_inner));
+    if spared.is_empty() {
+        return;
+    }
+    let players = game.native_server_players();
+    let mut keep = Vec::new();
+    for uuid in spared {
+        let found = {
+            let mut ev = events();
+            let run = ev.values_mut().find(|r| r.dim == dim && r.joined.contains_key(&uuid));
+            run.map(|r| {
+                r.out.insert(uuid);
+                (r.core, r.flow.clone())
+            })
+        };
+        let Some((core, flow)) = found else {
+            keep.push(uuid);
+            continue;
+        };
+        let Some(p) = players.iter().find(|p| p.uuid == uuid) else { continue };
+        game.native_set_player_status(uuid, Some(1024.0), None, None);
+        let to = outside_zone(game, core, &flow, p.position);
+        game.native_teleport_player(uuid, dim, to, p.yaw, p.pitch);
+        for line in [
+            format!("effect give {} minecraft:resistance 10 4 true", p.name),
+            format!("effect give {} minecraft:regeneration 10 1 true", p.name),
+            format!("title {} actionbar {{\"text\":\"Алтарь вынес вас из боя: смерть в ивенте не губит\",\"color\":\"gold\"}}", p.name),
+        ] {
+            game.native_run_command(&line);
+        }
+        record(format!("spared player={} to={:.0},{:.0},{:.0} tick={now}", p.name, to[0], to[1], to[2]));
+        log::info!("soulscraft: event spared player={} to={:.0},{:.0},{:.0}", p.name, to[0], to[1], to[2]);
+    }
+    if !keep.is_empty() {
+        SPARED.lock().unwrap_or_else(PoisonError::into_inner).extend(keep);
+    }
+}
+
+/// A standing spot just outside the event zone, on the side the player was, at the first floor
+/// with two free cells above it (searched from 24 above the altar down).
+fn outside_zone(game: &Game<'_>, core: [i32; 3], flow: &Flow, from: V3) -> V3 {
+    let c = core_centre(core);
+    let (dx, dz) = (from[0] - c[0], from[2] - c[2]);
+    let len = (dx * dx + dz * dz).sqrt();
+    let (ux, uz) = if len > 1e-6 { (dx / len, dz / len) } else { (1.0, 0.0) };
+    // The zone is zone_chunks chunks across round the altar's chunk: half of it plus a margin.
+    let reach = f64::from(flow.zone_chunks.max(1)) * 8.0 + 4.0;
+    let (x, z) = ((c[0] + ux * reach).floor() as i32, (c[2] + uz * reach).floor() as i32);
+    let free = |y: i32| {
+        let b = game.native_block([x, y, z]);
+        b == "minecraft:air" || b == "minecraft:cave_air"
+    };
+    let top = core[1] + 24;
+    let y = (core[1] - 24..=top).rev().find(|&y| !free(y) && free(y + 1) && free(y + 2)).map_or(top, |y| y + 1);
+    [f64::from(x) + 0.5, f64::from(y), f64::from(z) + 0.5]
+}
+
 pub(super) fn tick(game: &mut Game<'_>, dim: &str, now: u64) {
+    take_spared(game, dim, now);
     let keys: Vec<(String, [i32; 3])> = events().keys().filter(|k| k.0 == dim).cloned().collect();
     let hits: Vec<(u32, i32)> = std::mem::take(&mut *HITS.lock().unwrap_or_else(PoisonError::into_inner));
     for key in keys {

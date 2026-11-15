@@ -23,7 +23,7 @@
 # frame from game/world_primitives.rs:43).
 [mod]
 id = "soulscraft"
-version = "0.4.0"
+version = "0.5.0"
 
 # The commit RustCraft and Path-of-craft-tree build on (the joint bench refuses any other).
 [compatibility]
@@ -503,6 +503,14 @@ file = "crates/horizon-client/src/game.rs"
 name = "soulscraft_spawn_boost"
 source = "spawn_boost.rs"
 
+# The survival slice (10-survival.md): SoulsCraft's mobs in the natural spawn lists by biome, the
+# lurker's water spawner, the soul shards of credited kills.
+[[module]]
+id = "natural"
+file = "crates/horizon-client/src/game.rs"
+name = "soulscraft_natural"
+source = "natural.rs"
+
 # The state a head (rotation) or a diorama (facing) is placed in (API 76; game.rs:1659-1669,
 # authoritative servers, no mods() check).
 [[injection]]
@@ -532,7 +540,8 @@ bindings = [
 ]
 
 # Whether natural spawning asks the spawn list's hook (natural_spawning.rs:457-459: only with a
-# trait mod on 7e4e421): also where a sector is active.
+# trait mod on 7e4e421): always in the overworld (SoulsCraft's natural spawns, 10-survival.md),
+# and in any dimension where a sector is active.
 [[injection]]
 id = "spawn_hooks"
 target = "horizon_client::game::natural_spawning::<GameLevel<'_,'_> as NaturalLevel>::spawn_hooks"
@@ -543,7 +552,8 @@ bindings = [
   { name = "level", ty = "&crate::game::natural_spawning::GameLevel<'_, '_>", value = "&*self" },
 ]
 
-# A position's possible natural spawns (API 388, native_hooks.rs:6335-6356): a sector's extras.
+# A position's possible natural spawns (API 388, native_hooks.rs:6335-6356): the biome's
+# SoulsCraft mobs (the game for its biome) and a sector's extras.
 [[injection]]
 id = "potential_spawns"
 hook = "potential_spawns"
@@ -551,6 +561,7 @@ hook_version = 1
 kind = "HEAD"
 helper = "hook_potential_spawns.rs"
 bindings = [
+  { name = "game", ty = "&crate::game::Game<'_>", value = "&*self" },
   { name = "dimension", ty = "&str", value = "dimension" },
   { name = "category", ty = "&str", value = "category" },
   { name = "pos", ty = "[i32; 3]", value = "pos" },
@@ -615,4 +626,22 @@ kind = "RETURN"
 helper = "hook_spawner_planned.rs"
 bindings = [
   { name = "value", ty = "HashMap<u32, u32>", value = "$value" },
+]
+
+# ---- The survival slice (docs/design/10-survival.md) ----
+
+# The hardcore guard (owner's decision, round 2): `ServerPlayer.die` for a guest
+# (game/lan_actions.rs:4340, the only death path: death message, drops, death screen; hardcore
+# switches to spectator at the respawn, :4071-4085). At its head a participant of a running
+# event whose health ran out is kept at 1 health, so the body does nothing; soulscraft_event
+# heals them and puts them outside the zone on the next tick. The named `living_death` hook sits
+# behind `mods().is_empty()` there (:4343), so a bundle hears it only at the function.
+[[injection]]
+id = "guest_die"
+target = "horizon_client::game::lan_actions::Game<'_>::guest_die"
+kind = "HEAD"
+helper = "hook_guest_die.rs"
+bindings = [
+  { name = "host", ty = "&mut crate::game::lan::LanHost", value = "&mut *host" },
+  { name = "gi", ty = "usize", value = "gi" },
 ]

@@ -24,3 +24,4 @@ pub mod boost;
 pub mod vanilla;
 pub mod book;
 pub mod book_page;
+pub mod natural;
