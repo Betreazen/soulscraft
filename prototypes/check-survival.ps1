@@ -59,7 +59,7 @@ try {
     C 'sc arena' | Out-Null
     C 'sc clear' | Out-Null
     C 'gamemode creative sc_a' | Out-Null
-    C 'gamerule doDaylightCycle false' | Out-Null
+    C 'gamerule advance_time false' | Out-Null
     C 'time set noon' | Out-Null
 
     if (Scene 'recipes') {
@@ -73,12 +73,14 @@ try {
 
     if (Scene 'shards') {
         C 'kill @e[type=minecraft:item,x=-500,y=101,z=500,distance=..40]' | Out-Null
+        # The bot first: mobs summoned into a chunk nobody holds are gone before the blows land.
+        C "tp sc_a $($ax + 5) $ay $($az - 13)" | Out-Null
+        Start-Sleep -Seconds 3
         $mark = Mark
         for ($i = 0; $i -lt 10; $i++) {
             C "summon soulscraft:revenant $($ax + 0.5 + $i) $ay $($az - 10.5)" | Out-Null
         }
         Start-Sleep -Seconds 2
-        C "tp sc_a $($ax + 5) $ay $($az - 13)" | Out-Null
         for ($i = 0; $i -lt 10; $i++) {
             C "damage @e[type=soulscraft:revenant,limit=1,sort=nearest,x=$($ax + 0.5 + $i),y=$ay,z=$($az - 10.5)] 1000 minecraft:player_attack by sc_a" | Out-Null
             Start-Sleep -Milliseconds 300
@@ -162,7 +164,7 @@ try {
     }
 } finally {
     C 'tick unfreeze' | Out-Null
-    C 'gamerule doDaylightCycle true' | Out-Null
+    C 'gamerule advance_time true' | Out-Null
     C 'sc event stop' | Out-Null
     C 'sc clear' | Out-Null
     Stop-Bot $bot

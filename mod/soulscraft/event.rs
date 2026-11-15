@@ -412,7 +412,9 @@ fn take_spared(game: &mut Game<'_>, dim: &str, now: u64) {
 }
 
 /// A standing spot just outside the event zone, on the side the player was, at the first floor
-/// with two free cells above it (searched from 24 above the altar down).
+/// with two free cells above it: near the altar's height first (down from 24 above the core),
+/// then the rest of the column down to the world's floor and up to its roof (an altar on a cliff
+/// or a platform in the sky). No floor at all (an unloaded chunk reads as air): where they are.
 fn outside_zone(game: &Game<'_>, core: [i32; 3], flow: &Flow, from: V3) -> V3 {
     let c = core_centre(core);
     let (dx, dz) = (from[0] - c[0], from[2] - c[2]);
@@ -421,14 +423,23 @@ fn outside_zone(game: &Game<'_>, core: [i32; 3], flow: &Flow, from: V3) -> V3 {
     // The zone is zone_chunks chunks across round the altar's chunk: half of it plus a margin.
     let reach = f64::from(flow.zone_chunks.max(1)) * 8.0 + 4.0;
     let (x, z) = ((c[0] + ux * reach).floor() as i32, (c[2] + uz * reach).floor() as i32);
-    let free = |y: i32| {
-        let b = game.native_block([x, y, z]);
-        b == "minecraft:air" || b == "minecraft:cave_air"
+    let block = |y: i32| game.native_block([x, y, z]);
+    let free = |y: i32| matches!(block(y).as_str(), "minecraft:air" | "minecraft:cave_air");
+    let floor = |y: i32| {
+        !free(y) && !matches!(block(y).as_str(), "minecraft:lava" | "minecraft:fire" | "minecraft:soul_fire") && free(y + 1) && free(y + 2)
     };
-    let top = core[1] + 24;
-    let y = (core[1] - 24..=top).rev().find(|&y| !free(y) && free(y + 1) && free(y + 2)).map_or(top, |y| y + 1);
-    [f64::from(x) + 0.5, f64::from(y), f64::from(z) + 0.5]
+    let near = (core[1] - 24..=core[1] + 24).rev();
+    let below = (SPARE_MIN_Y..core[1] - 24).rev();
+    let above = core[1] + 25..=SPARE_MAX_Y;
+    match near.chain(below).chain(above).find(|&y| floor(y)) {
+        Some(y) => [f64::from(x) + 0.5, f64::from(y + 1), f64::from(z) + 0.5],
+        None => from,
+    }
 }
+
+/// The overworld's floor and roof (minus the two free cells) for the spared player's landing column.
+const SPARE_MIN_Y: i32 = -64;
+const SPARE_MAX_Y: i32 = 317;
 
 pub(super) fn tick(game: &mut Game<'_>, dim: &str, now: u64) {
     take_spared(game, dim, now);
