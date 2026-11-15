@@ -4,6 +4,8 @@
 
 /// The channel (`mod_id:name`).
 pub const STATE: &str = "soulscraft:state";
+/// LetsCam reads these messages from its replays to label attack phases (integration.md §4.3):
+/// tell its session before changing the format or this number.
 const VERSION: u8 = 1;
 /// Flag bits.
 pub const RAGE: u8 = 1;
