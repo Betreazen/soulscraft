@@ -264,7 +264,10 @@ fn arrange_timing(game: &mut Game<'_>, name: &str, c: &mut Case) -> bool {
         return false;
     };
     let kind = a.only.first().cloned().unwrap_or_else(|| g.types[0].clone());
-    let mut extra = ",Tags:[\"soulscraft.p=0.00\",\"soulscraft.fresh\"]".to_owned();
+    // Facing its golem (south, yaw 0): from a random spawn yaw a blow due 8 ticks after the force
+    // could still be turning and fall outside its arc (a wither skeleton's series missed both
+    // blows once in about twenty runs, 2026-11-15).
+    let mut extra = ",Rotation:[0.0f,0.0f],Tags:[\"soulscraft.p=0.00\",\"soulscraft.fresh\"]".to_owned();
     match kind.as_str() {
         "minecraft:drowned" => extra.push_str(",equipment:{mainhand:{id:\"minecraft:trident\",count:1}}"),
         "minecraft:slime" => extra.push_str(",Size:1"),
