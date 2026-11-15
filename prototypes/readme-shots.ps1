@@ -5,7 +5,10 @@
 # JPEG 1280 wide in docs/images/; the PNGs stay in the scratchpad.
 # Needs the joint server running offline with a client that has this build:
 #   .\joint.ps1 open; .\joint.ps1 serve -Owner "soulscraft session"   (and stop, close after)
+#   -Only lineup,brute,altar,dioramas,book   retake some scenes only
+param([string[]]$Only)
 $ErrorActionPreference = 'Stop'
+function Scene([string]$Name) { -not $Only -or $Only -contains $Name }
 . (Join-Path $PSScriptRoot 'lib\bot.ps1')
 $Out = Join-Path (Split-Path $PSScriptRoot) 'docs\images'
 $Raw = Join-Path $script:Scratch 'readme'
@@ -63,28 +66,38 @@ try {
     C 'clear sc_a'
     C 'weather clear'
     C 'gamerule doDaylightCycle false'
+    C 'gamerule announceAdvancements false'
+    C "kill @e[type=minecraft:item,x=$ax,y=$ay,z=$az,distance=..40]"
     C "fill $($ax - 14) $ay $($az - 14) $($ax + 14) $($ay + 8) $($az + 14) air"
     Start-Sleep -Seconds 1
     Invoke-Bot $bot 'key f1 tap' | Out-Null
 
     # 1. The seven in a row, facing the camera, in the late morning light.
+    if (Scene 'lineup') {
     C 'time set 3000'
     for ($i = 0; $i -lt $Mobs.Count; $i++) {
-        $x = $ax + 0.5 - 7.5 + $i * 2.5
+        $x = $ax + 0.5 + 5.4 - $i * 1.8
         C "summon soulscraft:$($Mobs[$i]) $x $ay $($az + 3.5) {Rotation:[180f,0f],$(Tag $Mobs[$i]),PersistenceRequired:1b,NoAI:1b}"
     }
-    View ($ax + 0.5) ($ay + 2.2) ($az - 8.5) ($ax + 0.5) ($ay + 1.3) ($az + 3.5) 3
+    # The view is ~100° wide (70° high at 16:9): 5 blocks away it holds the 11-block row.
+    View ($ax + 0.5) ($ay + 1.2) ($az - 1.8) ($ax + 0.5) ($ay + 1.0) ($az + 3.5) 3
     Save-Shot $bot 'mobs_lineup'
     C 'sc clear'
+    }
 
     # 2. The brute's overhead swing, frozen in its windup over a still golem, from the side.
+    if (Scene 'brute') {
+    C 'time set 3000'
     C 'tick rate 5'
     C "summon minecraft:iron_golem $($ax + 0.5) $ay $($az + 3.5) {NoAI:1b,Invulnerable:1b,PersistenceRequired:1b}"
     C "summon soulscraft:brute $($ax + 0.5) $ay $($az + 0.5) {Rotation:[0f,0f],$(Tag 'brute'),PersistenceRequired:1b}"
-    View ($ax + 6.0) ($ay + 1.6) ($az - 1.5) ($ax + 0.5) ($ay + 1.8) ($az + 1.5) 1
+    # From its front left, past the golem's side.
+    View ($ax - 3.5) ($ay + 1.4) ($az + 4.0) ($ax + 0.5) ($ay + 1.9) ($az + 0.5) 1
+    $mark = Mark
     C 'sc force overhead_wave'
-    # Windup 8 ticks at 5 a second: frozen near its end, the hammer high.
-    Start-Sleep -Milliseconds 1300
+    # Windup 16 ticks (mobs.json) at 5 a second: frozen 13 ticks after it starts, the maul high.
+    Wait-Log $mark 'soulscraft: phase mob=brute .*attack=overhead_wave phase=windup' 10 | Out-Null
+    Start-Sleep -Milliseconds 2600
     C 'tick freeze'
     Start-Sleep -Seconds 2
     Save-Shot $bot 'brute_overhead_windup'
@@ -92,11 +105,17 @@ try {
     C 'tick rate 20'
     C 'sc clear'
     C "kill @e[type=minecraft:iron_golem,distance=..30,x=$ax,y=$ay,z=$az]"
+    }
 
-    # 3. The altar at dusk: level 4 with banners, the event's first wave draining it.
+    # 3. The altar at sunset: level 4 with banners, the event's first wave draining it. The bot
+    #    must stay a participant (a spectator is not one, and the event waits), so it stands on a
+    #    barrier 9 blocks up, out of the wave's interception reach (6 blocks).
+    if (Scene 'altar') {
     C 'sc altar 4 banners'
-    C 'time set 12600'
-    View ($ax - 9.5) ($ay + 6) ($az - 3.5) ($ax + 0.5) ($ay + 0.5) ($az + 6.5) 1
+    C 'time set 12000'
+    $cam = @(($ax - 5.5), ($ay + 7), ($az + 0.5))
+    C "setblock $([Math]::Floor($cam[0])) $($cam[1]) $([Math]::Floor($cam[2])) minecraft:barrier"
+    View $cam[0] ($cam[1] + 1) $cam[2] ($ax + 0.5) ($ay + 0.5) ($az + 6.5) 1
     $mark = Mark
     C 'sc event start'
     Wait-Log $mark 'soulscraft: event drain' 60 | Out-Null
@@ -105,22 +124,29 @@ try {
     C 'sc event stop'
     C 'sc altar 0'
     C 'sc clear'
+    C "setblock $([Math]::Floor($cam[0])) $($cam[1]) $([Math]::Floor($cam[2])) minecraft:air"
+    C "kill @e[type=minecraft:item,x=$ax,y=$ay,z=$az,distance=..40]"
     C "fill $($ax - 14) $ay $($az - 14) $($ax + 14) $($ay + 8) $($az + 14) air"
+    }
 
     # 4. The dioramas at night on stone pedestals, then the brute's close up.
+    if (Scene 'dioramas') {
+    C "tp sc_a $($ax + 0.5) $ay $($az + 0.5)"
     C 'time set 18000'
     for ($i = 0; $i -lt $Mobs.Count; $i++) {
         $x = $ax - 6 + 2 * $i
         C "setblock $x $ay $($az + 4) minecraft:polished_deepslate"
         C "setblock $x $($ay + 1) $($az + 4) soulscraft:$($Mobs[$i])_trophy[facing=north]"
     }
-    View ($ax + 0.5) ($ay + 2.6) ($az - 2.5) ($ax + 0.5) ($ay + 1.4) ($az + 4.5) 3
+    View ($ax + 0.5) ($ay + 2.3) ($az + 0.6) ($ax + 0.5) ($ay + 1.3) ($az + 4.5) 3
     Save-Shot $bot 'dioramas_night'
     View ($ax + 1.7) ($ay + 2.2) ($az + 2.6) ($ax + 0.5) ($ay + 1.35) ($az + 4.5) 2
     Save-Shot $bot 'diorama_brute_night'
     C "fill $($ax - 7) $ay $($az + 4) $($ax + 7) $($ay + 1) $($az + 4) air"
+    }
 
     # 5. The hunter's book on the brute's page (expert), the HUD back for the GUI.
+    if (Scene 'book') {
     C 'time set 6000'
     Invoke-Bot $bot 'key f1 tap' | Out-Null
     C 'item replace entity sc_a hotbar.0 with soulscraft:hunter_book'
@@ -143,6 +169,7 @@ try {
     Start-Sleep -Seconds 1
     Save-Shot $bot 'book_brute'
     Invoke-Bot $bot 'key esc tap' | Out-Null
+    }
 } finally {
     C 'tick unfreeze'
     C 'tick rate 20'
