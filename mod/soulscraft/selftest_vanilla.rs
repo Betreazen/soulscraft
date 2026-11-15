@@ -229,7 +229,10 @@ fn arrange(game: &mut Game<'_>, name: &str, c: &mut Case) -> bool {
         }
         "vslow_skeleton_pause" => {
             c.golem = golem(game, [0, 0, 10]);
-            c.mobs = summon(game, "minecraft:skeleton", [0, 0, 0], &fresh("0.00")).into_iter().collect();
+            // Its bow in hand whatever a summon gives, and a helmet: the sun burnt the 2026-11-15 run's
+            // skeleton to death before its third arrow.
+            let gear = ",equipment:{mainhand:{id:\"minecraft:bow\",count:1},head:{id:\"minecraft:leather_helmet\",count:1}}";
+            c.mobs = summon(game, "minecraft:skeleton", [0, 0, 0], &format!("{}{gear}", fresh("0.00"))).into_iter().collect();
             c.golem.is_some() && !c.mobs.is_empty()
         }
         "vslow_zombie_flank" => {

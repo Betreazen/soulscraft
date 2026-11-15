@@ -411,6 +411,12 @@ pub struct VBrain {
     forced: Option<usize>,
     shots: u32,
     was_using: bool,
+    /// The last tick held the mob: a draw that ended then was cut by the take-over, not loosed.
+    held: bool,
+    /// The skeleton may back off: at first and after each arrow. Taking it over restarts vanilla's
+    /// bow goal, which walks in for 20 ticks before it shoots, so a retreat on every close tick
+    /// kept it from ever shooting.
+    may_retreat: bool,
     last_high: u64,
     last_hide: u64,
     pending: Option<Want>,
@@ -430,6 +436,8 @@ impl VBrain {
             forced: None,
             shots: 0,
             was_using: false,
+            held: false,
+            may_retreat: true,
             last_high: now,
             last_hide: 0,
             pending: None,
@@ -496,8 +504,9 @@ impl VBrain {
             self.next_decision = s.now + u64::from(decide_every.max(1));
         }
         if self.behavior == Behavior::Archer {
-            if self.was_using && !s.using_item {
+            if self.was_using && !s.using_item && !self.held {
                 self.shots += 1;
+                self.may_retreat = true;
             }
             self.was_using = s.using_item;
         }
@@ -509,6 +518,7 @@ impl VBrain {
         if self.run.is_some() {
             self.advance(def, s, &mut out);
             if self.run.is_some() {
+                self.held = out.control;
                 return out;
             }
         }
@@ -516,6 +526,7 @@ impl VBrain {
         if self.run.is_some() {
             self.advance(def, s, &mut out);
         }
+        self.held = out.control;
         out
     }
 
@@ -939,7 +950,8 @@ impl VBrain {
             }
             _ => {}
         }
-        if d < below {
+        if d < below && self.may_retreat {
+            self.may_retreat = false;
             let until = s.now + def.num("retreat_max_ticks", 30.0) as u64;
             self.set_mode(Mode::Retreat { until }, out);
             out.control = true;

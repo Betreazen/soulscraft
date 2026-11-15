@@ -273,6 +273,28 @@ fn a_skeleton_backs_off_climbs_and_pauses_after_three_arrows() {
 }
 
 #[test]
+fn a_skeleton_backs_off_again_only_after_a_shot() {
+    // Taking a skeleton over stops vanilla's bow goal, which walks in again for its first 20 ticks:
+    // a retreat on every close tick kept it from ever shooting (the vslow self-test, 2026-11-15).
+    let g = group("skeleton");
+    let mut b = VBrain::new(&g, "minecraft:skeleton", 1, 0);
+    assert!(b.tick(&g, 10, &senses(0, 3.0)).control, "the first retreat");
+    assert!(!b.tick(&g, 10, &senses(1, 8.0)).control, "far enough: free");
+    // Close again with no arrow loosed: vanilla's goal keeps it, so it draws and shoots.
+    assert!(!b.tick(&g, 10, &senses(2, 3.0)).control);
+    // A draw cut short by the take-over is not an arrow.
+    let close = |now: u64, using: bool| VSenses { using_item: using, ..senses(now, 3.0) };
+    assert!(!b.tick(&g, 10, &close(3, true)).control);
+    let t = b.tick(&g, 10, &close(4, false));
+    assert_eq!(b.shots(), 1, "released: one arrow");
+    assert!(t.control && t.events.contains(&Event::Mode("retreat")), "an arrow re-arms the retreat");
+    let mut b = VBrain::new(&g, "minecraft:skeleton", 1, 0);
+    b.tick(&g, 10, &VSenses { using_item: true, ..senses(0, 3.0) });
+    b.tick(&g, 10, &senses(1, 3.0));
+    assert_eq!(b.shots(), 0, "the draw the retreat stopped");
+}
+
+#[test]
 fn a_spider_waits_above_and_pounces_when_the_player_passes_under() {
     let g = with("spider", &[("pounce_chance", 0.0)]);
     let mut b = VBrain::new(&g, "minecraft:spider", 1, 0);
