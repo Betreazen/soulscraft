@@ -1,3 +1,34 @@
 {
-  "template": "minecraft:iron_axe"
+  "template": "minecraft:iron_axe",
+  "max_stack_size": 1,
+  "rarity": "rare",
+  "components": {
+    "minecraft:max_damage": 1800,
+    "minecraft:attribute_modifiers": [
+      {
+        "type": "minecraft:attack_damage",
+        "id": "minecraft:base_attack_damage",
+        "amount": 11.0,
+        "operation": "add_value",
+        "slot": "mainhand"
+      },
+      {
+        "type": "minecraft:attack_speed",
+        "id": "minecraft:base_attack_speed",
+        "amount": -3.2,
+        "operation": "add_value",
+        "slot": "mainhand"
+      },
+      {
+        "type": "minecraft:attack_knockback",
+        "id": "soulscraft:brute_maul_knockback",
+        "amount": 1.0,
+        "operation": "add_value",
+        "slot": "mainhand"
+      }
+    ],
+    "minecraft:repairable": {
+      "items": "soulscraft:soul_shard"
+    }
+  }
 }

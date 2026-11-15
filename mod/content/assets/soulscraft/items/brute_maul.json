@@ -1,6 +1,37 @@
 {
   "model": {
-    "type": "minecraft:model",
-    "model": "soulscraft:item/brute_maul"
+    "type": "minecraft:select",
+    "property": "minecraft:display_context",
+    "cases": [
+      {
+        "when": [
+          "gui",
+          "ground",
+          "fixed",
+          "on_shelf"
+        ],
+        "model": {
+          "type": "minecraft:model",
+          "model": "soulscraft:item/brute_maul_sprite"
+        }
+      }
+    ],
+    "fallback": {
+      "type": "minecraft:select",
+      "property": "minecraft:context_entity_type",
+      "cases": [
+        {
+          "when": "minecraft:player",
+          "model": {
+            "type": "minecraft:model",
+            "model": "soulscraft:item/brute_maul_sprite"
+          }
+        }
+      ],
+      "fallback": {
+        "type": "minecraft:model",
+        "model": "soulscraft:item/brute_maul"
+      }
+    }
   }
 }

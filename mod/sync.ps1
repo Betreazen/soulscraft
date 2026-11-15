@@ -62,10 +62,10 @@ foreach ($tag in 'undead', 'inverted_healing_and_harm') {
         (Json ([ordered]@{ replace = $false; values = $undead }))
 }
 
-# The weapons the rigs hold (socket items): declared items, so their models resolve.
-$weapons = [ordered]@{ rusty_sword = 'minecraft:iron_sword'; stalker_sickle = 'minecraft:iron_sword'
-    brute_maul = 'minecraft:iron_axe' }
-$names = @{ rusty_sword = 'Ржавый меч'; stalker_sickle = 'Серп ловчего'; brute_maul = 'Молот громилы' }
+# The weapons the rigs hold (socket items): declared items, so their models resolve. The brute's
+# maul is also the reward of tier 3, so it is declared with the tier rewards further down.
+$weapons = [ordered]@{ rusty_sword = 'minecraft:iron_sword'; stalker_sickle = 'minecraft:iron_sword' }
+$names = @{ rusty_sword = 'Ржавый меч'; stalker_sickle = 'Серп ловчего' }
 foreach ($w in $weapons.Keys) {
     Write-Text (Join-Path $Content "data\soulscraft\horizon\item\$w.json") (Json ([ordered]@{ template = $weapons[$w] }))
     Write-Text (Join-Path $Content "assets\soulscraft\items\$w.json") `
@@ -102,7 +102,10 @@ foreach ($f in Get-ChildItem (Join-Path $Repo 'assets\textures\entity') -Filter 
 Copy-File (Join-Path $Repo 'data\altar.json') (Join-Path $Crate 'data\altar.json')
 Copy-File (Join-Path $Repo 'data\trophies.json') (Join-Path $Crate 'data\trophies.json')
 Copy-File (Join-Path $Repo 'data\book.json') (Join-Path $Crate 'data\book.json')
-$altar = Get-Content -Raw -Encoding utf8 (Join-Path $Repo 'data\altar.json') | ConvertFrom-Json
+# The loot crate (horizon-world's side: chest horns and shards, zombies' Rotten Horn) compiles
+# data/loot.json in (docs/design/11-summons-rewards.md).
+Copy-File (Join-Path $Repo 'data\loot.json') (Join-Path $PSScriptRoot 'soulscraft\loot\data\loot.json')
+$altar =Get-Content -Raw -Encoding utf8 (Join-Path $Repo 'data\altar.json') | ConvertFrom-Json
 $art = Join-Path $Repo 'assets\soulscraft'
 
 # A model's outline in blocks: the box round its elements, inside 0..1.5 (a piece on a slab is
@@ -256,6 +259,60 @@ foreach ($si in $survival.Keys) {
     $lang["item.soulscraft.$si"] = $d[3]
 }
 
+# The tier rewards (docs/design/11-summons-rewards.md, «Предметы ступеней»): two weapons and a
+# talisman, with 26.3 components over their template's. `attribute_modifiers` is a list, as in
+# vanilla 26.3's items.json, and it replaces the template's list, so the weapons list their base
+# damage and speed too (the player's own 1 damage and 4 attacks a second come on top). The
+# weapons are repaired with soul shards. Sprites drawn by assets/models/blocks/rewards.py.
+# id = template, rarity, ru name, en name, components.
+function Modifier([string]$Type, [string]$Id, [double]$Amount, [string]$Slot) {
+    [ordered]@{ type = $Type; id = $Id; amount = $Amount; operation = 'add_value'; slot = $Slot }
+}
+$byShard = [ordered]@{ items = 'soulscraft:soul_shard' }
+$rewards = [ordered]@{
+    revenant_blade = @('minecraft:iron_sword', 'uncommon', 'Клинок латника', "Revenant's Blade", [ordered]@{
+            'minecraft:max_damage' = 1200
+            'minecraft:attribute_modifiers' = @(
+                (Modifier 'minecraft:attack_damage' 'minecraft:base_attack_damage' 6.0 'mainhand'),
+                (Modifier 'minecraft:attack_speed' 'minecraft:base_attack_speed' -2.4 'mainhand'),
+                (Modifier 'minecraft:armor' 'soulscraft:revenant_blade_armor' 2.0 'mainhand'))
+            'minecraft:repairable' = $byShard })
+    brute_maul = @('minecraft:iron_axe', 'rare', 'Молот громилы', "Brute's Maul", [ordered]@{
+            'minecraft:max_damage' = 1800
+            'minecraft:attribute_modifiers' = @(
+                (Modifier 'minecraft:attack_damage' 'minecraft:base_attack_damage' 11.0 'mainhand'),
+                (Modifier 'minecraft:attack_speed' 'minecraft:base_attack_speed' -3.2 'mainhand'),
+                (Modifier 'minecraft:attack_knockback' 'soulscraft:brute_maul_knockback' 1.0 'mainhand'))
+            'minecraft:repairable' = $byShard })
+    abyss_heart = @('minecraft:heart_of_the_sea', 'epic', 'Сердце бездны', 'Abyss Heart', [ordered]@{
+            'minecraft:attribute_modifiers' = @(
+                (Modifier 'minecraft:max_health' 'soulscraft:abyss_heart_health' 4.0 'offhand')) })
+}
+function Item-Model([string]$Model) { [ordered]@{ type = 'minecraft:model'; model = "soulscraft:item/$Model" } }
+# The brute's maul keeps its element model (assets/models/mobs/brute.py) where the brute holds it:
+# the rig draws it with no holder. The player sees the sprite instead, in a slot, on the ground,
+# in a frame and in the hand (the element maul is sized for the brute's fist).
+$maulSprite = Item-Model 'brute_maul_sprite'
+$itemModels = @{
+    brute_maul = [ordered]@{ type = 'minecraft:select'; property = 'minecraft:display_context'
+        cases = @([ordered]@{ when = @('gui', 'ground', 'fixed', 'on_shelf'); model = $maulSprite })
+        fallback = [ordered]@{ type = 'minecraft:select'; property = 'minecraft:context_entity_type'
+            cases = @([ordered]@{ when = 'minecraft:player'; model = $maulSprite })
+            fallback = Item-Model 'brute_maul' } }
+}
+foreach ($ri in $rewards.Keys) {
+    $d = $rewards[$ri]
+    Write-Text (Join-Path $Content "data\soulscraft\horizon\item\$ri.json") `
+        (Json ([ordered]@{ template = $d[0]; max_stack_size = 1; rarity = $d[1]; components = $d[4] }))
+    $model = if ($itemModels.Contains($ri)) { $itemModels[$ri] } else { Item-Model $ri }
+    Write-Text (Join-Path $Content "assets\soulscraft\items\$ri.json") (Json ([ordered]@{ model = $model }))
+    $lang["item.soulscraft.$ri"] = $d[2]
+}
+foreach ($m in 'revenant_blade', 'brute_maul', 'brute_maul_sprite', 'abyss_heart') {
+    Copy-File (Join-Path $art "models\item\$m.json") (Join-Path $Content "assets\soulscraft\models\item\$m.json")
+    Copy-File (Join-Path $art "textures\item\$m.png") (Join-Path $Content "assets\soulscraft\textures\item\$m.png")
+}
+
 # The hunter's book (docs/design/08-guide-book.md, data/book.json `item`): a plain item on paper's
 # template (a book's would be enchantable), drawn with the art's model (assets/models/blocks/altar.py), crafted cheaply from
 # a book and rotten flesh. A right click opens its window (soulscraft_book).
@@ -307,9 +364,10 @@ Shaped 'grave_horn' @('SYS', 'YDY', 'SYS') ([ordered]@{ S = $Shard; Y = 'minecra
 Shaped 'storm_horn' @('RSR', 'DHD', 'RSR') ([ordered]@{ R = 'minecraft:blaze_rod'; S = $Shard; D = 'minecraft:diamond'; H = '#soulscraft:heads' })
 Shaped 'abyss_horn' @('SNS', 'EBE', 'SSS') ([ordered]@{ S = $Shard; N = 'minecraft:netherite_scrap'; E = 'minecraft:ender_pearl'; B = 'soulscraft:brute_head' })
 
-# The creative tab with the altar's blocks, banners, the horns, the shard and the book.
+# The creative tab with the altar's blocks, banners, the horns, the shard, the tier rewards and the book.
 $tabItems = @($blocks.Keys | ForEach-Object { "soulscraft:$_" }) + @('soulscraft:rotten_horn') +
-    @('grave_horn', 'storm_horn', 'abyss_horn', 'soul_shard' | ForEach-Object { "soulscraft:$_" }) + @("soulscraft:$bookItem")
+    @('grave_horn', 'storm_horn', 'abyss_horn', 'soul_shard' | ForEach-Object { "soulscraft:$_" }) +
+    @($rewards.Keys | ForEach-Object { "soulscraft:$_" }) + @("soulscraft:$bookItem")
 Write-Text (Join-Path $Content 'data\soulscraft\horizon\creative_tab\altar.json') `
     (Json ([ordered]@{ title = 'itemGroup.soulscraft.altar'; icon = 'soulscraft:altar_core'; items = $tabItems }))
 $lang['itemGroup.soulscraft.altar'] = 'SoulsCraft: алтарь'
@@ -445,7 +503,6 @@ $en = [ordered]@{}
 foreach ($m in $mobs.mobs) { $en["entity.soulscraft.$($m.id)"] = $enNames[$m.id] }
 $en['item.soulscraft.rusty_sword'] = 'Rusty Sword'
 $en['item.soulscraft.stalker_sickle'] = "Stalker's Sickle"
-$en['item.soulscraft.brute_maul'] = "Brute's Maul"
 $en['effect.soulscraft.bleeding'] = 'Bleeding'
 foreach ($id in $blocks.Keys) {
     $en["block.soulscraft.$id"] = if ($altarEn.Contains($id)) { $altarEn[$id] } else {
@@ -453,6 +510,7 @@ foreach ($id in $blocks.Keys) {
 }
 $en['item.soulscraft.rotten_horn'] = 'Rotten Horn'
 foreach ($si in $survival.Keys) { $en["item.soulscraft.$si"] = $survival[$si][4] }
+foreach ($ri in $rewards.Keys) { $en["item.soulscraft.$ri"] = $rewards[$ri][3] }
 $en["item.soulscraft.$bookItem"] = "Hunter's Book"
 $en['itemGroup.soulscraft.altar'] = 'SoulsCraft: Altar'
 foreach ($k in $enTrophy.Keys) { $en[$k] = $enTrophy[$k] }
