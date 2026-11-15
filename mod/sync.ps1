@@ -236,6 +236,26 @@ Write-Text (Join-Path $Content 'assets\soulscraft\items\rotten_horn.json') `
     (Json ([ordered]@{ model = [ordered]@{ type = 'minecraft:model'; model = 'soulscraft:item/rotten_horn' } }))
 $lang['item.soulscraft.rotten_horn'] = 'Гнилой горн'
 
+# The survival slice (docs/design/10-survival.md): the soul shard, the hunt's currency, on the
+# amethyst shard's template, and the summon horns of tiers 2-4 on the rotten horn's pattern.
+# Drawn by assets/models/blocks/altar.py. id = template, stack, rarity, ru name, en name.
+$survival = [ordered]@{
+    soul_shard = @('minecraft:amethyst_shard', 64, 'common', 'Осколок души', 'Soul Shard')
+    grave_horn = @('minecraft:bone', 16, 'uncommon', 'Горн мертвецов', 'Grave Horn')
+    storm_horn = @('minecraft:bone', 16, 'rare', 'Горн бури', 'Storm Horn')
+    abyss_horn = @('minecraft:bone', 16, 'epic', 'Горн бездны', 'Abyss Horn')
+}
+foreach ($si in $survival.Keys) {
+    $d = $survival[$si]
+    Write-Text (Join-Path $Content "data\soulscraft\horizon\item\$si.json") `
+        (Json ([ordered]@{ template = $d[0]; max_stack_size = $d[1]; rarity = $d[2] }))
+    Copy-File (Join-Path $art "models\item\$si.json") (Join-Path $Content "assets\soulscraft\models\item\$si.json")
+    Copy-File (Join-Path $art "textures\item\$si.png") (Join-Path $Content "assets\soulscraft\textures\item\$si.png")
+    Write-Text (Join-Path $Content "assets\soulscraft\items\$si.json") `
+        (Json ([ordered]@{ model = [ordered]@{ type = 'minecraft:model'; model = "soulscraft:item/$si" } }))
+    $lang["item.soulscraft.$si"] = $d[3]
+}
+
 # The hunter's book (docs/design/08-guide-book.md, data/book.json `item`): a plain item on paper's
 # template (a book's would be enchantable), drawn with the art's model (assets/models/blocks/altar.py), crafted cheaply from
 # a book and rotten flesh. A right click opens its window (soulscraft_book).
@@ -251,8 +271,45 @@ Write-Text (Join-Path $Content "data\soulscraft\recipe\$bookItem.json") `
         ingredients = @('minecraft:book', 'minecraft:rotten_flesh'); result = [ordered]@{ id = "soulscraft:$bookItem"; count = 1 } }))
 $lang["item.soulscraft.$bookItem"] = 'Книга охотника'
 
-# The creative tab with the altar's blocks, banners, the horn and the book.
-$tabItems = @($blocks.Keys | ForEach-Object { "soulscraft:$_" }) + @('soulscraft:rotten_horn', "soulscraft:$bookItem")
+# The recipes of the survival slice (docs/design/10-survival.md, «Рецепты»), vanilla 1.21.2+ JSON.
+# Keys: G deepslate bricks, S soul shard, D diamond, Y gold ingot, and the rest named below.
+function Write-Recipe([string]$Id, $Recipe) {
+    Write-Text (Join-Path $Content "data\soulscraft\recipe\$Id.json") (Json $Recipe)
+}
+function Shaped([string]$Id, [string[]]$Pattern, $Key, [int]$Count = 1, [string]$Category = 'misc') {
+    Write-Recipe $Id ([ordered]@{ type = 'minecraft:crafting_shaped'; category = $Category; pattern = $Pattern; key = $Key
+            result = [ordered]@{ id = "soulscraft:$Id"; count = $Count } })
+}
+function Shapeless([string]$Id, [string[]]$Ingredients) {
+    Write-Recipe $Id ([ordered]@{ type = 'minecraft:crafting_shapeless'; category = 'misc'; ingredients = $Ingredients
+            result = [ordered]@{ id = "soulscraft:$Id"; count = 1 } })
+}
+$Bricks = 'minecraft:deepslate_bricks'; $Shard = 'soulscraft:soul_shard'
+Shaped 'altar_slab' @('GG', 'GG') ([ordered]@{ G = $Bricks }) 4 'building'
+Shaped 'altar_core' @('GSG', 'SDS', 'GSG') ([ordered]@{ G = $Bricks; S = $Shard; D = 'minecraft:diamond' }) 1 'building'
+Shaped 'altar_pedestal' @(' S ', ' G ', 'GGG') ([ordered]@{ S = $Shard; G = $Bricks }) 1 'building'
+Shaped 'altar_socket' @('GSG', 'GGG') ([ordered]@{ G = $Bricks; S = $Shard }) 2 'building'
+Shaped 'altar_pillar' @('G', 'S', 'G') ([ordered]@{ G = $Bricks; S = $Shard }) 2 'building'
+Shaped 'altar_brazier' @('SCS', 'GGG') ([ordered]@{ S = $Shard; C = 'minecraft:soul_campfire'; G = $Bricks }) 1 'building'
+Shaped 'altar_obelisk' @(' O ', 'SAS', 'GGG') ([ordered]@{ O = 'minecraft:crying_obsidian'; S = $Shard; A = 'minecraft:amethyst_shard'; G = $Bricks }) 1 'building'
+# A banner: a white banner, two shards and the emblem of its picture (10-survival.md, the emblem table).
+$emblems = @{ weight = 'minecraft:anvil'; mercy = 'minecraft:golden_apple'; horde = 'minecraft:iron_sword'
+    calm = 'minecraft:clock'; haste = 'minecraft:sugar'; rest = 'minecraft:campfire'; resilience = 'minecraft:shield'
+    kin_undead = 'minecraft:skeleton_skull'; kin_beasts = 'minecraft:bone'; kin_slimes = 'minecraft:slime_ball'
+    kin_flyers = 'minecraft:feather'; kin_water = 'minecraft:cod' }
+foreach ($m in $altar.modifiers) {
+    if (-not $emblems.Contains($m.id)) { throw "mod\sync.ps1: banner $($m.banner) has no emblem for its recipe" }
+    Shapeless $m.banner @('minecraft:white_banner', $Shard, $Shard, $emblems[$m.id])
+}
+Shapeless 'rotten_horn' (@('minecraft:rotten_flesh') * 4 + @('minecraft:iron_ingot') * 4 + @('minecraft:bone'))
+Shaped 'grave_horn' @('SYS', 'YDY', 'SYS') ([ordered]@{ S = $Shard; Y = 'minecraft:gold_ingot'; D = 'minecraft:diamond' })
+# Any SoulsCraft head (the tag below, with the trophies); the event of tier 2 drops them.
+Shaped 'storm_horn' @('RSR', 'DHD', 'RSR') ([ordered]@{ R = 'minecraft:blaze_rod'; S = $Shard; D = 'minecraft:diamond'; H = '#soulscraft:heads' })
+Shaped 'abyss_horn' @('SNS', 'EBE', 'SSS') ([ordered]@{ S = $Shard; N = 'minecraft:netherite_scrap'; E = 'minecraft:ender_pearl'; B = 'soulscraft:brute_head' })
+
+# The creative tab with the altar's blocks, banners, the horns, the shard and the book.
+$tabItems = @($blocks.Keys | ForEach-Object { "soulscraft:$_" }) + @('soulscraft:rotten_horn') +
+    @('grave_horn', 'storm_horn', 'abyss_horn', 'soul_shard' | ForEach-Object { "soulscraft:$_" }) + @("soulscraft:$bookItem")
 Write-Text (Join-Path $Content 'data\soulscraft\horizon\creative_tab\altar.json') `
     (Json ([ordered]@{ title = 'itemGroup.soulscraft.altar'; icon = 'soulscraft:altar_core'; items = $tabItems }))
 $lang['itemGroup.soulscraft.altar'] = 'SoulsCraft: алтарь'
@@ -379,6 +436,9 @@ Write-Text (Join-Path $Content 'data\soulscraft\horizon\creative_tab\trophies.js
     (Json ([ordered]@{ title = 'itemGroup.soulscraft.trophies'; icon = 'soulscraft:revenant_head'; items = $trophyTab }))
 $lang['itemGroup.soulscraft.trophies'] = 'SoulsCraft: трофеи'
 $enTrophy['itemGroup.soulscraft.trophies'] = 'SoulsCraft: Trophies'
+# Every head item, for the storm horn's recipe (10-survival.md, «Рецепты»).
+Write-Text (Join-Path $Content 'data\soulscraft\tags\item\heads.json') `
+    (Json ([ordered]@{ replace = $false; values = @($mobs.mobs | ForEach-Object { "soulscraft:$($_.id)_head" }) }))
 
 Write-Text (Join-Path $Content 'assets\soulscraft\lang\ru_ru.json') (Json $lang)
 $en = [ordered]@{}
@@ -392,6 +452,7 @@ foreach ($id in $blocks.Keys) {
         'Banner of ' + (Get-Culture).TextInfo.ToTitleCase(($id -replace '^banner_', '' -replace '_', ' ')) }
 }
 $en['item.soulscraft.rotten_horn'] = 'Rotten Horn'
+foreach ($si in $survival.Keys) { $en["item.soulscraft.$si"] = $survival[$si][4] }
 $en["item.soulscraft.$bookItem"] = "Hunter's Book"
 $en['itemGroup.soulscraft.altar'] = 'SoulsCraft: Altar'
 foreach ($k in $enTrophy.Keys) { $en[$k] = $enTrophy[$k] }

@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "building",
+  "pattern": [
+    "GSG",
+    "SDS",
+    "GSG"
+  ],
+  "key": {
+    "G": "minecraft:deepslate_bricks",
+    "S": "soulscraft:soul_shard",
+    "D": "minecraft:diamond"
+  },
+  "result": {
+    "id": "soulscraft:altar_core",
+    "count": 1
+  }
+}

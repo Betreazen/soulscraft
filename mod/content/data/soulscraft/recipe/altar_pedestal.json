@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "building",
+  "pattern": [
+    " S ",
+    " G ",
+    "GGG"
+  ],
+  "key": {
+    "S": "soulscraft:soul_shard",
+    "G": "minecraft:deepslate_bricks"
+  },
+  "result": {
+    "id": "soulscraft:altar_pedestal",
+    "count": 1
+  }
+}

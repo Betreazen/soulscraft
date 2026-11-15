@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "building",
+  "pattern": [
+    "SCS",
+    "GGG"
+  ],
+  "key": {
+    "S": "soulscraft:soul_shard",
+    "C": "minecraft:soul_campfire",
+    "G": "minecraft:deepslate_bricks"
+  },
+  "result": {
+    "id": "soulscraft:altar_brazier",
+    "count": 1
+  }
+}

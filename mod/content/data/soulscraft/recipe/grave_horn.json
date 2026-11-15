@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "SYS",
+    "YDY",
+    "SYS"
+  ],
+  "key": {
+    "S": "soulscraft:soul_shard",
+    "Y": "minecraft:gold_ingot",
+    "D": "minecraft:diamond"
+  },
+  "result": {
+    "id": "soulscraft:grave_horn",
+    "count": 1
+  }
+}

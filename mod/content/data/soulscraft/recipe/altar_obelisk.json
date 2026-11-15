@@ -1,0 +1,19 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "building",
+  "pattern": [
+    " O ",
+    "SAS",
+    "GGG"
+  ],
+  "key": {
+    "O": "minecraft:crying_obsidian",
+    "S": "soulscraft:soul_shard",
+    "A": "minecraft:amethyst_shard",
+    "G": "minecraft:deepslate_bricks"
+  },
+  "result": {
+    "id": "soulscraft:altar_obelisk",
+    "count": 1
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "RSR",
+    "DHD",
+    "RSR"
+  ],
+  "key": {
+    "R": "minecraft:blaze_rod",
+    "S": "soulscraft:soul_shard",
+    "D": "minecraft:diamond",
+    "H": "#soulscraft:heads"
+  },
+  "result": {
+    "id": "soulscraft:storm_horn",
+    "count": 1
+  }
+}

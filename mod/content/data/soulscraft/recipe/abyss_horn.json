@@ -1,0 +1,19 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "SNS",
+    "EBE",
+    "SSS"
+  ],
+  "key": {
+    "S": "soulscraft:soul_shard",
+    "N": "minecraft:netherite_scrap",
+    "E": "minecraft:ender_pearl",
+    "B": "soulscraft:brute_head"
+  },
+  "result": {
+    "id": "soulscraft:abyss_horn",
+    "count": 1
+  }
+}

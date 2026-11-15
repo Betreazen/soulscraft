@@ -1,0 +1,14 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    "minecraft:white_banner",
+    "soulscraft:soul_shard",
+    "soulscraft:soul_shard",
+    "minecraft:skeleton_skull"
+  ],
+  "result": {
+    "id": "soulscraft:banner_kin_undead",
+    "count": 1
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    "minecraft:white_banner",
+    "soulscraft:soul_shard",
+    "soulscraft:soul_shard",
+    "minecraft:feather"
+  ],
+  "result": {
+    "id": "soulscraft:banner_kin_flyers",
+    "count": 1
+  }
+}

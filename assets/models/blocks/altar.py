@@ -1,5 +1,6 @@
 """The summoning altar (docs/design/06-altar.md): core, pedestal, slab, socket, pillar, brazier,
-obelisk, the four assembled levels, and the summon item (Rotting Horn) and the hunter's book.
+obelisk, the four assembled levels, the summon items (Rotting Horn and the horns of tiers 2-4),
+the soul shard and the hunter's book.
 
 Theme: ancient weathered stone, warm grey-brown so it stands apart from the cold grey of the
 mobs; bone inlays and dark iron bands; dim soul fire in the cyan of the mobs' eyes. Each ring
@@ -32,6 +33,14 @@ PALETTES = {
     'ash': Material(['#151413', '#1d1b1a', '#262422', '#302d2a', '#3b3734'], noise=0.7, patch=2),
     'leather': ['#2a1b12', '#3b281b', '#4e3524', '#62442e'],
     'paper': ['#8e8366', '#b0a585', '#cbc1a0'],
+    # The survival slice's items (docs/design/10-survival.md): the soul shard and the horns 2-4.
+    'shard': ['#2a6066', '#4a9396', '#7cc4bf', '#aee6dc', '#dcfff6'],
+    'grave_bone': ['#4a4944', '#5f5e58', '#77756d', '#8f8d84', '#a9a69c'],
+    'gold': ['#6b4a0c', '#a8780f', '#d9a920', '#f2d250', '#fff09a'],
+    'horn_dark': ['#16110f', '#241c18', '#33281f', '#45372b', '#58483a'],
+    'blaze': ['#7a2a05', '#b84a0a', '#e8780f', '#ffaa2a', '#ffe07a'],
+    'abyss': ['#110a18', '#1d1028', '#2c1a3b', '#3f2757', '#563a76'],
+    'netherite': ['#2b2629', '#3e3639', '#554b4e', '#6d6265', '#8a7f80'],
 }
 SOUL = ('soul', 3)
 SOUL_CORE = ('soul', 4)
@@ -472,35 +481,119 @@ def obelisk_icon(c):
     c.edge('#141211')
 
 
+# The horn's outline, shared by the four horns (the tiers differ by material, not by shape):
+# o outline, h highlight, b body, d shadow, r stain at the bell, m the mouth, i the two bands.
+HORN_ROWS = ["..........ooooo.",
+             ".........ohhhbbo",
+             "........ohbmmmbo",
+             "........ohmmmmdo",
+             "........obmmmrdo",
+             ".......oobbrrdo.",
+             "......ohbbbrdo..",
+             ".....oiiiibdo...",
+             "....ohbbbiio....",
+             "...ohbbbdo......",
+             "..ohbbbdo.......",
+             ".oiiiido........",
+             ".ohbbdo.........",
+             ".obbdo..........",
+             ".oddo...........",
+             "..oo............"]
+HORN_BAND_GLINTS = ((8, 7), (3, 11))     # the lit texel of each band
+HORN_BAND_SHADES = ((9, 8), (5, 11))     # the shaded texel of each band
+HORN_MOUTH_GLOW = ((11, 2), (12, 3), (10, 3), (11, 4))
+
+
 def horn_sprite(c):
     """Гнилой горн: a bone war horn curling up from the mouthpiece (bottom left) to a wide
     flared bell (top right) whose dark mouth faces the viewer; rot creeps from the bell as a
     green-brown stain; two iron bands and a leather strap between them."""
-    c.rows(["..........ooooo.",
-            ".........ohhhbbo",
-            "........ohbmmmbo",
-            "........ohmmmmdo",
-            "........obmmmrdo",
-            ".......oobbrrdo.",
-            "......ohbbbrdo..",
-            ".....oiiiibdo...",
-            "....ohbbbiio....",
-            "...ohbbbdo......",
-            "..ohbbbdo.......",
-            ".oiiiido........",
-            ".ohbbdo.........",
-            ".obbdo..........",
-            ".oddo...........",
-            "..oo............"],
+    c.rows(HORN_ROWS,
            {'o': '#1a1411', 'h': ('bone', 4), 'b': ('bone', 2), 'd': ('bone', 0),
             'r': '#55603a', 'm': '#20170f', 'i': ('iron', 2)})
     c.px(12, 3, '#2e2316')
     c.px(13, 4, '#4a4e2c')
-    c.px(8, 7, ('iron', 4))
-    c.px(3, 11, ('iron', 4))
+    for x, y in HORN_BAND_GLINTS:
+        c.px(x, y, ('iron', 4))
     for x, y in ((6, 9), (7, 10), (8, 10), (9, 9)):
         if not c.solid(x, y):
             c.px(x, y, ('leather', 2))
+
+
+def grave_horn_sprite(c):
+    """Горн мертвецов (tier 2): the same horn in old grey bone, cracked by weather, grave dirt
+    in the bell, bound with two gold bands."""
+    c.rows(HORN_ROWS,
+           {'o': '#161514', 'h': ('grave_bone', 4), 'b': ('grave_bone', 2), 'd': ('grave_bone', 0),
+            'r': '#3e3a30', 'm': '#121110', 'i': ('gold', 2)})
+    for x, y in ((5, 10), (6, 9), (4, 12)):              # hairline cracks in the bone
+        c.px(x, y, ('grave_bone', 0))
+    c.px(10, 1, ('grave_bone', 3))
+    for x, y in HORN_BAND_GLINTS:
+        c.px(x, y, ('gold', 4))
+    for x, y in HORN_BAND_SHADES:
+        c.px(x, y, ('gold', 0))
+    c.px(6, 7, ('gold', 3))
+    c.px(2, 11, ('gold', 3))
+
+
+def storm_horn_sprite(c):
+    """Горн бури (tier 3): a dark horn with blaze-orange bands; its mouth crackles with embers,
+    fire cracks run down the bell and two sparks fly from it."""
+    c.rows(HORN_ROWS,
+           {'o': '#0d0907', 'h': ('horn_dark', 4), 'b': ('horn_dark', 2), 'd': ('horn_dark', 0),
+            'r': ('blaze', 1), 'm': ('blaze', 0), 'i': ('blaze', 2)})
+    for x, y in HORN_MOUTH_GLOW:
+        c.px(x, y, ('blaze', 2))
+    c.px(12, 2, ('blaze', 4))
+    c.px(11, 3, ('blaze', 3))
+    for x, y in HORN_BAND_GLINTS:
+        c.px(x, y, ('blaze', 4))
+    for x, y in HORN_BAND_SHADES:
+        c.px(x, y, ('blaze', 1))
+    c.px(15, 6, ('blaze', 4))                            # sparks
+    c.px(14, 8, ('blaze', 3))
+
+
+def abyss_horn_sprite(c):
+    """Горн бездны (tier 4): a black-purple horn with netherite bands; its mouth holds the teal
+    glow of soul fire, and soul veins creep down the bell."""
+    c.rows(HORN_ROWS,
+           {'o': '#07040a', 'h': ('abyss', 4), 'b': ('abyss', 2), 'd': ('abyss', 0),
+            'r': SOUL_DIM, 'm': SOUL_DIM, 'i': ('netherite', 2)})
+    for x, y in HORN_MOUTH_GLOW:
+        c.px(x, y, SOUL)
+    c.px(12, 2, SOUL_CORE)
+    c.px(11, 3, SOUL_CORE)
+    for x, y in HORN_BAND_GLINTS:
+        c.px(x, y, ('netherite', 4))
+    for x, y in HORN_BAND_SHADES:
+        c.px(x, y, ('netherite', 0))
+
+
+def soul_shard_sprite(c):
+    """Осколок души: a jagged pale-teal crystal shard pointing to the top right, a smaller chip
+    beside its base, and a faint soul glow in its heart."""
+    c.rows(["................",
+            "..........oo....",
+            ".........ohlo...",
+            "........ohllbo..",
+            "........ohlcbo..",
+            ".......ohlccbdo.",
+            ".......ohlccbo..",
+            "......ohlccbdo..",
+            ".....ohlccbdo...",
+            ".....ohcbbdo....",
+            "....ohcbbdo..oo.",
+            "....ohbbddo.ohlo",
+            "...ohbbddo..obdo",
+            "...obddoo....oo.",
+            "....ooo.........",
+            "................"],
+           {'o': '#0f2f33', 'h': ('shard', 4), 'l': ('shard', 3), 'c': SOUL, 'b': ('shard', 2),
+            'd': ('shard', 1)})
+    for x, y in ((10, 6), (9, 7)):                       # the brightest point of the glow
+        c.px(x, y, SOUL_CORE)
 
 
 def book_sprite(c):
@@ -529,6 +622,10 @@ SPRITES = [
     Sprite('altar_pillar', pillar_icon, palettes=PALETTES, name='Колонна алтаря'),
     Sprite('altar_obelisk', obelisk_icon, palettes=PALETTES, name='Обелиск'),
     Sprite('rotten_horn', horn_sprite, palettes=PALETTES, name='Гнилой горн'),
+    Sprite('grave_horn', grave_horn_sprite, palettes=PALETTES, name='Горн мертвецов'),
+    Sprite('storm_horn', storm_horn_sprite, palettes=PALETTES, name='Горн бури'),
+    Sprite('abyss_horn', abyss_horn_sprite, palettes=PALETTES, name='Горн бездны'),
+    Sprite('soul_shard', soul_shard_sprite, palettes=PALETTES, name='Осколок души'),
     Sprite('hunter_book', book_sprite, palettes=PALETTES, name='Книга охотника'),
 ]
 ICONS = {s.id: s for s in SPRITES}

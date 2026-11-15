@@ -1,0 +1,12 @@
+{
+  "replace": false,
+  "values": [
+    "soulscraft:revenant_head",
+    "soulscraft:stalker_head",
+    "soulscraft:marksman_head",
+    "soulscraft:brute_head",
+    "soulscraft:shrike_head",
+    "soulscraft:lurker_head",
+    "soulscraft:bog_slime_head"
+  ]
+}
