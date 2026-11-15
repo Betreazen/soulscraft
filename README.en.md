@@ -26,7 +26,9 @@ SoulsCraft adds enemies you read rather than out-click. Every attack has a windu
 - **Seven new mobs.** A shielded revenant, a stalker with sickles, a bone marksman, a brute with a stone maul, a shrike, a deep lurker and a bog slime. Each has its own model, animations, held weapon and a hitbox that fits the model.
 - **Vanilla mobs learn too.** The zombie lunges, the spider pounces, the vindicator brings an overhead down, the witch winds up a potion: 19 vanilla types get moves with the same honest windup. Their models and the rest of their behaviour stay vanilla.
 - **Enemies grow with you.** Enemy strength follows the players nearby: their armour, weapons and, with [Path-of-craft-tree](https://github.com/Betreazen/path-of-craft-tree) installed, their skill-tree levels.
-- **The summoning altar.** A build of up to 9 × 9 from a core, slabs, pillars, braziers and obelisks. Levels 1–4 come from its rings and an open sky. The Rotten Horn on the pedestal starts an event: waves walk to the altar from spawn points shown in advance and drain its power. Hold the altar until the waves run out.
+- **The mobs live in the world.** At night and in their biomes SoulsCraft's mobs come by themselves: the revenant wherever zombies spawn, the stalker in forests, the shrike high in the mountains, the lurker in the deep ocean. A mob you kill sometimes drops a **soul shard**, which the altar is built from.
+- **The summoning altar.** A build of up to 9 × 9 from a core, slabs, pillars, braziers and obelisks. Levels 1–4 come from its rings and an open sky. A horn on the pedestal starts an event: waves walk to the altar from spawn points shown in advance and drain its power. Hold the altar until the waves run out.
+- **Four tiers of events.** The Rotten Horn calls zombies, the Grave Horn the Night of the Dead, the Storm Horn the Claw Storm, the Abyss Horn the Last Stand: eight waves with three brutes. A head from one tier's event goes into the next tier's horn.
 - **12 banner modifiers.** Weight and mercy, horde and calm, haste and rest, resilience and five kin banners. They change the enemies' strength, number and kind, the rests between waves and the reward.
 - **Trophies.** A win brings mob heads (on the floor, on a wall or on your head), pieces of their armour and, on a level-three altar, a diorama: a piece of the mob's home on a plinth, the mob in its trophy pose, its own light and particles. The brass plaque shows the mob's name, the trophy's owner and how many of them they have killed.
 - **The hunter's book.** Entries open as you meet and kill: met, killed, studied, expert. The book plays the mob's live model through its attacks, and a phase strip shows when to strike.
@@ -59,7 +61,7 @@ SoulsCraft adds enemies you read rather than out-click. Every attack has a windu
 | **Revenant** | shielded duellist | the surface at night | thrust, slash, held overhead, shield bash |
 | **Stalker** | fast skirmisher | forests, taiga, jungle | double sickle slash with bleeding, dash lunge |
 | **Bone marksman** | archer | plains, badlands, mountains | aimed shot, stock strike |
-| **Brute** | heavy elite | mountains, caves, events | wide swing, overhead slam with a shockwave, charge |
+| **Brute** | heavy elite | mountain peaks, caves, events | wide swing, overhead slam with a shockwave, charge |
 | **Shrike** | diving hunter | mountains, windswept hills, at night | dive |
 | **Deep lurker** | ambush predator | deep ocean below Y 40 | ambush lunge, grab |
 | **Bog slime** | area damage, splits | swamps | high jump |
@@ -71,13 +73,14 @@ Vanilla moves: the zombie's lunge and the drowned's trident throw, the spider's 
 | What | How |
 | --- | --- |
 | Hunter's book | shapeless recipe: a book and rotten flesh; right-click opens it |
-| Start an event | the Rotten Horn on a finished altar's pedestal, right-click |
+| First altar | hunt soul shards at night, then craft a core, a pedestal and 8 slabs from deepslate bricks: a level-1 altar |
+| Start an event | a horn of its tier on the altar's pedestal, right-click; the altar's level must be at least the horn's tier |
 | Altar menu | right-click the core with an empty hand: level, banners, spawn boost |
 | Extend the altar | hold an altar block: a ghost shows where the next ring goes |
 | Survive an attack | the windup has a pose and a sound: step away or raise a shield, then strike in the recovery |
+| Dying in an event | never kills you, not even in hardcore: the altar carries you out of the zone at 1 health and heals you, and you keep your items |
 
-> [!NOTE]
-> This is an early version. Altar blocks, banners and the Rotten Horn come from creative mode or `/give` for now; recipes follow the playtest. Every balance number is a hypothesis the playtest will check.
+Every recipe is in the game's recipe book and in the [slice spec](docs/design/10-survival.md) (Russian). Every balance number is a hypothesis the playtest will check.
 
 ## Install
 
