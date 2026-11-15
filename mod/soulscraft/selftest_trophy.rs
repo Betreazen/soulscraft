@@ -41,7 +41,7 @@ pub(super) fn step(game: &mut Game<'_>, now: u64, t: u64, name: &str, c: &mut Ca
         "trophy_wall_head" => wall_head(game, t),
         "trophy_owner" => owner(game, t),
         "natural_lists" => natural_lists(game, t),
-        "chest_loot" => chest_loot(game, t),
+        "chest_loot" => chest_loot(game, t, c),
         "trophy_particles" => particles(game, t, c),
         "reward_seeded_win" => seeded_win(game, now, t, c),
         "kin_wave" => kin_wave(game, now, t, c),
@@ -464,25 +464,39 @@ const CHEST_SPOT: [i32; 3] = [-14, 1, 14];
 /// The loot tables as the server loaded them (11-summons-rewards.md, Г17): a woodland mansion's
 /// chest rolled 40 times gives Storm Horns (25% a chest) and soul shards (50%), and no horn of
 /// another tier. The chance of no horn at all in 40 rolls is 0.75^40, about 1e-5.
-fn chest_loot(game: &mut Game<'_>, t: u64) -> Option<Result<(), String>> {
+fn chest_loot(game: &mut Game<'_>, t: u64, c: &mut Case) -> Option<Result<(), String>> {
     let p = at(CHEST_SPOT);
     if t == 1 {
+        // The items the commands said they dropped, to tell a missing hook from items gone astray.
+        let mut dropped = 0;
         for _ in 0..CHEST_ROLLS {
-            game.native_run_command(&format!("loot spawn {} {} {} loot minecraft:chests/woodland_mansion", p[0], p[1] + 1, p[2]));
+            let line = format!("loot spawn {} {} {} loot minecraft:chests/woodland_mansion", p[0], p[1] + 1, p[2]);
+            dropped += game.native_run_command_captured(&line).result.max(0) as u32;
         }
+        c.count = dropped;
         return None;
     }
     if t < 5 {
         return None;
     }
-    let count = |item: &str| items_near(game, CHEST_SPOT, item, 6.0);
+    // Everything in a tall column over the spot, whatever floor caught it.
+    let at_spot = crate::game::soulscraft_selftest_altar::centre(p);
+    let near = game.native_item_entities(DIM, [at_spot[0] - 6.0, at_spot[1] - 40.0, at_spot[2] - 6.0], [at_spot[0] + 6.0, at_spot[1] + 6.0, at_spot[2] + 6.0]);
+    let count = |item: &str| near.iter().filter(|e| &*e.stack.item == item).map(|e| e.stack.count).sum::<u32>();
     let storm = count("soulscraft:storm_horn");
     let shards = count("soulscraft:soul_shard");
     let others: u32 = ["soulscraft:rotten_horn", "soulscraft:grave_horn", "soulscraft:abyss_horn"].iter().map(|i| count(i)).sum();
-    game.native_run_command(&format!("kill @e[type=minecraft:item,x={},y={},z={},distance=..8]", p[0], p[1], p[2]));
+    let mut kinds: Vec<String> = near.iter().map(|e| e.stack.item.to_string()).collect();
+    kinds.sort();
+    kinds.dedup();
+    game.native_run_command(&format!("kill @e[type=minecraft:item,x={},y={},z={},distance=..40]", p[0], p[1], p[2]));
     Some(if storm > 0 && shards > 0 && others == 0 && storm <= CHEST_ROLLS {
         Ok(())
     } else {
-        Err(format!("{CHEST_ROLLS} mansion chests: storm horns {storm}, shards {shards}, other horns {others}"))
+        Err(format!(
+            "{CHEST_ROLLS} mansion chests ({} items said dropped, {} entities found): storm horns {storm}, shards {shards}, other horns {others}; kinds {kinds:?}",
+            c.count,
+            near.len()
+        ))
     })
 }

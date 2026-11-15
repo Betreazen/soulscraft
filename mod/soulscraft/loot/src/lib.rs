@@ -90,7 +90,7 @@ impl LootFile {
             }
         }
         for k in self.killed_by_player.iter().filter(|k| k.tables.iter().any(|t| t == id)) {
-            let conditions = json!([{ "condition": "minecraft:killed_by_player" }, { "condition": "minecraft:random_chance", "chance": k.chance }]);
+            let conditions = json!([{ "type": "minecraft:killed_by_player" }, { "type": "minecraft:random_chance", "chance": k.chance }]);
             out.push(pool(&k.item, conditions, None));
         }
         out
@@ -98,16 +98,18 @@ impl LootFile {
 }
 
 fn chance_condition(chance: f64) -> Value {
-    json!([{ "condition": "minecraft:random_chance", "chance": chance }])
+    json!([{ "type": "minecraft:random_chance", "chance": chance }])
 }
 
-/// One roll of one item under `conditions`, with a count when given.
+/// One roll of one item under `conditions`, with a count when given. In the 26.3 shape Horizon's
+/// loot reads (horizon-world/src/loot.rs `table_raw`, data/minecraft/loot_table): `condition` and
+/// `modifier` with a `type` each, `rolls` a whole number (`1.0` would roll nothing).
 fn pool(item: &str, conditions: Value, count: Option<Value>) -> Value {
     let mut entry = json!({ "type": "minecraft:item", "name": item });
     if let Some(count) = count {
-        entry["functions"] = json!([{ "function": "minecraft:set_count", "count": count }]);
+        entry["modifier"] = json!([{ "type": "minecraft:set_count", "count": count }]);
     }
-    json!({ "rolls": 1.0, "bonus_rolls": 0.0, "conditions": conditions, "entries": [entry] })
+    json!({ "rolls": 1, "condition": conditions, "entries": [entry] })
 }
 
 /// Adds the file's pools to the table `id` as it loads. The table's own pools stay as they are;
@@ -160,9 +162,11 @@ mod tests {
         let pools = table["pools"].as_array().unwrap();
         assert_eq!(pools.len(), 3);
         assert_eq!(pools[1]["entries"][0]["name"], "soulscraft:rotten_horn");
-        assert_eq!(pools[1]["conditions"][0]["chance"], 0.25);
+        assert_eq!(pools[1]["condition"][0]["chance"], 0.25);
+        assert_eq!(pools[1]["rolls"], 1);
         assert_eq!(pools[2]["entries"][0]["name"], "soulscraft:soul_shard");
-        assert_eq!(pools[2]["entries"][0]["functions"][0]["count"]["max"], 4);
+        assert_eq!(pools[2]["entries"][0]["modifier"][0]["type"], "minecraft:set_count");
+        assert_eq!(pools[2]["entries"][0]["modifier"][0]["count"]["max"], 4);
         assert_eq!(table["random_sequence"], "minecraft:chests/simple_dungeon");
     }
 
@@ -172,8 +176,9 @@ mod tests {
         apply("minecraft:entities/husk", &mut table);
         let p = &table["pools"][0];
         assert_eq!(p["entries"][0]["name"], "soulscraft:rotten_horn");
-        assert_eq!(p["conditions"][0]["condition"], "minecraft:killed_by_player");
-        assert_eq!(p["conditions"][1]["chance"], 0.005);
+        assert_eq!(p["condition"][0]["type"], "minecraft:killed_by_player");
+        assert_eq!(p["condition"][1]["type"], "minecraft:random_chance");
+        assert_eq!(p["condition"][1]["chance"], 0.005);
     }
 
     #[test]
@@ -195,5 +200,19 @@ mod tests {
         assert!(bad.pools("minecraft:chests/ancient_city").is_empty());
         let wrong = LootFile::parse(r#"{"chests":[{"table":"minecraft:chests/x","item":"a","chance":3.0}]}"#);
         assert!(wrong.chests.is_empty());
+    }
+
+    #[test]
+    fn pools_use_the_26_3_shape_horizon_reads() {
+        let f = LootFile::embedded();
+        for id in ["minecraft:chests/woodland_mansion", "minecraft:entities/zombie"] {
+            let text = serde_json::to_string(&f.pools(id)).unwrap();
+            for old in ["\"conditions\"", "\"functions\"", "\"function\"", "\"condition\":\"minecraft:", "\"bonus_rolls\"", "1.0,\"entries\""] {
+                assert!(!text.contains(old), "{id}: {old} in {text}");
+            }
+            for p in f.pools(id) {
+                assert!(p["rolls"].is_u64(), "{id}: rolls {}", p["rolls"]);
+            }
+        }
     }
 }
