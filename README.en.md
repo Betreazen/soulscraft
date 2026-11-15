@@ -31,7 +31,7 @@ SoulsCraft adds enemies you read rather than out-click. Every attack has a windu
 - **Trophies.** A win brings mob heads (on the floor, on a wall or on your head), pieces of their armour and, on a level-three altar, a diorama: a piece of the mob's home on a plinth, the mob in its trophy pose, its own light and particles. The brass plaque shows the mob's name and how many of them you have killed.
 - **The hunter's book.** Entries open as you meet and kill: met, killed, studied, expert. The book plays the mob's live model through its attacks, and a phase strip shows when to strike.
 - **More spawns round the altar.** At night monsters of other biomes and SoulsCraft mobs come near an altar.
-- **Plays well with other mods.** Enemy strength reads the Path-of-craft-tree tree, and RustCraft turret kills count in their owner's book. The `soulscraft:bleeding` effect is shared by both mods.
+- **Plays well with other mods.** Enemy strength reads the Path-of-craft-tree tree, and kills by RustCraft turrets and guards count in their owner's book. The `soulscraft:bleeding` effect is shared by both mods.
 
 <table>
 <tr>
