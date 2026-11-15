@@ -1,0 +1,41 @@
+survival checks: run 1 2026-11-15T22:51:58 (recipes, events, natural), run 2 2026-11-15T23:29:03 (shards and hardcore after the fixes adf924a)
+== recipes (recipe give)
+  altar_slab -> Unlocked 1 recipe(s) for sc_a
+  altar_core -> Unlocked 1 recipe(s) for sc_a
+  altar_pedestal -> Unlocked 1 recipe(s) for sc_a
+  altar_socket -> Unlocked 1 recipe(s) for sc_a
+  altar_pillar -> Unlocked 1 recipe(s) for sc_a
+  altar_brazier -> Unlocked 1 recipe(s) for sc_a
+  altar_obelisk -> Unlocked 1 recipe(s) for sc_a
+  banner_weight -> Unlocked 1 recipe(s) for sc_a
+  banner_mercy -> Unlocked 1 recipe(s) for sc_a
+  banner_horde -> Unlocked 1 recipe(s) for sc_a
+  banner_calm -> Unlocked 1 recipe(s) for sc_a
+  banner_haste -> Unlocked 1 recipe(s) for sc_a
+  banner_rest -> Unlocked 1 recipe(s) for sc_a
+  banner_resilience -> Unlocked 1 recipe(s) for sc_a
+  banner_kin_undead -> Unlocked 1 recipe(s) for sc_a
+  banner_kin_beasts -> Unlocked 1 recipe(s) for sc_a
+  banner_kin_slimes -> Unlocked 1 recipe(s) for sc_a
+  banner_kin_flyers -> Unlocked 1 recipe(s) for sc_a
+  banner_kin_water -> Unlocked 1 recipe(s) for sc_a
+  rotten_horn -> Unlocked 1 recipe(s) for sc_a
+  grave_horn -> Unlocked 1 recipe(s) for sc_a
+  storm_horn -> Unlocked 1 recipe(s) for sc_a
+  abyss_horn -> Unlocked 1 recipe(s) for sc_a
+  hunter_book -> Unlocked 1 recipe(s) for sc_a
+== grave_night: level 1 starts 0, level 2 starts 1
+  soulscraft: event start core=-500,101,506 event=grave_night level=2 power=0.15 banners=[weight,horde] waves=6 hp=300 tick=12875
+== claw_storm: level 2 starts 0, level 3 starts 1
+  soulscraft: event start core=-500,101,506 event=claw_storm level=3 power=0.15 banners=[weight,horde,kin_undead,resilience] waves=7 hp=600 tick=13262
+== last_stand: level 3 starts 0, level 4 starts 1
+  soulscraft: event start core=-500,101,506 event=last_stand level=4 power=0.15 banners=[weight,horde,kin_undead,resilience,haste,kin_slimes,kin_flyers,kin_water] waves=8 hp=750 tick=13481
+== natural: 1 SoulsCraft mob adopted in 90 s on the flat world at night (plains), lurkers 0 (no deep ocean on the bench)
+  soulscraft: adopt mob=marksman id=211 p=0.01 size=0 fresh=false health=20.0 tick=14426
+== shards: 10 credited kills, 2 drops
+  soulscraft: shard drop mob=revenant count=1 at=-494,101,496
+  soulscraft: shard drop mob=revenant count=1 at=-490,101,495
+== hardcore guard
+  soulscraft: event spared player=sc_a to=-500,-60,478 tick=5989
+  soulscraft: event spared player=sc_a to=-500,-60,478
+  bot: health 20 creative  screen playing at -499,5,-60,478,5
