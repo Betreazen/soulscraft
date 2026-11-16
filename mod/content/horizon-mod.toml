@@ -4,7 +4,7 @@
 # Same id as the native bundle (../soulscraft), which drives and draws the mobs.
 id = "soulscraft"
 name = "SoulsCraft"
-version = "0.6.0"
+version = "0.6.1"
 description = "Resources of the SoulsCraft native mod: souls-like enemies (revenant, stalker, marksman, brute, shrike, lurker, bog slime), their rigs, weapons and the shared bleeding effect."
 authors = ["SoulsCraft"]
 api = "0.2"
