@@ -31,6 +31,7 @@ cd "C:\Claude code projects\horizon-joint-dev"
 .\prototypes\check-book.ps1                  # книга охотника в окне: evidence\book\
 .\prototypes\check-round11.ps1 -Parts heads  # надетые головы, камера — второй бот sc_b: evidence\round11\
 .\prototypes\check-vanilla.ps1               # замахи ванильных мобов через /sc force: evidence\vanilla\
+.\prototypes\check-final.ps1 -Only brute_wave,record  # 0.7.0: 11 сцен (латник … ивент, запись LetsCam), без -Only все: evidence\final\
 .\prototypes\tune.ps1                        # числа из data/mobs.json на живой сервер (/sc reload)
 .\prototypes\p5-world.ps1 init               # П5: свой сервер и мир без естественного спавна (раз)
 .\prototypes\p5-bench.ps1                    # П5, только на тихом ПК; heavy.lock берёт сам
