@@ -61,24 +61,39 @@ pub fn exposed(eye: V3, threats: &[Threat], sight: &impl Fn(V3, V3) -> bool) -> 
 /// The nearest of `spots` (where the mob's feet would stand) that no threat sees, the mob's eyes
 /// `eye_height` over its feet. None when every spot is seen.
 pub fn nearest_cover(from: V3, spots: &[V3], eye_height: f64, threats: &[Threat], sight: &impl Fn(V3, V3) -> bool) -> Option<V3> {
-    nearest_cover_at(from, spots, &[eye_height], threats, sight)
+    nearest_cover_at(from, spots, &[[0.0, eye_height, 0.0]], threats, sight)
 }
 
-/// [`nearest_cover`] that hides every one of `heights` over the mob's feet, not only its eyes.
-pub fn nearest_cover_at(from: V3, spots: &[V3], heights: &[f64], threats: &[Threat], sight: &impl Fn(V3, V3) -> bool) -> Option<V3> {
+/// [`nearest_cover`] that hides every one of `points` (offsets from the mob's feet), not only its
+/// eyes.
+pub fn nearest_cover_at(from: V3, spots: &[V3], points: &[V3], threats: &[Threat], sight: &impl Fn(V3, V3) -> bool) -> Option<V3> {
     let mut sorted: Vec<V3> = spots.to_vec();
     sorted.sort_by(|a, b| geom::dist(*a, from).total_cmp(&geom::dist(*b, from)));
     sorted
         .into_iter()
-        .find(|s| heights.iter().all(|h| !exposed(geom::add(*s, [0.0, *h, 0.0]), threats, sight)))
+        .find(|s| points.iter().all(|p| !exposed(geom::add(*s, *p), threats, sight)))
 }
 
+/// A mob walks to cover at this times its speed (from turrets, and the marksman to its reload).
+pub const COVER_SPEED: f64 = 1.2;
+
+/// A walk ends this far from where it was sent at most: vanilla's path is done within
+/// `maxDistanceToWaypoint` (0.75 − width / 2 for a box under 0.75 wide) of its last node.
+pub const ARRIVAL_SLACK: f64 = 0.45;
+
 /// The marksman's reload (04-bestiary.md): the nearest of `spots` its target, whose eyes are at
-/// `target_eye`, cannot see, at every one of `heights` (its eyes, `cover_min_height_blocks`). The
-/// target is the threat here, at any range. None: no cover, it steps back instead.
+/// `target_eye`, cannot see, at every one of `heights` (its eyes, `cover_min_height_blocks`), and
+/// wherever within [`ARRIVAL_SLACK`] of the spot its walk ends (the corners of that square: a
+/// wall's shadow is convex). The target is the threat here, at any range. None: no cover, it steps
+/// back instead.
 pub fn reload_cover(from: V3, spots: &[V3], heights: &[f64], target_eye: V3, sight: &impl Fn(V3, V3) -> bool) -> Option<V3> {
     let threat = [Threat { pos: target_eye, range: f64::INFINITY }];
-    nearest_cover_at(from, spots, heights, &threat, sight)
+    let s = ARRIVAL_SLACK;
+    let points: Vec<V3> = heights
+        .iter()
+        .flat_map(|h| [[-s, *h, -s], [s, *h, -s], [-s, *h, s], [s, *h, s]])
+        .collect();
+    nearest_cover_at(from, spots, &points, &threat, sight)
 }
 
 /// A straight look from `from` to `to` that no solid cell cuts, sampled every quarter block and

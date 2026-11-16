@@ -96,7 +96,7 @@ pub(super) fn steer(game: &mut Game<'_>, dim: &str, now: u64, id: u32, pos: V3, 
         }
         if now < s.next_check {
             if s.until.is_none() && now.saturating_sub(s.walked) >= REPATH {
-                game.native_mob_navigate(dim, id, spot, 0, 1.2);
+                game.native_mob_navigate(dim, id, spot, 0, cover::COVER_SPEED);
                 s.walked = now;
             }
             states().insert(id, s);
@@ -134,7 +134,7 @@ pub(super) fn steer(game: &mut Game<'_>, dim: &str, now: u64, id: u32, pos: V3, 
                     spot[2]
                 );
             }
-            game.native_mob_navigate(dim, id, spot, 0, 1.2);
+            game.native_mob_navigate(dim, id, spot, 0, cover::COVER_SPEED);
             s.spot = Some(spot);
             s.until = None;
             s.walked = now;

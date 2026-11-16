@@ -346,7 +346,12 @@ fn marksman_reloads_behind_cover() {
         .collect();
     let from = [0.5, 0.0, 0.5];
     let spot = crate::cover::reload_cover(from, &spots, &[eye, top], target_eye, &sight).expect("a spot behind the wall");
-    assert!(!sight(target_eye, geom::add(spot, [0.0, eye, 0.0])), "hidden: {spot:?}");
+    let s = crate::cover::ARRIVAL_SLACK;
+    for (dx, dz) in [(0.0, 0.0), (-s, -s), (s, -s), (-s, s), (s, s)] {
+        for h in [eye, top] {
+            assert!(!sight(target_eye, geom::add(spot, [dx, h, dz])), "hidden wherever its walk ends: {spot:?}");
+        }
+    }
     assert!(geom::flat_dist(from, spot) <= f64::from(k) * 1.5, "near: {spot:?}");
     // No wall: no cover, the old step back.
     let open = |a: V3, b: V3| crate::cover::clear_line(a, b, &|c: [i32; 3]| c[1] == -1);
@@ -363,7 +368,7 @@ fn marksman_reloads_behind_cover() {
     b.set_cover(Some(spot));
     let sc = Scaled::at(&m.stats, 0.0);
     let next = b.tick(&m, &sc, &senses(u64::from(line.recover_start()) + 1, 11.0));
-    assert_eq!(next.order, Order::Walk { to: spot, speed: 1.0 });
+    assert_eq!(next.order, Order::Walk { to: spot, speed: crate::cover::COVER_SPEED });
     assert_eq!(b.clip().name, "reload");
     let rest = run(&mut b, &m, 0.0, u64::from(line.recover_start()) + 2, u64::from(line.recover) + 2, |n| senses(n, 11.0));
     assert!(rest.iter().any(|t| t.events.iter().any(|e| matches!(e, Event::AttackEnd { .. }))));

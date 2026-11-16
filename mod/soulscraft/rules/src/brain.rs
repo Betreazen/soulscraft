@@ -504,7 +504,7 @@ impl Brain {
         match self.style {
             // The shooter reloads behind the cover the server found, else walking away.
             Style::Shooter => match self.cover {
-                Some(spot) => Order::Walk { to: spot, speed: 1.0 },
+                Some(spot) => Order::Walk { to: spot, speed: crate::cover::COVER_SPEED },
                 None => Order::Walk { to: away(s.pos, tg.pos, 4.0), speed: 1.0 },
             },
             // The shrike climbs low over the ground.
