@@ -1,0 +1,186 @@
+quiet check 2026-11-16T13:40:35: CPU 5.2 %, GPU 12 %, busy: nothing
+== run 1 of 3, 2026-11-16T13:40:35
+  relic | heart in the off hand: The value of attribute Max Health for entity sc_a is 24.0 | hand empty again: The value of attribute Max Health for entity sc_a is 20.0
+  revenants | cost sampling on
+  revenants | cost over 30.0 s: tick rate 20, server tick average 2.20 ms
+  revenants | cost kind=soulscraft:revenant mob_ticks=30050 total_ms=256.41 us_per_mob_tick=8.53 ms_per_server_tick=0.427
+  revenants | cost soulscraft_level_tick level_ticks=601 server_ticks=601 ms_per_server_tick=0.480
+  revenants | cost soulscraft_part part=index ms_per_server_tick=0.0025
+  revenants | cost soulscraft_part part=tasks ms_per_server_tick=0.0013
+  revenants | cost soulscraft_part part=altar ms_per_server_tick=0.0039
+  revenants | cost soulscraft_part part=trophy ms_per_server_tick=0.0011
+  revenants | cost soulscraft_part part=spawning ms_per_server_tick=0.0016
+  revenants | cost soulscraft_part part=relic ms_per_server_tick=0.0005
+  revenants | cost soulscraft_part part=power ms_per_server_tick=0.0039
+  revenants | cost soulscraft_part part=own_mobs ms_per_server_tick=0.4542
+  revenants | cost soulscraft_part part=vanilla ms_per_server_tick=0.0025
+  revenants | cost soulscraft_part part=book ms_per_server_tick=0.0085
+  empty | cost sampling on
+  empty | cost over 30.0 s: tick rate 20, server tick average 0.92 ms
+  empty | cost soulscraft_level_tick level_ticks=601 server_ticks=601 ms_per_server_tick=0.023
+  empty | cost soulscraft_part part=index ms_per_server_tick=0.0009
+  empty | cost soulscraft_part part=tasks ms_per_server_tick=0.0013
+  empty | cost soulscraft_part part=altar ms_per_server_tick=0.0038
+  empty | cost soulscraft_part part=trophy ms_per_server_tick=0.0011
+  empty | cost soulscraft_part part=spawning ms_per_server_tick=0.0015
+  empty | cost soulscraft_part part=relic ms_per_server_tick=0.0005
+  empty | cost soulscraft_part part=power ms_per_server_tick=0.0036
+  empty | cost soulscraft_part part=own_mobs ms_per_server_tick=0.0030
+  empty | cost soulscraft_part part=vanilla ms_per_server_tick=0.0016
+  empty | cost soulscraft_part part=book ms_per_server_tick=0.0056
+  crowd | cost sampling on
+  crowd | cost over 30.0 s: tick rate 20, server tick average 5.24 ms
+  crowd | cost kind=minecraft:spider mob_ticks=21035 total_ms=178.33 us_per_mob_tick=8.48 ms_per_server_tick=0.297
+  crowd | cost kind=minecraft:skeleton mob_ticks=19833 total_ms=165.31 us_per_mob_tick=8.33 ms_per_server_tick=0.275
+  crowd | cost kind=minecraft:zombie mob_ticks=19232 total_ms=141.01 us_per_mob_tick=7.33 ms_per_server_tick=0.235
+  crowd | cost soulscraft_level_tick level_ticks=601 server_ticks=601 ms_per_server_tick=0.085
+  crowd | cost soulscraft_part part=index ms_per_server_tick=0.0041
+  crowd | cost soulscraft_part part=tasks ms_per_server_tick=0.0012
+  crowd | cost soulscraft_part part=altar ms_per_server_tick=0.0032
+  crowd | cost soulscraft_part part=trophy ms_per_server_tick=0.0009
+  crowd | cost soulscraft_part part=spawning ms_per_server_tick=0.0014
+  crowd | cost soulscraft_part part=relic ms_per_server_tick=0.0004
+  crowd | cost soulscraft_part part=power ms_per_server_tick=0.0032
+  crowd | cost soulscraft_part part=own_mobs ms_per_server_tick=0.0031
+  crowd | cost soulscraft_part part=vanilla ms_per_server_tick=0.0583
+  crowd | cost soulscraft_part part=book ms_per_server_tick=0.0093
+== run 2 of 3, 2026-11-16T13:43:43
+  relic | heart in the off hand: The value of attribute Max Health for entity sc_a is 24.0 | hand empty again: The value of attribute Max Health for entity sc_a is 20.0
+  revenants | cost sampling on
+  revenants | cost over 30.0 s: tick rate 20, server tick average 2.19 ms
+  revenants | cost kind=soulscraft:revenant mob_ticks=30050 total_ms=257.64 us_per_mob_tick=8.57 ms_per_server_tick=0.429
+  revenants | cost soulscraft_level_tick level_ticks=601 server_ticks=601 ms_per_server_tick=0.481
+  revenants | cost soulscraft_part part=index ms_per_server_tick=0.0025
+  revenants | cost soulscraft_part part=tasks ms_per_server_tick=0.0014
+  revenants | cost soulscraft_part part=altar ms_per_server_tick=0.0041
+  revenants | cost soulscraft_part part=trophy ms_per_server_tick=0.0011
+  revenants | cost soulscraft_part part=spawning ms_per_server_tick=0.0019
+  revenants | cost soulscraft_part part=relic ms_per_server_tick=0.0005
+  revenants | cost soulscraft_part part=power ms_per_server_tick=0.0037
+  revenants | cost soulscraft_part part=own_mobs ms_per_server_tick=0.4539
+  revenants | cost soulscraft_part part=vanilla ms_per_server_tick=0.0025
+  revenants | cost soulscraft_part part=book ms_per_server_tick=0.0093
+  empty | cost sampling on
+  empty | cost over 30.0 s: tick rate 20, server tick average 0.93 ms
+  empty | cost soulscraft_level_tick level_ticks=601 server_ticks=601 ms_per_server_tick=0.023
+  empty | cost soulscraft_part part=index ms_per_server_tick=0.0008
+  empty | cost soulscraft_part part=tasks ms_per_server_tick=0.0014
+  empty | cost soulscraft_part part=altar ms_per_server_tick=0.0038
+  empty | cost soulscraft_part part=trophy ms_per_server_tick=0.0010
+  empty | cost soulscraft_part part=spawning ms_per_server_tick=0.0015
+  empty | cost soulscraft_part part=relic ms_per_server_tick=0.0005
+  empty | cost soulscraft_part part=power ms_per_server_tick=0.0035
+  empty | cost soulscraft_part part=own_mobs ms_per_server_tick=0.0029
+  empty | cost soulscraft_part part=vanilla ms_per_server_tick=0.0016
+  empty | cost soulscraft_part part=book ms_per_server_tick=0.0056
+  crowd | cost sampling on
+  crowd | cost over 30.0 s: tick rate 20, server tick average 5.25 ms
+  crowd | cost kind=minecraft:spider mob_ticks=21035 total_ms=179.42 us_per_mob_tick=8.53 ms_per_server_tick=0.299
+  crowd | cost kind=minecraft:skeleton mob_ticks=19833 total_ms=166.88 us_per_mob_tick=8.41 ms_per_server_tick=0.278
+  crowd | cost kind=minecraft:zombie mob_ticks=19232 total_ms=141.79 us_per_mob_tick=7.37 ms_per_server_tick=0.236
+  crowd | cost soulscraft_level_tick level_ticks=601 server_ticks=601 ms_per_server_tick=0.085
+  crowd | cost soulscraft_part part=index ms_per_server_tick=0.0042
+  crowd | cost soulscraft_part part=tasks ms_per_server_tick=0.0011
+  crowd | cost soulscraft_part part=altar ms_per_server_tick=0.0033
+  crowd | cost soulscraft_part part=trophy ms_per_server_tick=0.0009
+  crowd | cost soulscraft_part part=spawning ms_per_server_tick=0.0013
+  crowd | cost soulscraft_part part=relic ms_per_server_tick=0.0004
+  crowd | cost soulscraft_part part=power ms_per_server_tick=0.0031
+  crowd | cost soulscraft_part part=own_mobs ms_per_server_tick=0.0028
+  crowd | cost soulscraft_part part=vanilla ms_per_server_tick=0.0583
+  crowd | cost soulscraft_part part=book ms_per_server_tick=0.0093
+== run 3 of 3, 2026-11-16T13:46:38
+  relic | heart in the off hand: The value of attribute Max Health for entity sc_a is 24.0 | hand empty again: The value of attribute Max Health for entity sc_a is 20.0
+  revenants | cost sampling on
+  revenants | cost over 30.1 s: tick rate 20, server tick average 2.72 ms
+  revenants | cost kind=soulscraft:revenant mob_ticks=30050 total_ms=255.47 us_per_mob_tick=8.50 ms_per_server_tick=0.425
+  revenants | cost soulscraft_level_tick level_ticks=601 server_ticks=601 ms_per_server_tick=0.563
+  revenants | cost soulscraft_part part=index ms_per_server_tick=0.0022
+  revenants | cost soulscraft_part part=tasks ms_per_server_tick=0.0014
+  revenants | cost soulscraft_part part=altar ms_per_server_tick=0.0039
+  revenants | cost soulscraft_part part=trophy ms_per_server_tick=0.0010
+  revenants | cost soulscraft_part part=spawning ms_per_server_tick=0.0016
+  revenants | cost soulscraft_part part=relic ms_per_server_tick=0.0005
+  revenants | cost soulscraft_part part=power ms_per_server_tick=0.0037
+  revenants | cost soulscraft_part part=own_mobs ms_per_server_tick=0.5376
+  revenants | cost soulscraft_part part=vanilla ms_per_server_tick=0.0023
+  revenants | cost soulscraft_part part=book ms_per_server_tick=0.0086
+  empty | cost sampling on
+  empty | cost over 30.1 s: tick rate 20, server tick average 0.91 ms
+  empty | cost soulscraft_level_tick level_ticks=601 server_ticks=601 ms_per_server_tick=0.024
+  empty | cost soulscraft_part part=index ms_per_server_tick=0.0009
+  empty | cost soulscraft_part part=tasks ms_per_server_tick=0.0014
+  empty | cost soulscraft_part part=altar ms_per_server_tick=0.0040
+  empty | cost soulscraft_part part=trophy ms_per_server_tick=0.0011
+  empty | cost soulscraft_part part=spawning ms_per_server_tick=0.0016
+  empty | cost soulscraft_part part=relic ms_per_server_tick=0.0005
+  empty | cost soulscraft_part part=power ms_per_server_tick=0.0037
+  empty | cost soulscraft_part part=own_mobs ms_per_server_tick=0.0031
+  empty | cost soulscraft_part part=vanilla ms_per_server_tick=0.0019
+  empty | cost soulscraft_part part=book ms_per_server_tick=0.0060
+  crowd | cost sampling on
+  crowd | cost over 30.1 s: tick rate 20, server tick average 5.24 ms
+  crowd | cost kind=minecraft:spider mob_ticks=22237 total_ms=192.14 us_per_mob_tick=8.64 ms_per_server_tick=0.320
+  crowd | cost kind=minecraft:skeleton mob_ticks=20434 total_ms=169.27 us_per_mob_tick=8.28 ms_per_server_tick=0.282
+  crowd | cost kind=minecraft:zombie mob_ticks=21035 total_ms=164.02 us_per_mob_tick=7.80 ms_per_server_tick=0.273
+  crowd | cost soulscraft_level_tick level_ticks=601 server_ticks=601 ms_per_server_tick=0.089
+  crowd | cost soulscraft_part part=index ms_per_server_tick=0.0041
+  crowd | cost soulscraft_part part=tasks ms_per_server_tick=0.0011
+  crowd | cost soulscraft_part part=altar ms_per_server_tick=0.0031
+  crowd | cost soulscraft_part part=trophy ms_per_server_tick=0.0009
+  crowd | cost soulscraft_part part=spawning ms_per_server_tick=0.0013
+  crowd | cost soulscraft_part part=relic ms_per_server_tick=0.0004
+  crowd | cost soulscraft_part part=power ms_per_server_tick=0.0030
+  crowd | cost soulscraft_part part=own_mobs ms_per_server_tick=0.0028
+  crowd | cost soulscraft_part part=vanilla ms_per_server_tick=0.0622
+  crowd | cost soulscraft_part part=book ms_per_server_tick=0.0095
+
+case      server tick, ms      SoulsCraft hook, ms/tick mob ticks, ms/tick   quiet samples
+----      ---------------      ------------------------ ------------------   -------------
+revenants 2,200 (2,190..2,720) 0,481 (0,480..0,563)     0,427 (0,425..0,429) 3 of 3
+empty     0,920 (0,910..0,930) 0,023 (0,023..0,024)     0,000 (0,000..0,000) 3 of 3
+crowd     5,240 (5,240..5,250) 0,085 (0,085..0,089)     0,813 (0,807..0,875) 3 of 3
+
+
+part     case      SoulsCraft ms per server tick
+----     ----      -----------------------------
+altar    revenants 0,004 (0,004..0,004)
+altar    empty     0,004 (0,004..0,004)
+altar    crowd     0,003 (0,003..0,003)
+book     revenants 0,009 (0,009..0,009)
+book     empty     0,006 (0,006..0,006)
+book     crowd     0,009 (0,009..0,009)
+index    revenants 0,003 (0,002..0,003)
+index    empty     0,001 (0,001..0,001)
+index    crowd     0,004 (0,004..0,004)
+own_mobs revenants 0,454 (0,454..0,538)
+own_mobs empty     0,003 (0,003..0,003)
+own_mobs crowd     0,003 (0,003..0,003)
+power    revenants 0,004 (0,004..0,004)
+power    empty     0,004 (0,004..0,004)
+power    crowd     0,003 (0,003..0,003)
+relic    revenants 0,001 (0,001..0,001)
+relic    empty     0,001 (0,001..0,001)
+relic    crowd     0,000 (0,000..0,000)
+spawning revenants 0,002 (0,002..0,002)
+spawning empty     0,002 (0,002..0,002)
+spawning crowd     0,001 (0,001..0,001)
+tasks    revenants 0,001 (0,001..0,001)
+tasks    empty     0,001 (0,001..0,001)
+tasks    crowd     0,001 (0,001..0,001)
+trophy   revenants 0,001 (0,001..0,001)
+trophy   empty     0,001 (0,001..0,001)
+trophy   crowd     0,001 (0,001..0,001)
+vanilla  revenants 0,003 (0,002..0,003)
+vanilla  empty     0,002 (0,002..0,002)
+vanilla  crowd     0,058 (0,058..0,062)
+
+
+kind                case      ms per server tick
+----                ----      ------------------
+minecraft:skeleton  crowd     0,278 (0,275..0,282)
+minecraft:spider    crowd     0,299 (0,297..0,320)
+minecraft:zombie    crowd     0,236 (0,235..0,273)
+soulscraft:revenant revenants 0,427 (0,425..0,429)
+
+
