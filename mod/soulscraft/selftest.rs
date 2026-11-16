@@ -732,22 +732,30 @@ fn waves(game: &mut Game<'_>, dim: &str, now: u64, live: &mut Live) -> Option<Re
 
 /// The revenant's, the stalker's and the marksman's fight (plan 2026-11-16, task 1):
 ///   revenant_shield_bash_knocks  the shield bash (`knockback`) pushes a sheep that cannot walk a
-///                                block or more
+///                                block farther than a thrust does, and does the data's blow with
+///                                the shield-breaking axe in hand
 ///   revenant_shield_front        a blow from in front of its raised shield does at most a fifth of
 ///                                the same blow from behind (`shield_front_reduction`)
 ///   marksman_reload_cover        after its shot it reloads behind a 3×3 wall off to its side, out
 ///                                of the golem's sight (`reload_cover_blocks`)
-const DUEL_CASES: &[(&str, u64)] = &[("revenant_shield_bash_knocks", 80), ("revenant_shield_front", 60), ("marksman_reload_cover", 140)];
+const DUEL_CASES: &[(&str, u64)] = &[("revenant_shield_bash_knocks", 140), ("revenant_shield_front", 60), ("marksman_reload_cover", 140)];
 
 /// The blow `revenant_shield_front` deals from each side.
 const SHIELD_TEST_BLOW: f32 = 10.0;
-/// Ticks after the bash before the push is measured: the sheep lands and stops.
+/// Ticks after a blow before the push is measured: the sheep lands and stops.
 const KNOCK_SETTLE: u64 = 15;
+/// How much farther than an ordinary blow's the bash must push. The vanilla push of a hurt is 0.4
+/// a tick; the bash adds `knockback_strength` / 2 = 1 on top of half of it, about 3 times as
+/// fast, so the bash's push is about 3 times the thrust's (2 blocks or more). One block over the
+/// thrust's measured push is well under that, and well over what the hurt's push varies by.
+const KNOCK_MARGIN: f64 = 1.0;
 
-/// What a duel scenario keeps between its ticks: where the pushed sheep stood, the front blow's loss.
+/// What a duel scenario keeps between its ticks: where the pushed sheep stood, how far the
+/// ordinary blow pushed it, the front blow's loss.
 #[derive(Default)]
 struct Duel {
     from: Option<[f64; 3]>,
+    plain: f64,
     front: f32,
 }
 
@@ -784,35 +792,92 @@ fn pos_of(game: &Game<'_>, id: u32) -> Option<[f64; 3]> {
     game.mobs.iter().find(|m| m.id == id && !m.removed).map(|m| [m.position.x, m.position.y, m.position.z])
 }
 
+/// A still revenant (NoAI) strikes a sheep that cannot walk 1.5 blocks in front of it, twice from
+/// the same spot: an ordinary thrust (the hurt's own push), then the shield bash (`knockback`,
+/// `knockback_strength`). The bash must push it at least [`KNOCK_MARGIN`] farther than the thrust.
+/// The revenant takes the sheep for a shield holder (`test_shield`), so the bash holds the
+/// shield-breaking axe; the sheep has no shield, so the bash must still do the data's blow.
 fn shield_bash_knocks(game: &mut Game<'_>, dim: &str, now: u64, live: &mut Live, first: bool) -> Option<Result<(), String>> {
     if first {
-        live.mob = revenant(game, dim, BASE, false);
+        live.mob = revenant(game, dim, BASE, true);
         let at = [BASE[0], BASE[1], BASE[2] + GAP];
         live.golem = summon(game, dim, "minecraft:sheep", at, "{Tags:[\"soulscraft.selftest_sheep\"],PersistenceRequired:1b}");
-        // It may not walk off (nor panic away when hurt): only the blow moves it.
+        // It may not walk off (nor panic away when hurt): only the blows move it.
         run_cmd(game, "attribute @e[tag=soulscraft.selftest_sheep,limit=1] minecraft:movement_speed base set 0");
         return (live.mob.is_none() || live.golem.is_none()).then(|| Err("revenant or sheep not spawned".into()));
     }
     let (mob, sheep) = (live.mob?, live.golem?);
-    if live.mark == 0 {
-        if !aim(live, false) {
-            return None;
+    // The last blow of `attack` since the mark, once the sheep has landed after it.
+    let settled = |attack: &str, mark: u64| {
+        server::state()
+            .strikes
+            .iter()
+            .rev()
+            .find(|r| r.mob == mob && r.attack == attack && r.tick > mark)
+            .filter(|r| now >= r.tick + KNOCK_SETTLE)
+            .cloned()
+    };
+    match live.note.as_str() {
+        "" => {
+            // Seen with a shield up, the revenant circles instead of picking its own attacks.
+            if !aim(live, true) {
+                return None;
+            }
+            if let Err(e) = force(live, "thrust") {
+                return Some(Err(e));
+            }
+            DUEL.lock().unwrap_or_else(PoisonError::into_inner).as_mut()?.from = pos_of(game, sheep);
+            live.mark = now;
+            live.note = "thrust".into();
+            None
         }
-        if let Err(e) = force(live, "shield_bash") {
-            return Some(Err(e));
+        "thrust" => {
+            let rec = settled("thrust", live.mark)?;
+            let from = DUEL.lock().unwrap_or_else(PoisonError::into_inner).as_ref()?.from?;
+            let plain = soulscraft_rules::geom::flat_dist(from, pos_of(game, sheep)?);
+            if !rec.hit {
+                return Some(Err(format!("the thrust missed (the sheep moved {plain:.2})")));
+            }
+            DUEL.lock().unwrap_or_else(PoisonError::into_inner).as_mut()?.plain = plain;
+            game.native_teleport_mob(dim, sheep, from);
+            if let Some(m) = crate::game::soulscraft_find::mob_mut(game, sheep) {
+                m.invulnerable = 0;
+            }
+            live.golem_health = health(game, sheep)?;
+            if let Err(e) = force(live, "shield_bash") {
+                return Some(Err(e));
+            }
+            live.mark = now;
+            live.note = "bash".into();
+            None
         }
-        DUEL.lock().unwrap_or_else(PoisonError::into_inner).as_mut()?.from = pos_of(game, sheep);
-        live.mark = now;
-        return None;
+        _ => {
+            let rec = settled("shield_bash", live.mark)?;
+            let (from, plain) = DUEL.lock().unwrap_or_else(PoisonError::into_inner).as_ref().map(|d| (d.from, d.plain))?;
+            let Some(after) = health(game, sheep) else {
+                return Some(Err("the sheep is gone after the bash (killed by an axe-sized blow?)".into()));
+            };
+            let moved = soulscraft_rules::geom::flat_dist(from?, pos_of(game, sheep)?);
+            let lost = live.golem_health - after;
+            let blow = {
+                let s = server::state();
+                let def = s.data.mob("revenant")?;
+                server::scaled(def, 0.0, 0).blow(def.attack("shield_bash")?.damage)
+            };
+            log::info!("soulscraft: selftest shield_bash hit={} plain={plain:.2} moved={moved:.2} lost={lost:.2} blow={blow:.2}", rec.hit);
+            let mut problems = Vec::new();
+            if !rec.hit {
+                problems.push("the bash missed".to_owned());
+            }
+            if moved < plain + KNOCK_MARGIN {
+                problems.push(format!("the bash pushed {moved:.2} blocks, the thrust {plain:.2}: wanted {KNOCK_MARGIN} more"));
+            }
+            if !close(lost, blow) {
+                problems.push(format!("the bash took {lost:.2} health, the blow is {blow:.2}"));
+            }
+            Some(if problems.is_empty() { Ok(()) } else { Err(problems.join("; ")) })
+        }
     }
-    let rec = server::state().strikes.iter().rev().find(|r| r.mob == mob && r.attack == "shield_bash" && r.tick > live.mark).cloned()?;
-    if now < rec.tick + KNOCK_SETTLE {
-        return None;
-    }
-    let from = DUEL.lock().unwrap_or_else(PoisonError::into_inner).as_ref()?.from?;
-    let moved = soulscraft_rules::geom::flat_dist(from, pos_of(game, sheep)?);
-    log::info!("soulscraft: selftest shield_bash hit={} moved={moved:.2}", rec.hit);
-    Some(if rec.hit && moved >= 1.0 { Ok(()) } else { Err(format!("bash hit={}, the sheep moved {moved:.2} blocks", rec.hit)) })
 }
 
 fn shield_front(game: &mut Game<'_>, dim: &str, live: &mut Live, first: bool) -> Option<Result<(), String>> {

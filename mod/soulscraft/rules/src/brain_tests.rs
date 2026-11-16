@@ -325,6 +325,26 @@ fn stalker_strikes_after_timeout() {
     assert_eq!(st[0].1, m.attack_index("double_slash").unwrap());
 }
 
+/// Back from fleeing, a stalker that is seen flanks again from the start: the time spent fleeing
+/// does not count towards `flank_max_ticks`.
+#[test]
+fn stalker_flanks_anew_after_fleeing() {
+    let m = mob("stalker");
+    let max = m.param("flank_max_ticks").unwrap() as usize;
+    let back = m.param("return_after_ticks").unwrap() as usize;
+    let mut b = Brain::new(Style::Skirmisher, 2, 0);
+    // Seen all along; hurt at tick 40 (a decision tick at P 0): it flees until 40 + back.
+    let out = run(&mut b, &m, 0.0, 0, (40 + back + max + 30) as u64, |n| {
+        let mut s = facing_stalker(n, true);
+        s.health_frac = if n < 40 { 1.0 } else { 0.2 };
+        s
+    });
+    assert!(out[40].events.contains(&Event::Mode("flee")));
+    let st = starts(&out);
+    assert!(!st.is_empty());
+    assert!(st[0].0 >= 40 + back + max, "struck at {} while seen, back at {}", st[0].0, 40 + back);
+}
+
 /// A wall the marksman reloads behind: 3 wide (x 4..6) and 3 high (y 0..2) at z 3, the target
 /// 11 blocks south of a marksman at the origin, the floor at y −1.
 fn reload_wall(c: [i32; 3]) -> bool {
@@ -373,6 +393,30 @@ fn marksman_reloads_behind_cover() {
     let rest = run(&mut b, &m, 0.0, u64::from(line.recover_start()) + 2, u64::from(line.recover) + 2, |n| senses(n, 11.0));
     assert!(rest.iter().any(|t| t.events.iter().any(|e| matches!(e, Event::AttackEnd { .. }))));
     assert_ne!(b.clip().name, "reload", "the clip ends with the reload");
+
+    // Not in its cover when the reload ends (the bench's walk took longer than the 30 ticks): it
+    // keeps going there and shoots no more until it stands in it.
+    let after = u64::from(line.end()) + 4;
+    let going = run(&mut b, &m, 0.0, after, 20, |n| senses(n, 11.0));
+    assert!(starts(&going).is_empty(), "no shot on the way to cover");
+    assert!(going.iter().all(|t| t.order == Order::Walk { to: spot, speed: crate::cover::COVER_SPEED }), "{:?}", going[0].order);
+    let there = run(&mut b, &m, 0.0, after + 20, 25, |n| {
+        let mut s = senses(n, 11.0);
+        s.pos = spot;
+        s
+    });
+    assert_eq!(starts(&there).first().map(|x| x.1), Some(shot), "shoots again once in cover");
+
+    // A cover it never gets to is given up a reload's length after the reload.
+    let mut b = Brain::new(Style::Shooter, 4, 0);
+    b.force(shot);
+    run(&mut b, &m, 0.0, 0, u64::from(line.recover_start()) + 1, |n| senses(n, 11.0));
+    b.set_cover(Some(spot));
+    let stuck = run(&mut b, &m, 0.0, u64::from(line.recover_start()) + 1, 100, |n| senses(n, 11.0));
+    let give_up = (line.recover_start() + 2 * line.recover) as usize - (line.recover_start() as usize + 1);
+    let again = starts(&stuck);
+    assert!(!again.is_empty(), "shoots again after giving up");
+    assert!(again[0].0 >= give_up && again[0].0 <= give_up + 20, "at {} (gives up at {give_up})", again[0].0);
 }
 
 #[test]

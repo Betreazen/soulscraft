@@ -219,8 +219,9 @@ pub struct Brain {
     last_stick: u64,
     /// The stalker's flank began then (it strikes unseen, or once `flank_max_ticks` passed).
     flank_since: Option<u64>,
-    /// The marksman's cover for this reload.
+    /// The marksman's cover for this reload, and the tick it gives it up when it never gets there.
     cover: Option<V3>,
+    cover_until: u64,
     /// The marksman's spot in its kept distance.
     post: Option<V3>,
 }
@@ -243,6 +244,7 @@ impl Brain {
             last_stick: 0,
             flank_since: None,
             cover: None,
+            cover_until: 0,
             post: None,
         }
     }
@@ -260,6 +262,15 @@ impl Brain {
     /// The spot the server picked in the kept distance ([`Tick::wants_post`]).
     pub fn set_post(&mut self, spot: Option<V3>) {
         self.post = spot;
+    }
+
+    /// The marksman's cover it is still on its way to, after the reload: not yet within
+    /// `cover::ARRIVAL_SLACK` of it on both ground axes (the square that is hidden), and not given up.
+    fn cover_walk(&self, s: &Senses) -> Option<V3> {
+        let near = |a: f64, b: f64| (a - b).abs() <= crate::cover::ARRIVAL_SLACK;
+        self.cover
+            .filter(|_| s.now < self.cover_until)
+            .filter(|c| !(near(c[0], s.pos[0]) && near(c[2], s.pos[2])))
     }
 
     pub fn clip(&self) -> &Clip {
@@ -334,6 +345,8 @@ impl Brain {
     }
 
     fn begin(&mut self, idx: usize, now: u64, events: &mut Vec<Event>) {
+        // A new attack ends the walk to the last reload's cover.
+        self.cover = None;
         self.run = Some(Run {
             idx,
             start: now,
@@ -400,7 +413,9 @@ impl Brain {
                     if let Some(clip) = mob.move_clip("hide") {
                         self.set_clip(clip, s.now);
                     }
+                    // Not there by the reload's end, it keeps going for one more reload's length.
                     self.cover = None;
+                    self.cover_until = s.now + 2 * u64::from(a.recover);
                     out.wants_cover = true;
                 }
                 if run.ends_at.is_none() && a.recover_if.as_deref() == Some("wall") && run.per_tick > 0.0 {
@@ -421,7 +436,6 @@ impl Brain {
         if phase == Phase::Done {
             out.events.push(Event::AttackEnd { attack: run.idx, t });
             self.run = None;
-            self.cover = None;
             self.after_attack(mob, a, s, &mut out.events);
             self.set_clip(self.mode_clip(mob), s.now);
         } else {
@@ -573,6 +587,7 @@ impl Brain {
             out.label = "idle".into();
             self.flank_since = None;
             self.post = None;
+            self.cover = None;
             return;
         };
         let d = geom::flat_dist(s.pos, tg.pos);
@@ -582,8 +597,18 @@ impl Brain {
         if self.run.is_some() {
             return;
         }
-        out.wants_post = decide && self.style == Style::Shooter && self.mode == Mode::Engage && self.held_post(mob, &tg).is_none();
-        out.order = self.order(mob, s, &tg, d);
+        let to_cover = if self.style == Style::Shooter { self.cover_walk(s) } else { None };
+        out.wants_post = decide
+            && self.style == Style::Shooter
+            && self.mode == Mode::Engage
+            && to_cover.is_none()
+            && self.held_post(mob, &tg).is_none();
+        out.order = match to_cover {
+            // After the reload, still on its way to cover: it keeps going (soulscraft_selftest
+            // `marksman_reload_cover`: the walk took longer than the reload on the bench).
+            Some(spot) => Order::Walk { to: spot, speed: crate::cover::COVER_SPEED },
+            None => self.order(mob, s, &tg, d),
+        };
         out.guarding = self.style == Style::Duelist;
         out.repath = decide || before != self.mode;
         self.set_clip(self.mode_clip(mob), s.now);
@@ -601,7 +626,7 @@ impl Brain {
                 let butt = mob.attack("butt_strike");
                 if d < melee && butt.is_some_and(|a| d <= reach_of(mob, a, self.style)) {
                     pick("butt_strike")
-                } else if (lo..=hi).contains(&d) {
+                } else if (lo..=hi).contains(&d) && self.cover_walk(s).is_none() {
                     pick("aimed_shot")
                 } else {
                     None
@@ -696,6 +721,8 @@ impl Brain {
             self.fled = true;
             let back = mob.param("return_after_ticks").unwrap_or(200.0) as u64;
             self.set_mode(Mode::Flee { until: s.now + back }, s.now, events);
+            // Back from fleeing, it flanks anew: the flight is no time spent flanking.
+            self.flank_since = None;
             return None;
         }
         // The flank: it circles to the target's side or back while the target looks at it, and

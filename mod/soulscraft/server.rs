@@ -1047,20 +1047,41 @@ fn deal(
 /// with its extra push from the `attack_knockback` attribute (`knockback_strength`; half of it is
 /// the push, mobs/ai.rs:2806-2821), and with `break_shield` an axe in hand for that instant, so a
 /// blocking player's shield goes on cooldown as an axe's blow puts it (shield.rs:200-208,
-/// 242-283). The mob's own numbers are put back after. Whether the blow was dealt.
+/// 242-283). The axe's own `attack_damage` modifier is taken out of the mob's value for that blow
+/// ([`base_for_blow`]), so the hit stays the data's blow. The mob's own numbers are put back after.
+/// Whether the blow was dealt.
 fn knock_blow(game: &mut Game<'_>, dim: &str, id: u32, target: u32, blow: f64, strength: f64, break_shield: bool) -> bool {
-    let Some(m) = crate::game::soulscraft_find::mob_mut(game, id) else { return false };
+    let Some(i) = crate::game::soulscraft_find::index_of(game, id) else { return false };
+    let m = &mut game.mobs[i];
     let was = (m.attrs.attack_damage, m.attrs.attack_knockback, m.extra.main_hand.clone());
-    m.attrs.attack_damage = blow as f32;
     m.attrs.attack_knockback = strength;
     if break_shield {
         m.extra.main_hand = Some(std::sync::Arc::from(SHIELD_BREAKER));
     }
+    let base = base_for_blow(game, i, blow);
+    game.mobs[i].attrs.attack_damage = base;
     let landed = game.native_mob_attack(dim, id, target);
     if let Some(m) = crate::game::soulscraft_find::mob_mut(game, id) {
         (m.attrs.attack_damage, m.attrs.attack_knockback, m.extra.main_hand) = was;
     }
     landed
+}
+
+/// The mob's own attack damage that makes its hit come to `blow` with what it holds now: the
+/// engine's hit reads the value plus the main hand item's `attack_damage` modifiers from the item
+/// data (`gear::attack_damage`, mobs/gear.rs:152-167; `attribute_with`, mobs/equip.rs:67-85). Those
+/// are additions and multiplications of the value, so the hit is `a · value + b`: read at 0 and 1,
+/// solved for `blow`. With nothing in hand it is `blow` itself. Leaves the value it last tried.
+fn base_for_blow(game: &mut Game<'_>, i: usize, blow: f64) -> f32 {
+    let b = hit_at(game, i, 0.0);
+    let a = hit_at(game, i, 1.0) - b;
+    if a.abs() < 1e-6 { blow as f32 } else { ((blow - b) / a) as f32 }
+}
+
+/// The hit of mob `i` (its value and what it holds) with its own attack damage set to `value`.
+fn hit_at(game: &mut Game<'_>, i: usize, value: f32) -> f64 {
+    game.mobs[i].attrs.attack_damage = value;
+    f64::from(horizon_client::mobs::gear::attack_damage(&game.mobs[i], Some(game.items())))
 }
 
 /// A later strike of a several-strike attack (the stalker's double slash, 3 ticks apart) would
