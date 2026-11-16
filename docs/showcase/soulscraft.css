@@ -393,3 +393,47 @@ a.sc-card:hover { text-decoration: none; border-color: var(--brass-lo); transfor
 body.calm .sparks { opacity: 0; }
 body.calm .sparks i { animation-play-state: paused; }
 @media (prefers-reduced-motion: reduce) { .sparks { display: none; } }
+
+/* ------------------------------------------------------------------ events, defense, vanilla, recipes (0.7.0) */
+.sc-inline { display: inline-block; vertical-align: middle; background: none; }
+.sc-list { margin: var(--sp-2) 0; padding-left: 20px; }
+.sc-list li { margin: var(--sp-1) 0; }
+.sc-scheme { display: block; width: 100%; max-width: 300px; height: auto; background: var(--sunken); border: 1px solid var(--edge); border-radius: var(--r-3); }
+.sc-s-altar { fill: var(--brass-lo); stroke: var(--brass); stroke-width: 1.5; }
+.sc-s-ring { fill: none; stroke-width: 1; stroke-dasharray: 4 3; }
+.sc-s-ring.near { stroke: var(--warn); }
+.sc-s-ring.far { stroke: var(--dim); }
+.sc-s-player { fill: var(--soul); }
+.sc-s-mob { fill: var(--bad); }
+.sc-s-path { stroke: var(--dim); stroke-width: 1; stroke-dasharray: 2 3; }
+.sc-s-beam { stroke: var(--soul); stroke-width: 2; }
+.sc-s-t { fill: var(--text); font: 9px var(--font-body); }
+.sc-vgroup { margin: var(--sp-4) 0; padding: 0 0 var(--sp-2); border-bottom: 1px solid var(--edge); }
+.sc-vgroup h3 { margin-top: var(--sp-4); }
+.sc-vgroup details { margin: var(--sp-2) 0; }
+.sc-vgroup summary { cursor: pointer; color: var(--dim); font-size: var(--fs-small); }
+.sc-craftrow { display: flex; align-items: center; gap: var(--sp-3); }
+.sc-craftrow p { margin: 0; }
+.sc-craft { display: grid; grid-template-columns: repeat(3, 58px); gap: 3px; padding: 6px; background: var(--sunken); border: 1px solid var(--edge); border-radius: var(--r-2); }
+.sc-slot { position: relative; width: 58px; height: 58px; display: flex; align-items: center; justify-content: center; background: var(--surface-2); border: 1px solid var(--edge-strong); overflow: hidden; }
+.sc-slot.empty { background: var(--surface); border-color: var(--edge); }
+.sc-slot.txt span { padding: 2px; font-size: 9px; line-height: 1.1; text-align: center; color: var(--text); overflow-wrap: anywhere; hyphens: auto; }
+.sc-slot img { width: 40px; height: 40px; background: none; }
+.sc-slot i { position: absolute; right: 3px; bottom: 1px; font: 700 12px var(--mono); font-style: normal; color: var(--text-strong); text-shadow: 1px 1px 0 #000; }
+.sc-arrow { font-size: 22px; color: var(--brass); }
+.sc-recipe { flex: 0 1 300px; }
+.sc-horn { flex: 1 1 320px; }
+.sc-horn .stats { margin-top: var(--sp-2); }
+/* The altar menu as the mod draws it: a dark panel, text lines, three buttons (altar_client.rs draw_screen) */
+.mc-gui.mc-menu { width: 460px; padding: 8px 8px 8px; background: #1a1714; color: #e8e0d0; border: 0; border-top: 1px solid #9cf5e4; box-shadow: none; font: 13px/1.45 var(--mono); }
+.mc-menu .mc-title { margin-bottom: 4px; color: #9cf5e4; }
+.mc-line { overflow-wrap: anywhere; }
+.mc-line.warn { color: #ff6060; }
+.mc-btns { display: flex; gap: 8px; margin-top: 10px; }
+.mc-gbtn { flex: 1 1 0; padding: 3px 2px; text-align: center; font-size: 12px; color: #fff; background: #3a3430; }
+.mc-gbtn.on { background: #3c6e5a; }
+.sc-loot .sc-horn { flex: 1 1 320px; }
+.bk-dim { margin: 3px 0; font-size: var(--fs-label); font-style: italic; color: var(--bk-ink-hint); }
+.bk-nomodel { display: flex; align-items: center; justify-content: center; padding: var(--sp-3); text-align: center; font-size: var(--fs-label); color: var(--bk-ink-soft); }
+.bk-strip-row { margin: 6px 0; }
+.bk-strip-row .att-strip { margin: 2px 0 0; }

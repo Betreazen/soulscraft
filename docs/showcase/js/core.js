@@ -17,6 +17,7 @@
     TROPHIES: {}, // mob id -> assets/rigs/<mob>.trophy.json (head, diorama)
     TROPHY_DATA: null, // data/trophies.json: the diorama, the rejected variants, drops
     BOOK: null, // data/book.json: stages of the hunter's book
+    EXTRA: null, // extra.js (tools/embed-extra.mjs): loot.json, the recipes, the lang names, the item numbers
   });
   SC.TICK = 20;
 
@@ -32,6 +33,7 @@
   SC.trophy = (id, t) => (SC.TROPHIES[id] = t);
   SC.trophyData = (d) => (SC.TROPHY_DATA = d);
   SC.bookData = (d) => (SC.BOOK = d);
+  SC.extra = (d) => (SC.EXTRA = d);
   // Extra blocks at the end of a mob page (js/trophies.js: its trophies): fn(mob, def, main).
   SC.MOB_SECTIONS = [];
   SC.mobSection = (fn) => SC.MOB_SECTIONS.push(fn);
@@ -59,6 +61,27 @@
   };
 
   SC.mobById = (id) => SC.DATA.mobs.find((m) => m.id === id);
+
+  // A name from the lang file (js/extra.js) by item or block id: 'soulscraft:rotten_horn' -> «Гнилой горн».
+  SC.itemName = (id) => {
+    const lang = (SC.EXTRA && SC.EXTRA.lang) || {};
+    const [ns, path] = String(id).split(':');
+    return lang['item.' + ns + '.' + path] || lang['block.' + ns + '.' + path] || (SC.EXTRA && SC.EXTRA.vanilla_names[id]) || path || id;
+  };
+  // The name of a wave entry (data/mobs.json events[].waves[].mobs[]): its own `name`, else the
+  // mob of that type (type 'revenant' is a mob's id, 'minecraft:skeleton' a vanilla group's type).
+  SC.waveName = (x) => {
+    if (x.name) return x.name;
+    const own = SC.DATA.mobs.find((m) => m.id === x.type || m.key === x.type);
+    if (own) return own.name;
+    for (const g of SC.DATA.vanilla.groups) {
+      const i = g.types.indexOf(x.type);
+      if (i < 0) continue;
+      const parts = g.name.split(', ');
+      return (parts.length === g.types.length ? parts[i] : g.name).toLowerCase();
+    }
+    return String(x.type).replace(/^minecraft:/, '');
+  };
 
   // Phases of an attack on its timeline, as the build writes them from data/mobs.json. Colours are
   // CSS tokens (soulscraft.css, --phase-*), for inline styles only.
