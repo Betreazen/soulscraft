@@ -58,10 +58,10 @@ fn table() -> MutexGuard<'static, Table> {
 
 /// The level's tick: the dimension's sectors from its altars.
 pub(super) fn on_level_tick(dim: &str, now: u64) {
-    let file = crate::game::soulscraft_altar::file();
     let mut active = Vec::new();
     let mut logs = Vec::new();
     let altars = crate::game::soulscraft_altar::altars_in(dim);
+    let file = crate::game::soulscraft_altar::file();
     let mut t = table();
     for a in &altars {
         let effects = ra::effects(&file, &a.banner_ids());

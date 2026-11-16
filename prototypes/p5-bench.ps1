@@ -44,7 +44,11 @@ function Assert-QuietPc {
     if ($gpu -and [int]($gpu | Select-Object -First 1) -gt 15) { $busy += "GPU at $gpu %" }
     if (Test-Path $Lock) { $busy += "heavy.lock: $(Get-Content $Lock -Raw)" }
     if (Test-Path "$env:LOCALAPPDATA\Horizon\joint-dev\maintenance.txt") { $busy += 'bench maintenance' }
-    $cpu = (Get-CimInstance Win32_Processor | Measure-Object -Property LoadPercentage -Average).Average
+    # The average of five seconds: a single reading catches a browser's spike as a busy PC.
+    $cpu = [math]::Round((1..5 | ForEach-Object {
+                (Get-CimInstance Win32_PerfFormattedData_PerfOS_Processor -Filter "Name='_Total'").PercentProcessorTime
+                Start-Sleep -Seconds 1
+            } | Measure-Object -Average).Average, 1)
     if ($cpu -gt 20) { $busy += "CPU at $cpu %" }
     "quiet check $(Get-Date -Format s): CPU $cpu %, GPU $gpu %, busy: $(if ($busy) { $busy -join '; ' } else { 'nothing' })" |
         Tee-Object -FilePath $Out -Append | Write-Host
@@ -99,6 +103,11 @@ function Invoke-Run([int]$N) {
     $bot = $null
     try {
         $bot = Start-Bot sc_a
+        # A client the server turns away (its content older than the server's: `joint.ps1 content`)
+        # leaves the mobs with nobody to fight, and the numbers mean nothing.
+        Start-Sleep -Seconds 5
+        $list = (Invoke-Console 'list') -join ' '
+        if ($list -notmatch '\bsc_a\b') { throw "The bot sc_a is not on the P5 server ($list): see its latest.log" }
         Invoke-Console 'sc arena' | Out-Null
         Invoke-Console "tp sc_a $cx $cy $cz 0 0" | Out-Null
         Invoke-Console 'gamemode survival sc_a' | Out-Null
@@ -124,7 +133,7 @@ function Invoke-Run([int]$N) {
         }
         # Monsters on rings 6..20 blocks out, cows on rings 24..60: one block apart or more, so the
         # engine's collisions stay what a herd in a field costs.
-        $crowd = {
+        $crowdSpawn = {
             $kinds = 'minecraft:zombie', 'minecraft:skeleton', 'minecraft:spider'
             for ($i = 0; $i -lt $Crowd; $i++) {
                 $a = $i * 2.399963
@@ -147,7 +156,7 @@ function Invoke-Run([int]$N) {
             mixed = { Invoke-Console "sc bench $mixed mixed" | Out-Null }
             zombies = $zombies
             empty = { }
-            crowd = $crowd
+            crowd = $crowdSpawn
         }
         @(foreach ($case in $spawns.Keys) {
                 if ($Cases -contains $case) { Measure-Case $case $spawns[$case] }

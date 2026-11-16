@@ -89,7 +89,7 @@ enum Action {
 }
 
 struct Hub {
-    file: AltarFile,
+    file: std::sync::Arc<AltarFile>,
     altars: HashMap<(String, [i32; 3]), Altar>,
     /// Pedestals' items as the server last wrote them: a player's hook decides from this.
     pedestals: HashMap<(String, [i32; 3]), Option<String>>,
@@ -104,7 +104,7 @@ struct Hub {
 
 static HUB: LazyLock<Mutex<Hub>> = LazyLock::new(|| {
     Mutex::new(Hub {
-        file: AltarFile::embedded(),
+        file: std::sync::Arc::new(AltarFile::embedded()),
         altars: HashMap::new(),
         pedestals: HashMap::new(),
         actions: Vec::new(),
@@ -126,8 +126,10 @@ fn hub() -> MutexGuard<'static, Hub> {
     HUB.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
-pub(super) fn file() -> AltarFile {
-    hub().file.clone()
+/// The altar data, shared: the spawn boost asks for it every level tick (a copy of the whole file
+/// each time cost 0.01 ms per tick, docs/design/12-playtest-tidewill.md).
+pub(super) fn file() -> std::sync::Arc<AltarFile> {
+    std::sync::Arc::clone(&hub().file)
 }
 
 /// A copy of the altars of a dimension (the event reads them).
