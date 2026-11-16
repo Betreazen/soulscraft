@@ -195,18 +195,22 @@ impl Grid {
     }
 }
 
-/// The two distance fields of one build.
+/// The two distance fields of one build. The breach field is worked out the first time a breaker
+/// asks for it: it is the costly one (on real ground every block under the zone is a wall a brute
+/// could break, about 11 ms against 0.9 ms for the open field; playtest on tidewill 2026-11-16),
+/// and only a brute with no open way needs it.
 #[derive(Clone, Debug)]
 pub struct Field {
     pub grid: Grid,
     open: Vec<u32>,
-    breach: Vec<u32>,
+    breach: std::cell::OnceCell<Vec<u32>>,
     /// The standable seeds round the altar.
     pub seeds: Vec<Pos>,
 }
 
 impl Field {
-    /// Builds both fields from `seeds` (cells where a mob is at the altar).
+    /// Builds the open field from `seeds` (cells where a mob is at the altar); the breach field
+    /// waits for its first use.
     pub fn build(grid: Grid, seeds: &[Pos]) -> Self {
         let n = grid.len();
         let mut open = vec![NONE; n];
@@ -228,9 +232,14 @@ impl Field {
                 }
             }
         }
-        let mut breach = vec![NONE; n];
+        Self { grid, open, breach: std::cell::OnceCell::new(), seeds }
+    }
+
+    /// The breach field: the cost to the altar of each cell when walls may be broken.
+    fn breach_field(grid: &Grid, seeds: &[Pos]) -> Vec<u32> {
+        let mut breach = vec![NONE; grid.len()];
         let mut heap = BinaryHeap::new();
-        for s in &seeds {
+        for s in seeds {
             if let Some(i) = grid.index(*s) {
                 breach[i] = 0;
                 heap.push(Reverse((0u32, *s)));
@@ -253,23 +262,42 @@ impl Field {
                 }
             }
         }
-        Self { grid, open, breach, seeds }
+        breach
+    }
+
+    fn breach(&self) -> &[u32] {
+        self.breach.get_or_init(|| Self::breach_field(&self.grid, &self.seeds))
+    }
+
+    /// Whether the breach field of this build was worked out already.
+    pub fn breach_ready(&self) -> bool {
+        self.breach.get().is_some()
     }
 
     pub fn open_at(&self, p: Pos) -> Option<u32> {
         self.grid.index(p).map(|i| self.open[i]).filter(|d| *d != NONE)
     }
 
+    /// The first call of a build works the breach field out.
     pub fn breach_at(&self, p: Pos) -> Option<u32> {
-        self.grid.index(p).map(|i| self.breach[i]).filter(|d| *d != NONE)
+        let i = self.grid.index(p)?;
+        Some(self.breach()[i]).filter(|d| *d != NONE)
     }
 
-    /// The cell a mob at block position `p` stands in: `p`, or one above or below it (a mob on a
-    /// slab, a mob in a jump).
+    /// The cell a mob at block position `p` stands in for walking: `p`, or one above or below it
+    /// (a mob on a slab, a mob in a jump). Never needs the breach field.
+    pub fn locate_open(&self, p: Pos) -> Option<Pos> {
+        [p, [p[0], p[1] - 1, p[2]], [p[0], p[1] + 1, p[2]]].into_iter().find(|c| self.grid.standable(*c))
+    }
+
+    /// As [`Field::locate_open`], and for a breaker also a cell it stands in among walls it may
+    /// break (this one works the breach field out when no walkable cell is found).
     pub fn locate(&self, p: Pos) -> Option<Pos> {
-        [p, [p[0], p[1] - 1, p[2]], [p[0], p[1] + 1, p[2]]]
-            .into_iter()
-            .find(|c| self.grid.standable(*c) || self.grid.breach_standable(*c) && self.breach_at(*c).is_some())
+        self.locate_open(p).or_else(|| {
+            [p, [p[0], p[1] - 1, p[2]], [p[0], p[1] + 1, p[2]]]
+                .into_iter()
+                .find(|c| self.grid.breach_standable(*c) && self.breach_at(*c).is_some())
+        })
     }
 
     /// The next cell toward the altar through walkable cells.
@@ -501,5 +529,98 @@ mod tests {
         assert!(!g.contains([40, 0, 0]));
         assert_eq!(g.get([40, 0, 0]), Cell::Hard);
         assert!(!g.is_empty());
+    }
+
+    #[test]
+    fn the_breach_field_waits_for_a_breaker() {
+        let f = Field::build(real_ground(), &altar_seeds());
+        // Walking mobs: their cells and steps never need the breach field.
+        let c = f.locate_open([10, 0, 0]).unwrap();
+        assert!(f.open_at(c).is_some());
+        assert!(f.next_open(c).is_some());
+        assert!(!f.breach_ready());
+        // A breaker's first question works it out, once.
+        assert!(f.breach_at(c).is_some());
+        assert!(f.breach_ready());
+        let copy = f.clone();
+        assert!(copy.breach_ready());
+        assert_eq!(copy.breach_at(c), f.breach_at(c));
+    }
+
+    /// A zone on real ground, as on tidewill (playtest 2026-11-16): the zone's size (3 × 3 chunks,
+    /// 8 below and 8 above the core), everything under the core's level breakable ground, five
+    /// trees. On the flat bench the arena stands in the air with nothing under it.
+    fn real_ground() -> Grid {
+        let mut g = Grid::new([-24, -8, -24], [48, 17, 48], Cell::Open);
+        for x in -24..24 {
+            for z in -24..24 {
+                for y in -8..0 {
+                    g.set([x, y, z], Cell::Wall(1));
+                }
+            }
+        }
+        for (tx, tz) in [(5, 7), (-9, 3), (12, -11), (-15, -14), (18, 16)] {
+            for dx in -2..=2 {
+                for dz in -2..=2 {
+                    for y in 4..7 {
+                        g.set([tx + dx, y, tz + dz], Cell::Wall(1));
+                    }
+                }
+            }
+            for y in 0..6 {
+                g.set([tx, y, tz], Cell::Wall(1));
+            }
+        }
+        g
+    }
+
+    /// The seed cells round a core at the origin, as event_path.rs takes them (drain 3 blocks).
+    fn altar_seeds() -> Vec<Pos> {
+        let mut seeds = Vec::new();
+        for dx in -3..=3_i32 {
+            for dz in -3..=3_i32 {
+                if dx * dx + dz * dz <= 9 {
+                    for dy in 0..=2 {
+                        seeds.push([dx, dy, dz]);
+                    }
+                }
+            }
+        }
+        seeds
+    }
+
+    #[test]
+    #[ignore = "timing: cargo test --release -p soulscraft-rules flow_build_timing -- --ignored --nocapture"]
+    fn flow_build_timing() {
+        let seeds = altar_seeds();
+        let runs = 20;
+        let started = std::time::Instant::now();
+        for _ in 0..runs {
+            let f = Field::build(real_ground(), &seeds);
+            assert!(!f.breach_ready());
+        }
+        let ms = started.elapsed().as_secs_f64() * 1000.0 / f64::from(runs);
+        println!("real ground, open field only (what a build costs now): {ms:.2} ms per build");
+        let started = std::time::Instant::now();
+        let mut reached = 0;
+        for _ in 0..runs {
+            let f = Field::build(real_ground(), &seeds);
+            reached = f.breach().iter().filter(|d| **d != NONE).count();
+        }
+        let ms = started.elapsed().as_secs_f64() * 1000.0 / f64::from(runs);
+        println!("real ground with the breach field: {ms:.2} ms per build, breach cells reached {reached} of {}", real_ground().len());
+        // The same zone with nothing breakable: the open field's share.
+        let mut hard = real_ground();
+        for c in hard.cells.iter_mut() {
+            if matches!(c, Cell::Wall(_)) {
+                *c = Cell::Hard;
+            }
+        }
+        let started = std::time::Instant::now();
+        for _ in 0..runs {
+            let _ = Field::build(hard.clone(), &seeds);
+        }
+        let ms = started.elapsed().as_secs_f64() * 1000.0 / f64::from(runs);
+        println!("nothing breakable: {ms:.2} ms per build");
     }
 }

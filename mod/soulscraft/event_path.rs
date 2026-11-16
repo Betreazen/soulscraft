@@ -66,7 +66,23 @@ pub(super) fn build_field(game: &mut Game<'_>, r: &mut EventRun, now: u64) {
     );
 }
 
-fn classify(game: &Game<'_>, id: BlockStateId, pos: [i32; 3], rules: &defense::BreachRules) -> Cell {
+/// The breach field's cost at `c`. Its first question after a build works the field out (the
+/// costly part, rules::flow::Field), logged:
+///   soulscraft: event field breach ms=10.95 build=3
+pub(super) fn breach_at(r: &EventRun, c: [i32; 3]) -> Option<u32> {
+    let f = r.field.as_ref()?;
+    if f.breach_ready() {
+        return f.breach_at(c);
+    }
+    let started = std::time::Instant::now();
+    let d = f.breach_at(c);
+    log::info!("soulscraft: event field breach ms={:.2} build={}", started.elapsed().as_secs_f64() * 1000.0, r.builds);
+    d
+}
+
+/// The cell a block makes on the path map. The zone's changes are told apart by it too: a change
+/// that leaves the cell as it was never rebuilds the map.
+pub(super) fn classify(game: &Game<'_>, id: BlockStateId, pos: [i32; 3], rules: &defense::BreachRules) -> Cell {
     let facts = game.res.facts().get(id);
     let name: &str = &facts.name;
     if matches!(name, "minecraft:air" | "minecraft:cave_air" | "minecraft:void_air") {

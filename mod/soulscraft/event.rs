@@ -328,17 +328,29 @@ pub(super) fn core_gone(game: &mut Game<'_>, dim: &str, core: [i32; 3], now: u64
 }
 
 /// A block in a zone changed: the path map is built again soon, and a place the brute broke
-/// that a player built on stays the player's.
-pub(super) fn on_block_change(dim: &str, pos: [i32; 3], now_air: bool, now: u64) {
+/// that a player built on stays the player's. Only a change the map would see makes it dirty:
+/// inside its box, and a cell of another kind (a leaf's distance, a crop's age or grass spreading
+/// change nothing). On real ground such changes came every second (playtest 2026-11-16).
+pub(super) fn on_block_change(game: &mut Game<'_>, dim: &str, pos: [i32; 3], now_air: bool, now: u64) {
     let mut ev = events();
     for r in ev.values_mut().filter(|r| r.dim == dim) {
         if !r.flow.in_zone(r.core, f64::from(pos[0]) + 0.5, f64::from(pos[2]) + 0.5) {
             continue;
         }
-        if r.dirty_at.is_none() {
-            r.dirty_at = Some(now);
-        }
         r.breaches.changed(pos, now_air);
+        if r.dirty_at.is_some() {
+            continue;
+        }
+        if let Some(f) = r.field.as_ref() {
+            if !f.grid.contains(pos) {
+                continue;
+            }
+            let id = game.world.block(pos[0], pos[1], pos[2]);
+            if crate::game::soulscraft_event_path::classify(game, id, pos, &r.numbers.breach) == f.grid.get(pos) {
+                continue;
+            }
+        }
+        r.dirty_at = Some(now);
     }
 }
 
@@ -681,11 +693,14 @@ fn to_altar(game: &mut Game<'_>, r: &mut EventRun, id: u32, w: &mut WaveMob, alt
     // A mob's centre is up to a block from the seed cell it stands in: a cell next to the altar
     // (step 0 of the map) counts too.
     let range = if w.role == Role::Ranged { RANGED_DRAIN } else { r.flow.drain_blocks + 1.0 };
-    let cell = r.field.as_ref().and_then(|f| f.locate(cell_of(w.pos)));
+    // Only the brute, walled out, ever asks the costly breach field (rules::flow::Field).
+    let brute = w.kind == "soulscraft:brute";
+    let cell = r.field.as_ref().and_then(|f| f.locate_open(cell_of(w.pos)));
     let open = cell.and_then(|c| r.field.as_ref().and_then(|f| f.open_at(c)));
+    let cell = if brute && open.is_none() { r.field.as_ref().and_then(|f| f.locate(cell_of(w.pos))).or(cell) } else { cell };
     let at_altar = (flat <= range && dy.abs() <= 3.0 && (w.role != Role::Ranged || altar_visible))
         || (w.role != Role::Ranged && open == Some(0));
-    let breaker = w.kind == "soulscraft:brute" && cell.and_then(|c| r.field.as_ref().and_then(|f| f.breach_at(c))).is_some();
+    let breaker = brute && open.is_none() && cell.is_some_and(|c| crate::game::soulscraft_event_path::breach_at(r, c).is_some());
     let has_path = at_altar || open.is_some() || r.field.is_none() || w.breach.is_some() || breaker;
     if now % 100 == 0 {
         log::debug!("soulscraft: event mob={id} at={:.1},{:.1},{:.1} cell={cell:?} open={open:?} breaker={breaker} at_altar={at_altar} tick={now}", w.pos[0], w.pos[1], w.pos[2]);
@@ -935,5 +950,5 @@ fn reward(game: &mut Game<'_>, r: &mut EventRun, now: u64) {
 /// On the zone's path map with a walkable way to the altar (no map yet: taken as walkable). Two
 /// such places are joined through the altar: the round-10 test for «a path to the participant».
 fn walkable(field: Option<&Field>, at: V3) -> bool {
-    field.is_none_or(|f| f.locate(cell_of(at)).and_then(|c| f.open_at(c)).is_some())
+    field.is_none_or(|f| f.locate_open(cell_of(at)).and_then(|c| f.open_at(c)).is_some())
 }

@@ -600,7 +600,7 @@ fn on_change(game: &mut Game<'_>, dim: &str, now: u64, c: &Change) {
         }
     }
     let now_air = new.0 == "minecraft:air" || new.0 == "minecraft:cave_air";
-    event::on_block_change(dim, pos, now_air, now);
+    event::on_block_change(game, dim, pos, now_air, now);
 }
 
 /// A piece placed with its bottom (or a one-block piece): its other segments go up above it, it
