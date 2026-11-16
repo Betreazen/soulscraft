@@ -20,7 +20,7 @@ use crate::mod_api::NativeServerPlayer;
 use horizon_client::particles::ParticleOptions;
 use soulscraft_rules::{
     attack::{Phase, Timeline, wave_center, wave_hits},
-    brain::{Brain, DiveTurns, Event, Order, Senses, Strike, Style, TargetSense, Tick},
+    brain::{self, Brain, DiveTurns, Event, Order, Senses, Strike, Style, TargetSense, Tick},
     data::{MobDef, MobsFile},
     geom::{self, V3},
     scale::{self, Scaled},
@@ -47,6 +47,12 @@ const FORGET_AFTER: u64 = 40;
 const LOG_KEEP: usize = 512;
 /// The shared bleed (integration.md 4.1).
 pub(super) const BLEEDING: &str = "soulscraft:bleeding";
+/// `SoundSource.HOSTILE`'s index, the source a cue sounds from.
+const HOSTILE: usize = 5;
+/// What a shield-breaking blow holds for its instant (`shield_disable_ticks`): the engine disables a
+/// blocking player's shield only for a mob whose main hand item has `disable_blocking_for_seconds`
+/// (shield.rs:200-208, 242-283), and an axe's 5 s are the data's 100 ticks.
+const SHIELD_BREAKER: &str = "minecraft:iron_axe";
 
 /// One SoulsCraft mob the server drives.
 pub(super) struct Tracked {
@@ -542,8 +548,6 @@ fn tick_mob(
     drop(s);
     guard_snapshot(m, &tick, style);
     log_events(&def, m.id, now, &tick);
-    play_cues(game, &def, m, &tick, size);
-    roar(game, &def, m, &tick, size);
     let leap_up = def.jump_velocity_at(size).unwrap_or(LEAP_UP);
     let path = drive(game, dimension, now, m, &tick, style, repath, path, &sc, leap_up);
     if let Some(t) = state().mobs.get_mut(&m.id) {
@@ -566,26 +570,15 @@ fn tick_mob(
     if contact && let Some(tg) = &target {
         stick(game, &def, tg, m.id);
     }
-}
-
-/// The slime's jump without `sizes.*.jump_velocity`: the upward speed it always had.
-const LEAP_UP: f64 = 0.62;
-
-/// The numbers of this mob at its P (the slime's by its size, from `sizes`: health, damage and
-/// its decision interval, `decide_mult`).
-pub(super) fn scaled(def: &MobDef, p: f64, size: u8) -> Scaled {
-    let mut stats = def.stats;
-    if let Some(sz) = def.sizes.iter().find(|s| s.size == u32::from(size)) {
-        stats.health = sz.health;
-        stats.damage = sz.damage;
+    play_cues(game, &def, m, &tick, size);
+    roar(game, &def, m, &tick, size);
+    if tick.wants_cover || tick.wants_post {
+        answer_marksman(game, &def, m, &tick, target.as_ref(), size, now);
     }
-    let mut sc = Scaled::at(&stats, p);
-    sc.decide_every = def.decide_every_at(size, sc.decide_every);
-    sc
 }
 
-/// The cues of this tick's attack phases (data/mobs.json `cue`, at its `on` phase). Task 1's
-/// `play_cues` (wip/final-1) does the same and also the marksman's reload: keep that one.
+/// The cues of this tick's attack phases (data/mobs.json `cue`, at its `on` phase) and of the
+/// marksman's reload as it starts (its `hide` move's cue).
 fn play_cues(game: &mut Game<'_>, def: &MobDef, m: &Seen, tick: &Tick, size: u8) {
     let at = geom::add(m.pos, [0.0, def.hitbox_at(size).height * 0.6, 0.0]);
     for e in &tick.events {
@@ -594,36 +587,18 @@ fn play_cues(game: &mut Game<'_>, def: &MobDef, m: &Seen, tick: &Tick, size: u8)
             play_cue(game, m.id, at, &c.cue);
         }
     }
-}
-
-/// The brute's roar as its rage starts (the mode `rage`): `passives.rage.cue`.
-fn roar(game: &mut Game<'_>, def: &MobDef, m: &Seen, tick: &Tick, size: u8) {
-    if !tick.events.contains(&Event::Mode("rage")) {
-        return;
+    if tick.wants_cover
+        && let Some(c) = def.moves.iter().find(|x| x.id == "hide").and_then(|x| x.cue.as_ref())
+    {
+        play_cue(game, m.id, at, c);
     }
-    let Some(cue) = def.passive("rage").and_then(|r| serde_json::from_value::<Cue>(r.get("cue")?.clone()).ok()) else { return };
-    let at = geom::add(m.pos, [0.0, def.hitbox_at(size).height * 0.6, 0.0]);
-    play_cue(game, m.id, at, &cue);
 }
-
-/// The slime's shadow where it lands (`params.shadow_particle`): the cue's particle shape, sized by
-/// its box at its size, round the landing point.
-fn shadow(game: &mut Game<'_>, def: &MobDef, size: u8, at: V3, kind: &str) {
-    let hb = def.hitbox_at(size);
-    let options = ParticleOptions::named(kind.to_owned());
-    let spread = [hb.width * 0.6, hb.height * 0.3, hb.width * 0.6];
-    let low = geom::add(at, [0.0, 0.2, 0.0]);
-    game.with_level(|_, level, _| level.native_send_particles(&options, None, low, spread, 0.02, 12));
-}
-
-/// `SoundSource.HOSTILE`'s index, the source a cue sounds from.
-const HOSTILE: usize = 5;
 
 /// A cue (the vanilla groups' schema, soulscraft_rules::vanilla::Cue): its sound at `at` from the
 /// hostile source (`GameLevel::native_play_sound`, native_hooks.rs:9906), its particles round the
-/// mob's feet (`native_send_particles`, native_hooks.rs:9936) and a small hop while it stands. A
-/// copy of Task 1's (wip/final-1, taken out of vanilla.rs:639-655), same signature and body: keep
-/// either at the merge.
+/// mob's feet (`native_send_particles`, native_hooks.rs:9936) and a small hop while it stands. The
+/// vanilla groups' windups (soulscraft_vanilla) and SoulsCraft's own mobs play it; the `pose` is
+/// the caller's (a vanilla model's raised arms).
 pub(super) fn play_cue(game: &mut Game<'_>, mob_id: u32, at: V3, cue: &Cue) {
     let Some((feet, width, height, on_ground)) = crate::game::soulscraft_find::mob(game, mob_id)
         .map(|m| ([m.position.x, m.position.y, m.position.z], m.kind.width, m.kind.height, m.on_ground))
@@ -646,6 +621,97 @@ pub(super) fn play_cue(game: &mut Game<'_>, mob_id: u32, at: V3, cue: &Cue) {
         set_velocity(game, mob_id, [0.0, up, 0.0], true);
     }
 }
+
+/// A standing player's eye height (vanilla `Player`), when the target's own is not at hand.
+const PLAYER_EYE: f64 = 1.62;
+
+/// The marksman's asks of this tick (soulscraft_rules::brain, `Tick::wants_cover`, `wants_post`):
+/// cover from its target for the reload that starts, a post in its kept distance.
+#[allow(clippy::too_many_arguments)]
+fn answer_marksman(game: &mut Game<'_>, def: &MobDef, m: &Seen, tick: &Tick, target: Option<&Target>, size: u8, now: u64) {
+    let Some(tg) = target else { return };
+    let hb = def.hitbox_at(size);
+    let cover = if tick.wants_cover { reload_cover(game, def, m, tg, hb) } else { None };
+    let post = if tick.wants_post { high_post(game, def, m, tg, hb) } else { None };
+    let mut s = state();
+    let Some(t) = s.mobs.get_mut(&m.id) else { return };
+    if tick.wants_cover {
+        t.brain.set_cover(cover);
+        let to = cover.map_or("-".into(), |c| format!("{:.1},{:.1},{:.1}", c[0], c[1], c[2]));
+        log::log!(chatty(), "soulscraft: reload_cover mob={} id={} to={to} tick={now}", def.id, m.id);
+    }
+    if tick.wants_post {
+        t.brain.set_post(post);
+    }
+}
+
+/// Where the marksman reloads: the nearest spot within `reload_cover_blocks` its target cannot see
+/// at its eyes nor at `cover_min_height_blocks` over its feet (soulscraft_rules::cover::reload_cover,
+/// the lines and spots of soulscraft_cover).
+fn reload_cover(game: &Game<'_>, def: &MobDef, m: &Seen, tg: &Target, hb: soulscraft_rules::data::Hitbox) -> Option<V3> {
+    let k = def.param("reload_cover_blocks").unwrap_or(8.0) as i32;
+    let top = def.param("cover_min_height_blocks").unwrap_or(2.0);
+    // A player's own (`Guest::eye_height`, lan/guest.rs:812: sneaking too), a mob's (mobs/living.rs:558).
+    let eye_height = match tg.player {
+        Some(uuid) => game.lan.as_ref().and_then(|h| h.hub.guests.iter().find(|g| g.uuid == uuid)).map_or(PLAYER_EYE, |g| g.eye_height()),
+        None => crate::game::soulscraft_find::mob(game, tg.entity).map_or(PLAYER_EYE, |x| x.eye_height()),
+    };
+    let eye = geom::add(tg.pos, [0.0, eye_height, 0.0]);
+    let spots = crate::game::soulscraft_cover::spots(game, m.pos, k, hb.width, hb.height);
+    let sight = |a: V3, b: V3| crate::game::soulscraft_cover::sees(game, a, b);
+    soulscraft_rules::cover::reload_cover(m.pos, &spots, &[hb.eye, top], eye, &sight)
+}
+
+/// The marksman's post: the candidates of soulscraft_rules::brain::post_candidates on the ground
+/// (within `high_ground_scan_blocks` up or down; where it stands is kept as it is), the highest
+/// with `prefers_high_ground` (`pick_post`).
+fn high_post(game: &Game<'_>, def: &MobDef, m: &Seen, tg: &Target, hb: soulscraft_rules::data::Hitbox) -> Option<V3> {
+    let (lo, hi) = def.param_range("keep_distance_blocks").unwrap_or((10.0, 16.0));
+    let scan = def.param("high_ground_scan_blocks").unwrap_or(6.0) as i32;
+    let grounded: Vec<V3> = brain::post_candidates(tg.pos, m.pos, lo, hi)
+        .into_iter()
+        .filter_map(|c| if c == m.pos { Some(c) } else { crate::game::soulscraft_cover::ground(game, c, scan, hb.width, hb.height) })
+        .collect();
+    brain::pick_post(&grounded, m.pos, def.param_bool("prefers_high_ground"))
+}
+
+/// The slime's jump without `sizes.*.jump_velocity`: the upward speed it always had.
+const LEAP_UP: f64 = 0.62;
+
+/// The numbers of this mob at its P (the slime's by its size, from `sizes`: health, damage and
+/// its decision interval, `decide_mult`).
+pub(super) fn scaled(def: &MobDef, p: f64, size: u8) -> Scaled {
+    let mut stats = def.stats;
+    if let Some(sz) = def.sizes.iter().find(|s| s.size == u32::from(size)) {
+        stats.health = sz.health;
+        stats.damage = sz.damage;
+    }
+    let mut sc = Scaled::at(&stats, p);
+    sc.decide_every = def.decide_every_at(size, sc.decide_every);
+    sc
+}
+
+/// The brute's roar as its rage starts (the mode `rage`): `passives.rage.cue`.
+fn roar(game: &mut Game<'_>, def: &MobDef, m: &Seen, tick: &Tick, size: u8) {
+    if !tick.events.contains(&Event::Mode("rage")) {
+        return;
+    }
+    let Some(cue) = def.passive("rage").and_then(|r| serde_json::from_value::<Cue>(r.get("cue")?.clone()).ok()) else { return };
+    let at = geom::add(m.pos, [0.0, def.hitbox_at(size).height * 0.6, 0.0]);
+    play_cue(game, m.id, at, &cue);
+}
+
+/// The slime's shadow where it lands (`params.shadow_particle`): the cue's particle shape, sized by
+/// its box at its size, round the landing point.
+fn shadow(game: &mut Game<'_>, def: &MobDef, size: u8, at: V3, kind: &str) {
+    let hb = def.hitbox_at(size);
+    let options = ParticleOptions::named(kind.to_owned());
+    let spread = [hb.width * 0.6, hb.height * 0.3, hb.width * 0.6];
+    let low = geom::add(at, [0.0, 0.2, 0.0]);
+    game.with_level(|_, level, _| level.native_send_particles(&options, None, low, spread, 0.02, 12));
+}
+
+
 /// The lurker's grab: its target put at its mouth this tick (a player keeps where it looks).
 fn hold_target(game: &mut Game<'_>, dim: &str, tg: &Target, at: V3, players: &[(NativeServerPlayer, bool)]) {
     match tg.player {
@@ -819,7 +885,7 @@ fn choose_target(game: &Game<'_>, m: &Seen, players: &[(NativeServerPlayer, bool
             pos,
             name: format!("mob{id}"),
             player: None,
-            sense: TargetSense { pos, shield_up, ..TargetSense::default() },
+            sense: TargetSense { pos, yaw: f64::from(t.yaw), shield_up, ..TargetSense::default() },
         });
     }
     let (p, up) = players
@@ -835,6 +901,7 @@ fn choose_target(game: &Game<'_>, m: &Seen, players: &[(NativeServerPlayer, bool
         player: Some(p.uuid),
         sense: TargetSense {
             pos,
+            yaw: f64::from(p.yaw),
             shield_up: *up,
             looking_at_me: looking,
             at_wall: at_wall(game, m.pos, pos),
@@ -855,6 +922,7 @@ fn target_entity(game: &Game<'_>, m: &Seen, entity: u32, players: &[(NativeServe
             player: Some(p.uuid),
             sense: TargetSense {
                 pos,
+                yaw: f64::from(p.yaw),
                 shield_up: *up,
                 looking_at_me: geom::off_facing(pos, f64::from(p.yaw), m.pos) <= 60.0,
                 at_wall: at_wall(game, m.pos, pos),
@@ -864,7 +932,13 @@ fn target_entity(game: &Game<'_>, m: &Seen, entity: u32, players: &[(NativeServe
     }
     let t = crate::game::soulscraft_find::mob(game, entity).filter(|x| !x.removed && x.alive())?;
     let pos = [t.position.x, t.position.y, t.position.z];
-    Some(Target { entity, pos, name: format!("mob{entity}"), player: None, sense: TargetSense { pos, ..TargetSense::default() } })
+    Some(Target {
+        entity,
+        pos,
+        name: format!("mob{entity}"),
+        player: None,
+        sense: TargetSense { pos, yaw: f64::from(t.yaw), ..TargetSense::default() },
+    })
 }
 
 /// Path-of-craft-tree's experience tag (Г3, variant A; PCT v0.4.6): exactly one `pct.xpNNN` on
@@ -1065,7 +1139,13 @@ fn deal(
         if later || a.follows.is_some() {
             clear_hurt_cooldown(game, tg);
         }
-        landed = game.native_hurt_entity(dim, tg.entity, blow as f32, "minecraft:mob_attack", Some(m.id));
+        landed = if a.knockback {
+            let strength = def.param("knockback_strength").unwrap_or(0.0);
+            let break_shield = tg.sense.shield_up && def.param("shield_disable_ticks").is_some_and(|t| t > 0.0);
+            knock_blow(game, dim, m.id, tg.entity, blow, strength, break_shield)
+        } else {
+            game.native_hurt_entity(dim, tg.entity, blow as f32, "minecraft:mob_attack", Some(m.id))
+        };
         if landed {
             crate::game::soulscraft_book::struck(&def.key, tg.entity, tg.player);
             give_effects(game, &a.effects, tg.player);
@@ -1095,6 +1175,48 @@ fn deal(
     if n > LOG_KEEP {
         s.strikes.drain(..n - LOG_KEEP);
     }
+}
+
+/// A blow with `knockback` (the revenant's shield bash, the marksman's butt strike): the engine's
+/// own mob hit (`native_mob_attack`, native_npcs.rs:231, `Mob.doHurtTarget`) at the blow's damage,
+/// with its extra push from the `attack_knockback` attribute (`knockback_strength`; half of it is
+/// the push, mobs/ai.rs:2806-2821), and with `break_shield` an axe in hand for that instant, so a
+/// blocking player's shield goes on cooldown as an axe's blow puts it (shield.rs:200-208,
+/// 242-283). The axe's own `attack_damage` modifier is taken out of the mob's value for that blow
+/// ([`base_for_blow`]), so the hit stays the data's blow. The mob's own numbers are put back after.
+/// Whether the blow was dealt.
+fn knock_blow(game: &mut Game<'_>, dim: &str, id: u32, target: u32, blow: f64, strength: f64, break_shield: bool) -> bool {
+    let Some(i) = crate::game::soulscraft_find::index_of(game, id) else { return false };
+    let m = &mut game.mobs[i];
+    let was = (m.attrs.attack_damage, m.attrs.attack_knockback, m.extra.main_hand.clone());
+    m.attrs.attack_knockback = strength;
+    if break_shield {
+        m.extra.main_hand = Some(std::sync::Arc::from(SHIELD_BREAKER));
+    }
+    let base = base_for_blow(game, i, blow);
+    game.mobs[i].attrs.attack_damage = base;
+    let landed = game.native_mob_attack(dim, id, target);
+    if let Some(m) = crate::game::soulscraft_find::mob_mut(game, id) {
+        (m.attrs.attack_damage, m.attrs.attack_knockback, m.extra.main_hand) = was;
+    }
+    landed
+}
+
+/// The mob's own attack damage that makes its hit come to `blow` with what it holds now: the
+/// engine's hit reads the value plus the main hand item's `attack_damage` modifiers from the item
+/// data (`gear::attack_damage`, mobs/gear.rs:152-167; `attribute_with`, mobs/equip.rs:67-85). Those
+/// are additions and multiplications of the value, so the hit is `a · value + b`: read at 0 and 1,
+/// solved for `blow`. With nothing in hand it is `blow` itself. Leaves the value it last tried.
+fn base_for_blow(game: &mut Game<'_>, i: usize, blow: f64) -> f32 {
+    let b = hit_at(game, i, 0.0);
+    let a = hit_at(game, i, 1.0) - b;
+    if a.abs() < 1e-6 { blow as f32 } else { ((blow - b) / a) as f32 }
+}
+
+/// The hit of mob `i` (its value and what it holds) with its own attack damage set to `value`.
+fn hit_at(game: &mut Game<'_>, i: usize, value: f32) -> f64 {
+    game.mobs[i].attrs.attack_damage = value;
+    f64::from(horizon_client::mobs::gear::attack_damage(&game.mobs[i], Some(game.items())))
 }
 
 /// The wave of a blow on the players it catches (the target the blow hit aside): from the impact
@@ -1408,6 +1530,12 @@ pub(super) fn on_incoming_damage(entity: i32, kind: &str, damage_type: &str, cau
         *amount *= (1.0 - reduction) as f32;
         log::info!("soulscraft: blocked mob=revenant id={entity} dmg={before:.2}->{:.2}", *amount);
     }
+}
+
+/// The self-test's stand-in for a player who hits a guarding revenant (`revenant_shield_front`):
+/// the damage hook's only player, at `pos`, until the next level tick names the real ones.
+pub(super) fn stand_in_player(pos: V3) {
+    GUARDS.lock().unwrap_or_else(PoisonError::into_inner).players = vec![(0, pos)];
 }
 
 /// soulscraft:bleeding hurts every `period_ticks` (data/mobs.json `effects.bleeding`).

@@ -11,6 +11,8 @@
   const mods = () => SC.ALTAR.modifiers;
   const modById = (id) => mods().find((m) => m.id === id);
   const levelName = (n) => 'Уровень ' + n;
+  // The recipe of a block or item from the recipe files (js/extra.js): «по форме: …» or «без формы: …».
+  const recipeLine = (id) => SC.recipeText(id) || 'нет рецепта';
 
   // ------------------------------------------------------------------ nav
   SC.navSection((active) => ['Алтарь', [
@@ -155,7 +157,7 @@
     const rows = SC.ALTAR.levels.map((lv) => {
       sockets += lv.sockets.length;
       return el('tr', {}, el('td', {}, lv.level), el('td', {}, lv.size + '×' + lv.size), el('td', {}, ringNeeds(lv.level)),
-        el('td', {}, sockets), el('td', {}, lv.spawn_boost), el('td', {}, lv.unlocks));
+        el('td', {}, sockets), el('td', {}, '×' + (1 + SC.ALTAR.spawn_boost.extra_passes[lv.level - 1]) + ' попыток'), el('td', {}, lv.unlocks));
     });
     return el('div', { class: 'wide' }, el('table', { class: 'sc-moves' }, el('thead', {}, head), el('tbody', {}, rows)),
       el('p', { class: 'small sc-cap' }, 'Гнёзда стоят на клетках кольца вместо плит (предложение): уровень 2 — запад и восток, 3 — север и юг, 4 — четыре клетки «вертушкой». Число гнёзд — на весь алтарь этого уровня.'));
@@ -400,100 +402,125 @@
   }
 
   // ------------------------------------------------------------------ menu mock
-  // What the altar menu shows (06-altar.md, «Меню алтаря»), drawn here in a vanilla-like GUI.
-  // The game version is drawn by the mod; the controls under the mock only set its state.
-  const heads = (n) => (n % 10 === 1 && n % 100 !== 11 ? 'голова' : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? 'головы' : 'голов');
-  function effects(counts) {
+  // The altar menu as the mod draws it (mod/soulscraft/altar_client.rs, rules/src/view.rs menu_lines):
+  // a dark panel with a title, a list of text lines and three buttons under it. The lines below are
+  // built the way the server builds them (altar_ui.rs menu_of, rules/src/altar.rs Effects::lines,
+  // boost.rs menu_line, event_ui.rs menu_lines); the controls under the mock only set the state.
+  const trimNum = (v) => String(Math.round(v * 100) / 100); // the game writes numbers with a dot
+  const signed = (v) => (v >= 0 ? '+' : '−') + trimNum(Math.abs(v));
+  const BLOCK_WORD = { core: 'ядро', pedestal: 'подставка', slab: 'плита', socket: 'гнездо', altar_pillar: 'колонна', altar_brazier: 'жаровня', altar_obelisk: 'обелиск' };
+
+  // Effects::lines of the banners standing.
+  function effectLines(counts) {
     const n = (id) => counts[id] || 0;
+    const sum = (key) => mods().reduce((a, m) => a + n(m.id) * (m.effect[key] || 0), 0);
     const out = [];
-    const pow = n('weight') - n('mercy');
-    if (pow) out.push(['Сила врагов', (pow > 0 ? '+ ' : '− ') + SC.num(Math.round(Math.abs(pow) * 15) / 100) + ' к силе P']);
-    const wave = n('horde') - n('calm');
-    if (wave) out.push(['Враги в волнах', (wave > 0 ? '+' : '−') + Math.abs(wave) * 25 + '%']);
-    const rest = n('haste') - n('rest');
-    if (rest) out.push(['Передышка', rest > 0 ? '−' + rest * 10 + ' с' : '+' + -rest * 15 + ' с']);
-    if (n('resilience')) out.push(['Здоровье алтаря', '+' + n('resilience') * 50 + '%']);
-    const kin = mods().filter((m) => m.effect.kin && n(m.id)).map((m) => KIN()[m.effect.kin] + (n(m.id) > 1 ? ' ×' + n(m.id) : ''));
-    if (kin.length) out.push(['Чаще', kin.join(', ')]);
-    const harder = Math.max(0, pow) + Math.max(0, wave) + Math.max(0, rest);
-    const easier = Math.max(0, -pow) + Math.max(0, -wave) + Math.max(0, -rest) + n('resilience');
-    out.push(['Награда', harder || easier ? (harder ? '+' + harder + ' ' + heads(harder) : '') + (harder && easier ? ', ' : '') + (easier ? 'меньше трофеев (−' + easier + ')' : '') : 'без изменений']);
+    if (Math.abs(sum('power')) > 1e-9) out.push('сила врагов P ' + signed(sum('power')));
+    if (Math.abs(sum('wave_size')) > 1e-9) out.push('врагов в волне ' + signed(sum('wave_size') * 100) + '%');
+    if (Math.abs(sum('rest_seconds')) > 1e-9) out.push('передышка ' + signed(sum('rest_seconds')) + ' с');
+    if (Math.abs(sum('altar_health')) > 1e-9) out.push('здоровье алтаря ' + signed(sum('altar_health') * 100) + '%');
+    const kins = mods().filter((m) => m.effect.kin && n(m.id));
+    if (kins.length) {
+      const share = Math.min(1, kins.reduce((a, m) => a + n(m.id) * m.effect.kin_share, 0));
+      out.push('род: ' + kins.map((m) => KIN()[m.effect.kin] + (n(m.id) > 1 ? ' ×' + n(m.id) : '')).join(', ') + ' — ' + trimNum(share * 100) + '% волны и чаще в спавне');
+    }
+    const more = mods().reduce((a, m) => a + (m.reward === 'more' ? n(m.id) : 0), 0);
+    const less = mods().reduce((a, m) => a + (m.reward === 'less' ? n(m.id) : 0), 0);
+    if (more || less) out.push('трофеи: сложнее ' + more + ', проще ' + less + ' (голов ' + (more >= less ? '+' + (more - less) : '−' + (less - more)) + ')');
     return out;
   }
+
+  // The boost's line (boost.rs menu_line): passes by level, the calm and horde banners scale them,
+  // the sector starts start_chunks away and comes one chunk closer every drift_ticks.
+  function boostLine(state, level, counts) {
+    const b = SC.ALTAR.spawn_boost;
+    if (!state.boost) return 'Учащённый спавн выключен';
+    const wave = mods().reduce((a, m) => a + (counts[m.id] || 0) * (m.effect.wave_size || 0), 0);
+    const passes = level ? Math.max(0, Math.round(b.extra_passes[level - 1] * (1 + wave))) : 0;
+    if (!passes) return 'Учащённый спавн: нет (алтарь не достроен или затишье гасит его)';
+    const side = 2 * b.sector_radius_chunks + 1;
+    const d = b.start_chunks - Math.min(b.start_chunks, Math.floor(state.age / (b.drift_ticks / 1200)));
+    const place = d === 0 ? 'вокруг алтаря' : 'в ' + d + ' чанк. от алтаря, на чанк ближе каждые ' + b.drift_ticks / 1200 + ' мин';
+    return 'Учащённый спавн: ×' + (1 + passes) + ' попыток в секторе ' + side + '×' + side + ' чанков ' + place;
+  }
+
+  // The lines the client draws, top to bottom (view.rs menu_lines).
+  function menuLines(state, counts, names) {
+    const lv = state.sky ? state.level : 0;
+    const out = [['Уровень алтаря: ' + lv]];
+    if (!state.sky) out.push(['Над ядром нет неба: уровень не засчитан', 'warn']);
+    else if (lv >= 4) out.push(['Алтарь достроен']);
+    else {
+      out.push(['До уровня ' + (lv + 1) + ':']);
+      for (const l of ringList(lv + 1)) out.push(['  ' + l]);
+    }
+    if (!names.length) out.push(['Знамён нет']);
+    else {
+      out.push(['Знамёна: ' + names.join(', ')]);
+      for (const l of effectLines(counts)) out.push(['  ' + l]);
+    }
+    out.push(['Учащённый спавн: ' + (state.boost ? 'включён' : 'выключен')]);
+    const ev = SC.DATA.events.find((e) => e.id === state.event);
+    if (state.running && lv && ev && ev.tier <= lv) {
+      const health = Math.round(ev.altar_health * (1 + 0.5 * (counts.resilience || 0)));
+      out.push(['Ивент «' + ev.name + '»: волна 2 из ' + ev.waves.length + ' (бой)'],
+        ['Здоровье алтаря: ' + Math.round(health * 0.62) + ' / ' + health], ['Участники: Lumen, Sova, Kestrel']);
+      return out;
+    }
+    if (!lv) out.push([state.sky ? 'Ивенты недоступны: достройте первое кольцо' : 'Ивенты недоступны: над ядром крыша']);
+    else {
+      out.push([SC.ALTAR.levels[lv - 1].unlocks]);
+      for (const e of SC.DATA.events) if (e.tier <= lv) out.push(['Ивент «' + e.name + '»: положите ' + SC.itemName(e.item) + ' на подставку']);
+    }
+    out.push([boostLine(state, lv, counts)]);
+    return out;
+  }
+
+  // «плита ×16»: what ring n still needs, a line per kind of block, from the placed structure.
+  function ringList(n) {
+    const placed = pieces(placedOf(n, false)).filter((p) => (n === 1 ? p.ring <= 1 : p.ring === n));
+    const out = [], seen = new Map();
+    for (const p of placed) {
+      const word = BLOCK_WORD[p.kind === 'corner' ? SC.ALTAR.levels[n - 1].corner : p.kind] || p.kind;
+      seen.set(word, (seen.get(word) || 0) + 1);
+    }
+    for (const [w, k] of seen) out.push(w + ' ×' + k);
+    return out;
+  }
+
   function menuMock() {
-    const state = { level: 3, banners: ['weight', 'weight', 'mercy', 'kin_undead'], boost: true, event: false, sky: true };
-    const gui = el('div', { class: 'mc-gui', role: 'img', 'aria-label': 'Макет меню алтаря' });
+    const state = { level: 3, banners: ['weight', 'weight', 'mercy', 'kin_undead'], boost: true, running: false, sky: true, event: 'grave_night', age: 0 };
+    const gui = el('div', { class: 'mc-gui mc-menu', role: 'img', 'aria-label': 'Макет меню алтаря: список строк и три кнопки' });
     const ctl = el('div', { class: 'mc-ctl' });
     const sockets = (lv) => SC.ALTAR.levels.slice(0, lv).reduce((a, l) => a + l.sockets.length, 0);
-    const icon = (id) => (SC.ITEMS[modById(id).banner] || {}).texture;
-    // Altar health rolls to its new value when banners or the event change it (SC.Flow).
-    const hpNow = new SC.Flow(String), hpMax = new SC.Flow(String), hpInfo = new SC.Flow(String);
-    let hpPct = null;
     function draw() {
       gui.textContent = '';
       const lv = state.sky ? state.level : 0;
-      gui.append(el('div', { class: 'mc-title' }, 'Алтарь призыва'));
-      if (!state.sky) gui.append(el('div', { class: 'mc-warn' }, 'Алтарю нужно небо: над ядром есть блоки. Уровни не засчитываются, ивенты и учащённый спавн не работают.'));
-      // Level
-      const next = SC.ALTAR.levels[lv];
-      gui.append(el('div', { class: 'mc-panel' }, el('div', { class: 'mc-h' }, 'Уровень'),
-        el('div', { class: 'mc-big' }, lv ? 'Уровень ' + lv + ' из 4' : 'Уровень не засчитан'),
-        el('div', {}, !state.sky ? 'Уберите блоки над ядром.' : next ? 'До уровня ' + next.level + ': ' + ringNeeds(next.level) : 'Алтарь достроен.'),
-        el('button', { type: 'button', class: 'mc-btn', tabindex: -1 }, 'Показать призрак')));
-      // Banners
-      const n = sockets(lv);
-      const slots = el('div', { class: 'mc-slots' });
-      const counts = {};
-      for (let i = 0; i < Math.max(n, 1); i++) {
-        const id = i < n ? state.banners[i] : null;
-        if (id) counts[id] = (counts[id] || 0) + 1;
-        slots.append(el('div', { class: 'mc-slot' + (i < n ? '' : ' off'), title: id ? modById(id).name : i < n ? 'пустое гнездо' : 'гнёзд нет' },
-          id ? el('img', { src: icon(id), alt: modById(id).name }) : null));
+      const counts = {}, names = [];
+      for (let i = 0; i < sockets(lv); i++) {
+        const id = state.banners[i];
+        if (!id) continue;
+        counts[id] = (counts[id] || 0) + 1;
+        names.push(modById(id).name);
       }
-      const eff = effects(counts);
-      gui.append(el('div', { class: 'mc-panel' }, el('div', { class: 'mc-h' }, 'Знамёна · гнёзд ' + n),
-        slots, el('table', { class: 'mc-eff' }, el('tbody', {}, eff.map(([k, v]) => el('tr', {}, el('td', {}, k), el('td', {}, v)))))));
-      // Spawn boost
-      gui.append(el('div', { class: 'mc-panel' }, el('div', { class: 'mc-h' }, 'Учащённый спавн'),
-        el('div', { class: 'mc-row' },
-          el('button', { type: 'button', class: 'mc-btn' + (state.boost ? ' on' : ''), tabindex: -1 }, 'Включён'),
-          el('button', { type: 'button', class: 'mc-btn' + (state.boost ? '' : ' on'), tabindex: -1 }, 'Выключен')),
-        el('div', { class: 'mc-small' }, !lv ? 'Не работает без неба.' : state.boost ? 'Сила: ' + SC.ALTAR.levels[lv - 1].spawn_boost + '. Сектор сдвигается к алтарю.' : 'Алтарь не учащает спавн; ивенты запускаются.')));
-      // Event
-      const ev = SC.DATA.events[0];
-      const health = Math.round(ev.altar_health * (1 + 0.5 * (counts.resilience || 0)));
-      const evPanel = el('div', { class: 'mc-panel' }, el('div', { class: 'mc-h' }, 'Ивент'));
-      if (state.event && lv) {
-        const now = Math.round(health * 0.62);
-        const pct = (now / health) * 100;
-        const fill = el('i', { style: 'width:' + (hpPct == null ? pct : hpPct) + '%' });
-        evPanel.append(el('div', {}, 'Волна 2 из ' + ev.waves.length + ' · ' + ev.name),
-          el('div', { class: 'mc-bar' }, fill, el('span', {}, 'Здоровье алтаря ', hpNow.el, ' / ', hpMax.el)),
-          el('div', { class: 'mc-small' }, 'Участники: Lumen, Sova, Kestrel (3 в зоне)'));
-        gui.append(evPanel);
-        hpNow.set(now);
-        hpMax.set(health);
-        void fill.offsetWidth;
-        fill.style.width = pct + '%';
-        hpPct = pct;
-      } else {
-        evPanel.append(el('div', {}, lv ? 'Доступны ивенты ступеней ' + (lv > 1 ? '1–' + lv : '1') + '.' : 'Ивенты недоступны.'),
-          el('div', { class: 'mc-small' }, 'Положите предмет призыва на подставку. Здоровье алтаря в ивенте: ', hpInfo.el, '.'));
-        gui.append(evPanel);
-        hpInfo.set(health);
-      }
+      gui.append(el('div', { class: 'mc-title' }, 'Алтарь призыва'),
+        ...menuLines(state, counts, names).map(([text, tone]) => el('div', { class: 'mc-line' + (tone === 'warn' ? ' warn' : ''), style: 'padding-left:' + (text.length - text.trimStart().length) * 0.5 + 'em' }, text.trimStart() || ' ')),
+        el('div', { class: 'mc-btns' },
+          el('span', { class: 'mc-gbtn' + (state.boost ? ' on' : '') }, 'Учащ. спавн: вкл'),
+          el('span', { class: 'mc-gbtn' + (state.boost ? '' : ' on') }, 'Учащ. спавн: выкл'),
+          el('span', { class: 'mc-gbtn' }, 'Показать призрак')));
     }
-    // Controls of the mock
+    const redraw = (fn) => () => (fn(), draw());
     const lvRow = el('div', { class: 'sc-clips' }, el('span', { class: 'sc-state-label' }, 'Уровень:'));
-    for (const lv of SC.ALTAR.levels) {
+    for (const lv of SC.ALTAR.levels)
       lvRow.append(el('button', { type: 'button', 'data-level': lv.level, onclick: () => {
         state.level = lv.level;
         for (const b of lvRow.querySelectorAll('button')) b.classList.toggle('on', Number(b.dataset.level) === lv.level);
         draw();
       } }, String(lv.level)));
-    }
+    for (const b of lvRow.querySelectorAll('button')) b.classList.toggle('on', Number(b.dataset.level) === state.level);
     const flags = el('div', { class: 'sc-clips' });
-    for (const [key, label] of [['event', 'Идёт ивент'], ['boost', 'Учащённый спавн включён'], ['sky', 'Над ядром небо']]) {
+    for (const [key, label] of [['running', 'Идёт ивент'], ['boost', 'Учащённый спавн включён'], ['sky', 'Над ядром небо']]) {
       const b = el('button', { type: 'button', 'aria-pressed': String(state[key]), class: state[key] ? 'on' : '' }, label);
       b.onclick = () => {
         state[key] = !state[key];
@@ -503,6 +530,12 @@
       };
       flags.append(b);
     }
+    const evSel = el('select', { 'aria-label': 'Ивент, который идёт' }, SC.DATA.events.map((e) => el('option', { value: e.id, selected: e.id === state.event }, e.tier + '. ' + e.name)));
+    evSel.onchange = redraw(() => (state.event = evSel.value));
+    const ageSel = el('select', { 'aria-label': 'Сколько стоит алтарь' }, [[0, 'алтарь только что построен'], [10, 'стоит 10 минут'], [30, 'стоит 30 минут и больше']]
+      .map(([v, t]) => el('option', { value: v, selected: v === state.age }, t)));
+    ageSel.onchange = redraw(() => (state.age = Number(ageSel.value)));
+    flags.append(evSel, ageSel);
     const pick = el('div', { class: 'sc-clips' }, el('span', { class: 'sc-state-label' }, 'Знамёна в гнёздах (по порядку):'));
     for (let i = 0; i < 8; i++) {
       const sel = el('select', { 'aria-label': 'Гнездо ' + (i + 1) }, el('option', { value: '' }, '—'),
@@ -514,9 +547,28 @@
       pick.append(sel);
     }
     ctl.append(lvRow, flags, pick);
-    for (const b of lvRow.querySelectorAll('button')) b.classList.toggle('on', Number(b.dataset.level) === state.level);
     draw();
-    return el('div', { class: 'mc-wrap' }, el('div', { class: 'mc-mock-label' }, 'Макет: меню в игре рисует мод, здесь только содержание и расклад'), gui, ctl);
+    return el('div', { class: 'mc-wrap' }, el('div', { class: 'mc-mock-label' }, 'Макет: меню в игре рисует мод, здесь строки и кнопки в том виде, как их строит сервер'), gui, ctl,
+      el('p', { class: 'small sc-cap' }, 'Во время ивента вместо строк о горнах и спавне идут три строки ивента. Над алтарём панель ивента пишет «Волна 2 из ' + SC.DATA.events[1].waves.length + ' · ' + SC.DATA.events[1].name + '».'));
+  }
+
+  // ------------------------------------------------------------------ spawn boost
+  // data/altar.json spawn_boost (hypotheses of iteration 3): passes by level, the sector, the drift.
+  function boostSection() {
+    const b = SC.ALTAR.spawn_boost, side = 2 * b.sector_radius_chunks + 1;
+    const head = el('tr', {}, ['Уровень', 'Попыток спавна', 'Доп. проходов'].map((h) => el('th', {}, h)));
+    const rows = SC.ALTAR.levels.map((lv, i) => el('tr', {}, el('td', {}, lv.level), el('td', {}, '×' + (1 + b.extra_passes[i])), el('td', {}, b.extra_passes[i])));
+    return [el('h2', {}, 'Учащённый спавн'),
+      el('p', {}, 'Пока алтарь стоит под открытым небом и кнопка в меню включена, ванильный спавн пробует сектор вокруг алтаря чаще: каждый чанк сектора, где спавн и так возможен, проходится ещё несколько раз по ванильным правилам и лимитам. Кроме того, в списке спавна сектора появляются мобы других биомов и мобы SoulsCraft; знамёна рода поднимают вес своего рода.'),
+      el('div', { class: 'wide' }, el('table', { class: 'sc-moves' }, el('thead', {}, head), el('tbody', {}, rows),
+        el('caption', { class: 'sc-cap' }, 'Знамя орды увеличивает число проходов на 25%, знамя затишья уменьшает на 25%: при нуле проходов спавн не учащается.'))),
+      el('table', { class: 'stats' }, el('tbody', {},
+        el('tr', {}, el('td', {}, 'Сектор'), el('td', {}, side + '×' + side + ' чанков (радиус ' + b.sector_radius_chunks + ')')),
+        el('tr', {}, el('td', {}, 'Где он начинает'), el('td', {}, b.start_chunks + ' чанков от алтаря, в одном из восьми направлений, которое задаёт место ядра')),
+        el('tr', {}, el('td', {}, 'Шаг к алтарю'), el('td', {}, 'на чанк ближе каждые ' + b.drift_ticks / 1200 + ' минут: через ' + (b.start_chunks * b.drift_ticks) / 1200 + ' минут сектор уже вокруг алтаря')),
+        el('tr', {}, el('td', {}, 'Чужие мобы'), el('td', {}, b.foreign.map((f) => SC.waveName({ type: f.type }) + ' (вес ' + f.weight + ')').join(', '))),
+        el('tr', {}, el('td', {}, 'Мобы SoulsCraft'), el('td', {}, 'вес ' + b.soulscraft_weight + ' у каждого, элитных и водных нет')))),
+      el('p', { class: 'small sc-cap' }, 'Источник: ' + b.source + '.')];
   }
 
   // ------------------------------------------------------------------ pages
@@ -533,7 +585,8 @@
         levels: () => [el('h2', {}, 'Уровни'), levelViewer(), levelsTable()],
         build: () => [el('h2', {}, 'Достройка и призрак'), SC.ui.scenesPanel({}, { scenes: [buildScene()], ground: 22, legend: false })],
         summon: () => [el('h2', {}, 'Призыв: Гнилой горн'), SC.ui.scenesPanel({}, { scenes: [summonScene()], ground: 64, legend: false })],
-        menu: () => [el('h2', {}, 'Меню алтаря'), el('p', {}, 'Правый клик по ядру без предмета в руке. Кнопки нажимает любой игрок.'), menuMock()],
+        menu: () => [el('h2', {}, 'Меню алтаря'), el('p', {}, 'Правый клик по ядру без предмета в руке. Список строк и три кнопки; кнопки нажимает любой игрок.'), menuMock()],
+        boost: () => boostSection(),
         banners: () => [el('h2', {}, 'Знамёна'), bannerGrid(), el('p', {}, el('a', { href: '#altar/blocks' }, 'Все блоки алтаря и предметы →'))],
       };
       for (const [key, make] of Object.entries(parts)) if (!only || only === key) box.append(...make());
@@ -573,9 +626,10 @@
     snapStage.scene.remove(object);
     return url;
   }
+  SC.pieceSnapshot = pieceSnapshot; // js/recipes.js draws the blocks of the recipes' results with it
 
   function blocksPage() {
-    const main = start('altar/blocks', 'Блоки алтаря и предметы', 'Модели блоков — ванильные JSON-модели из элементов, по блоку на клетку; колонна и обелиск — несколько блоков друг на друге, как дверь. Рецепты появятся после утверждения.');
+    const main = start('altar/blocks', 'Блоки алтаря и предметы', 'Модели блоков — ванильные JSON-модели из элементов, по блоку на клетку; колонна и обелиск — несколько блоков друг на друге, как дверь. Рецепты — в разделе «Предметы и рецепты».');
     const box = el('div');
     main.append(box);
     whenReady(box, () => {
@@ -590,13 +644,13 @@
           el('div', { class: 'sc-thumb' }, el('img', { src: pic, alt: 'Блок: ' + b.name })),
           el('div', { class: 'sc-card-body' }, el('b', {}, b.name), el('code', {}, 'soulscraft:' + b.id),
             el('div', { class: 'sc-q' }, b.role), el('div', { class: 'sc-role' }, facts.join(' · ')),
-            el('div', { class: 'sc-nums' }, 'рецепт — после утверждения'))));
+            el('div', { class: 'sc-nums' }, recipeLine(b.id)))));
       }
       box.append(el('h2', {}, 'Блоки'), grid);
-      box.append(el('h2', {}, 'Знамёна'), el('p', {}, 'Двенадцать знамён, каждое ставится на гнездо модификатора. Блок высотой 2, смотрит наружу от алтаря.'), bannerGrid());
+      box.append(el('h2', {}, 'Знамёна'), el('p', {}, 'Двенадцать знамён, каждое ставится на гнездо модификатора. Блок высотой 2, смотрит наружу от алтаря. Все собираются из белого знамени и двух осколков души плюс один предмет.'), bannerGrid());
       const items = [
-        ['rotten_horn', 'Гнилой горн', 'Предмет призыва тестового ивента: на подставке запускает ивент, призывает только зомби. Тратится при старте.', 'Где взять: сундуки структур, редкая добыча с врагов, крафт (Г9) — рецепт после утверждения'],
-        ['hunter_book', 'Книга охотника', 'Справочник в игре: открывает сведения об алтарях и врагах по мере встреч и убийств (08-guide-book.md).', 'Крафт: книга и гнилая плоть (предложение) — рецепт после утверждения'],
+        ['rotten_horn', 'Гнилой горн', 'Горн первой ступени: на подставке алтаря запускает тестовый ивент с зомби. Тратится при старте.', 'Где взять: сундуки подземелий и шахт, редко с ванильных зомби, крафт: ' + recipeLine('rotten_horn')],
+        ['hunter_book', 'Книга охотника', 'Справочник в игре: открывает сведения об алтарях и врагах по мере встреч и убийств (08-guide-book.md).', 'Крафт: ' + recipeLine('hunter_book')],
       ];
       const loot = el('div', { class: 'sc-loot' });
       for (const [id, name, text, where] of items) {
@@ -659,7 +713,7 @@
         ['Награда', rewardText(m.reward) + (m.reward === 'more' ? ': + 1 голова за победу' : m.reward === 'less' ? ': трофеев меньше' : '')],
         ['Складывается', opp ? 'одинаковые складываются; с «' + opp.name + '» гасят друг друга' : 'одинаковые складываются'],
         ['Где стоит', 'на гнезде модификатора; гнёзд 2 на уровне 2, 4 на уровне 3, 8 на уровне 4'],
-        ['Рецепт', 'после утверждения']];
+        ['Рецепт', recipeLine(m.banner)]];
       box.append(el('div', { class: 'sc-banner-page' },
         el('div', { class: 'sc-banner-pics' }, canvas, el('div', { class: 'sc-item sc-banner-view' }, view),
           el('img', { class: 'sc-px', src: SC.ITEMS[m.banner].texture, alt: 'Значок предмета', width: 64, height: 64 })),

@@ -7,8 +7,9 @@
 // (`BlockEntities::mods_near`), not by scanning blocks; the check runs every
 // `cover.check_every_ticks`.
 //
-// Not yet (prototypes/p6-altar.md): the marksman's cover that still sees its target, and other
-// threats (players with bows) in the same list.
+// The marksman's reload takes cover from its target with the same lines and spots ([`spots`],
+// [`sees`]; soulscraft_server). Not yet (prototypes/p6-altar.md): the marksman's cover that still
+// sees its target, and other threats (players with bows) in the same list.
 //
 // Log line: soulscraft: cover mob=revenant id=12 from=-706,101,700 to=-697.5,101.0,700.5 tick=..
 use crate::game::Game;
@@ -95,7 +96,7 @@ pub(super) fn steer(game: &mut Game<'_>, dim: &str, now: u64, id: u32, pos: V3, 
         }
         if now < s.next_check {
             if s.until.is_none() && now.saturating_sub(s.walked) >= REPATH {
-                game.native_mob_navigate(dim, id, spot, 0, 1.2);
+                game.native_mob_navigate(dim, id, spot, 0, cover::COVER_SPEED);
                 s.walked = now;
             }
             states().insert(id, s);
@@ -119,19 +120,7 @@ pub(super) fn steer(game: &mut Game<'_>, dim: &str, now: u64, id: u32, pos: V3, 
         states().insert(id, s);
         return None;
     }
-    let boxes = |c: [i32; 3]| game.native_block_collision(c);
-    let k = r.search_blocks;
-    let mut spots = Vec::new();
-    for dy in -1..=1 {
-        for dx in -k..=k {
-            for dz in -k..=k {
-                let p = [pos[0].floor() + 0.5 + f64::from(dx), pos[1].floor() + f64::from(dy), pos[2].floor() + 0.5 + f64::from(dz)];
-                if fit::fits(p, width, height, &boxes) && fit::supported(p, width, &boxes) {
-                    spots.push(p);
-                }
-            }
-        }
-    }
+    let spots = spots(game, pos, r.search_blocks, width, height);
     let found = cover::nearest_cover(pos, &spots, eye, &threats, &sight);
     match found {
         Some(spot) => {
@@ -145,7 +134,7 @@ pub(super) fn steer(game: &mut Game<'_>, dim: &str, now: u64, id: u32, pos: V3, 
                     spot[2]
                 );
             }
-            game.native_mob_navigate(dim, id, spot, 0, 1.2);
+            game.native_mob_navigate(dim, id, spot, 0, cover::COVER_SPEED);
             s.spot = Some(spot);
             s.until = None;
             s.walked = now;
@@ -157,6 +146,36 @@ pub(super) fn steer(game: &mut Game<'_>, dim: &str, now: u64, id: u32, pos: V3, 
             None
         }
     }
+}
+
+/// The block centres within `k` blocks of `pos` (a block up or down too) where a box `width` by
+/// `height` fits and stands on something: where a mob may take cover.
+pub(super) fn spots(game: &Game<'_>, pos: V3, k: i32, width: f64, height: f64) -> Vec<V3> {
+    let boxes = |c: [i32; 3]| game.native_block_collision(c);
+    let mut spots = Vec::new();
+    for dy in -1..=1 {
+        for dx in -k..=k {
+            for dz in -k..=k {
+                let p = [pos[0].floor() + 0.5 + f64::from(dx), pos[1].floor() + f64::from(dy), pos[2].floor() + 0.5 + f64::from(dz)];
+                if fit::fits(p, width, height, &boxes) && fit::supported(p, width, &boxes) {
+                    spots.push(p);
+                }
+            }
+        }
+    }
+    spots
+}
+
+/// The ground under `at` for a box `width` by `height`: the spot in its column nearest its height,
+/// within `scan` blocks up or down, where the box fits and stands on something (the marksman's
+/// posts). None when there is none.
+pub(super) fn ground(game: &Game<'_>, at: V3, scan: i32, width: f64, height: f64) -> Option<V3> {
+    let boxes = |c: [i32; 3]| game.native_block_collision(c);
+    let base = at[1].floor();
+    (0..=scan)
+        .flat_map(|d| [d, -d])
+        .map(|dy| [at[0], base + f64::from(dy), at[2]])
+        .find(|p| fit::fits(*p, width, height, &boxes) && fit::supported(*p, width, &boxes))
 }
 
 /// A mob gone: its cover state too.

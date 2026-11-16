@@ -34,6 +34,10 @@ const PANEL_W: f32 = 300.0;
 const PANEL_MAX_W: f32 = 460.0;
 const BUTTON_H: f32 = 18.0;
 const LEFT: i32 = 0;
+/// The zone border's posts stand this many blocks apart, this tall.
+const OUTLINE_STEP: i32 = 4;
+const OUTLINE_BEAM: u32 = 3;
+const OUTLINE_COLOR: u32 = 0xC0FF_D040;
 
 #[derive(Default)]
 struct AltarClient {
@@ -131,8 +135,17 @@ fn panel_width(screen: &NativeScreenView<'_>) -> f32 {
 }
 
 /// The menu's lines wrapped to the panel's text width (a long line, the spawn boost's, breaks).
+/// The horns are named from the language table (`item.soulscraft.<id>`), the crate's own words
+/// where it has no entry.
 fn wrapped(game: &Game<'_>, screen: &NativeScreenView<'_>, menu: &view::Menu) -> Vec<String> {
-    view::wrap(&view::menu_lines(menu), panel_width(screen) - 16.0, |s| game.native_text_width(s))
+    let lines = view::menu_lines_named(menu, item_name);
+    view::wrap(&lines, panel_width(screen) - 16.0, |s| game.native_text_width(s))
+}
+
+/// An item's name in the player's language, by its id.
+fn item_name(id: &str) -> String {
+    let key = format!("item.{}", id.replacen(':', ".", 1));
+    horizon_client::lang::get_or(&key, &soulscraft_rules::book_page::piece_name(id))
 }
 
 fn inside(r: [f32; 4], at: [f32; 2]) -> bool {
@@ -151,7 +164,7 @@ pub(super) fn draw_screen(game: &Game<'_>, batch: &mut HudBatch, screen: &Native
     game.native_fill(batch, [panel[0], panel[1], panel[2], 1.0], 0xFF9C_F5E4);
     game.native_text(batch, "Алтарь призыва", [panel[0] + 8.0, panel[1] + 6.0], 0x9CF5E4, true);
     for (i, l) in lines.iter().enumerate() {
-        let color = if l.starts_with("Алтарю нужно") { 0xFF6060 } else { 0xE8E0D0 };
+        let color = if l == view::NO_SKY { 0xFF6060 } else { 0xE8E0D0 };
         game.native_text(batch, l, [panel[0] + 8.0, panel[1] + 6.0 + LINE * (i as f32 + 1.0)], color, true);
     }
     let labels = [("Учащ. спавн: вкл", menu.boost), ("Учащ. спавн: выкл", !menu.boost), ("Показать призрак", false)];
@@ -293,6 +306,9 @@ pub(super) fn primitives(game: &Game<'_>, p: &mut WorldPrimitives) {
             }
         }
         let Some(e) = &v.event else { continue };
+        if let Some(o) = &e.outline {
+            outline(p, o);
+        }
         for s in &e.spawns {
             let base = [f64::from(s[0]) + 0.5, f64::from(s[1]), f64::from(s[2]) + 0.5];
             p.beam(base, 24, 0xFFFF_5030);
@@ -316,5 +332,20 @@ pub(super) fn primitives(game: &Game<'_>, p: &mut WorldPrimitives) {
         p.text([top[0], top[1] + 1.4, top[2]], format!("Алтарь {:.0}/{:.0}", e.hp.ceil(), e.max), color, 1.0)
             .background()
             .scale_with_distance();
+    }
+}
+
+/// The event zone's border for the first seconds of a run: a rail round it at the core's height
+/// and a short beam every `OUTLINE_STEP` blocks, as the spawn points are drawn.
+fn outline(p: &mut WorldPrimitives, o: &view::Outline) {
+    let c = o.corners();
+    for i in 0..4 {
+        let (a, b) = (c[i], c[(i + 1) % 4]);
+        for dy in [0.1, 2.0] {
+            p.line([a[0], a[1] + dy, a[2]], [b[0], b[1] + dy, b[2]], OUTLINE_COLOR, 2.0);
+        }
+    }
+    for post in o.posts(OUTLINE_STEP) {
+        p.beam([f64::from(post[0]), f64::from(o.y), f64::from(post[1])], OUTLINE_BEAM, OUTLINE_COLOR);
     }
 }

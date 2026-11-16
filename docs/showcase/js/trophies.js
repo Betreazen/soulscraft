@@ -49,8 +49,9 @@
     node.rotation.set(rot[0], -rot[1], -rot[2], 'ZYX');
     node.scale.set(1, 1, 1);
   }
-  // A flat label on the plaque: the name and a made-up kill count, as the mod will write it.
-  function plaqueMesh(plaque, text) {
+  // A flat label on the plaque: two lines as the mod writes them (trophy.rs plaque_lines): the mob's
+  // name, then «<владелец> — убито N» (the owner's kills of that mob from the hunter's book).
+  function plaqueMesh(plaque, lines) {
     const c = document.createElement('canvas');
     const w = plaque.to[0] - plaque.from[0], h = plaque.to[1] - plaque.from[1];
     c.width = 256;
@@ -59,10 +60,11 @@
     g.fillStyle = '#2a1c0b';
     g.textAlign = 'center';
     g.textBaseline = 'middle';
-    let size = Math.round(c.height * 0.6);
+    // One size for both lines: the larger of what the plaque's height lets them be, cut down until the widest fits.
+    let size = Math.round(c.height / (lines.length + 0.6));
     g.font = '700 ' + size + 'px Georgia, serif';
-    while (g.measureText(text).width > c.width * 0.86 && size > 8) g.font = '700 ' + --size + 'px Georgia, serif';
-    g.fillText(text, c.width / 2, c.height / 2 + 1);
+    while (Math.max(...lines.map((l) => g.measureText(l).width)) > c.width * 0.86 && size > 8) g.font = '700 ' + --size + 'px Georgia, serif';
+    lines.forEach((l, i) => g.fillText(l, c.width / 2, ((i + 1) * c.height) / (lines.length + 1) + 1));
     const tex = new T.CanvasTexture(c);
     tex.encoding = T.sRGBEncoding;
     const mat = new T.MeshLambertMaterial({ map: tex, transparent: true, polygonOffset: true, polygonOffsetFactor: -2 });
@@ -72,8 +74,8 @@
     mesh.rotation.y = Math.PI;
     return mesh;
   }
-  // The plaque says the name and the owner's kills (from the hunter's book): a sample number.
-  const plaqueText = (id) => mobName(id) + ' · ' + (7 + (id.length * 5) % 17);
+  // The plaque says the name and the owner's kills (from the hunter's book): a sample owner and number.
+  const plaqueText = (id) => [mobName(id), 'Lumen — убито ' + (7 + (id.length * 5) % 17)];
 
   // A head on the floor (rotation 0..15) or on a wall (facing): {group, actor}.
   SC.trophyHead = (id, where, r) =>
@@ -586,10 +588,9 @@
         stage.frame(boxPts([-4.6, 0, -4.6], [4.6, 2, 4.6]), 1.0);
       }).catch((e) => fail(String(e && e.stack ? e.stack : e)));
       icons.textContent = '';
-      const it = SC.ITEMS[id + '_head'];
-      if (it)
-        icons.append(el('img', { class: 'sc-px', src: it.texture, alt: 'Значок предмета: голова', width: 64, height: 64 }),
-          el('span', { class: 'small' }, 'Значок предмета ' + 'soulscraft:' + id + '_head: лицевая грань головы с текстуры моба (запасной вариант; лучше — мод рисует голову в слоте, как ваниль).'));
+      if (SC.ITEMS[id + '_head'])
+        icons.append(SC.ui.itemStage(id + '_head'),
+          el('span', { class: 'small' }, 'Предмет soulscraft:' + id + '_head — объёмная модель из тех же кубов, что и голова; в руке, в слоте и на земле он выглядит так же. Поставленный блок: на полу soulscraft:' + id + '_head_stand, на стене soulscraft:' + id + '_head_mount. Из любого из них при ломании выпадает предмет.'));
     }
     const first = SC.TROPHIES[params.get('mob')] ? params.get('mob') : 'brute';
     buttons(mRow, mobs().map((m) => [m.id, m.name]), first, show);
@@ -603,12 +604,24 @@
     const d = SC.TROPHY_DATA.drops;
     const pc = (v) => SC.num(Math.round(v * 1000) / 10) + '%';
     const rows = [
-      ['Голова', d.head.event, pc(d.head.world) + ' с обычного моба, ' + pc(d.head.world_elite) + ' с элитного'],
-      ['Часть брони', pc(d.armor.event) + ' за победу на каждую часть брони мобов ивента', d.armor.world],
+      ['Голова', d.head.event, pc(d.head.world) + ' с обычного моба SoulsCraft, ' + pc(d.head.world_elite) + ' с элитного (громила), за убийство, которое засчитала книга'],
+      ['Часть брони', pc(d.armor.event) + ' за победу на каждую часть брони мобов ивента, умножается на знамёна', d.armor.world],
       ['Диорама', d.diorama.event, 'нет'],
     ];
-    return el('table', { class: 'sc-moves' }, el('thead', {}, el('tr', {}, ['Трофей', 'Ивент', 'Обычный мир'].map((h) => el('th', {}, h)))),
-      el('tbody', {}, rows.map((r) => el('tr', {}, r.map((c) => el('td', {}, c))))));
+    const mult = [0, 1, 2, 3, -1, -2].map((k) => [k > 0 ? k + ' × «сложнее»' : k < 0 ? -k + ' × «проще»' : 'без знамён', SC.num(Math.max(0, 1 + d.banner_step * k)),
+      pc(Math.min(1, d.armor.event * Math.max(0, 1 + d.banner_step * k))), Math.max(1, 1 + k)]);
+    const tiers = SC.TROPHY_DATA.tiers.map((t) => [t.tier, t.shards, t.item ? SC.itemName(t.item) : '—', t.chance ? pc(t.chance) : '—']);
+    return el('div', { class: 'wide' },
+      el('table', { class: 'sc-moves' }, el('thead', {}, el('tr', {}, ['Трофей', 'Ивент', 'Обычный мир'].map((h) => el('th', {}, h)))),
+        el('tbody', {}, rows.map((r) => el('tr', {}, r.map((c) => el('td', {}, c)))))),
+      el('h3', {}, 'Множитель знамён'),
+      el('table', { class: 'sc-moves' }, el('thead', {}, el('tr', {}, ['Знамёна', 'Множитель', 'Шанс каждой части брони', 'Голов за победу'].map((h) => el('th', {}, h)))),
+        el('tbody', {}, mult.map((r) => el('tr', {}, r.map((c) => el('td', {}, c))))),
+        el('caption', { class: 'sc-cap' }, '1 + ' + SC.num(d.banner_step) + ' × (сложнее − проще), не меньше нуля. Тот же множитель у шанса предмета ступени.')),
+      el('h3', {}, 'Награда ступени'),
+      el('table', { class: 'sc-moves' }, el('thead', {}, el('tr', {}, ['Ступень', 'Осколки души', 'Предмет', 'Шанс предмета'].map((h) => el('th', {}, h)))),
+        el('tbody', {}, tiers.map((r) => el('tr', {}, r.map((c) => el('td', {}, c))))),
+        el('caption', { class: 'sc-cap' }, SC.TROPHY_DATA.tiers_text + '.')));
   }
   function exportTable() {
     const head = el('tr', {}, ['Моб', 'Блок', 'Голова', 'Фигурка: масштаб, сдвиг, поворот', 'Свет', 'Частицы'].map((h) => el('th', {}, h)));
@@ -642,7 +655,7 @@
     const main = ui.main;
     main.append(el('h1', {}, 'Трофеи: диорамы'));
     main.append(el('p', { class: 'sum' }, SC.TROPHY_DATA.diorama.text + ' ' + SC.TROPHY_DATA.diorama.item +
-      '. Награда за победу на алтаре 3-го уровня и выше. Ещё трофеи — головы мобов и части их брони.'));
+      '. Награда за победу на алтаре 3-го уровня и выше. Ещё трофеи — головы мобов и части их брони. На табличке две строки: имя моба и «<владелец> — убито N»: сколько таких мобов убил игрок, поставивший диораму (по книге охотника).'));
     const box = el('div');
     main.append(box);
     whenReady(box, () => {
@@ -658,7 +671,7 @@
           return [el('h2', {}, 'Зал трофеев'), b];
         },
         heads: () => [el('h2', {}, 'Головы'),
-          el('p', {}, 'Блок головы на полу поворачивается на 16 направлений (состояние rotation 0..15), на стене — на 4 (facing). Головы — те же кубы и текстура, что у моба; рога громилы и приманка удильщика выходят за ванильные 8 пикселей.'),
+          el('p', {}, 'Голова — предмет, а поставленная — блок: на полу <id>_head_stand поворачивается на 16 направлений (состояние rotation 0..15), на стене <id>_head_mount — на 4 (facing). Тег #soulscraft:heads собирает все семь голов для рецепта Горна бури. Головы — те же кубы и текстура, что у моба; рога громилы и приманка удильщика выходят за ванильные 8 пикселей.'),
           headsPanel(params)],
         drops: () => [el('h2', {}, 'Откуда берутся'), dropsTable(),
           el('p', { class: 'small sc-cap' }, 'Числа — предложения (09-trophies.md). Диорама видна в пределах ' + SC.TROPHY_DATA.diorama.view_blocks +
@@ -690,8 +703,8 @@
       el('div', { class: 'cols' },
         el('div', { class: 'text' }, el('h3', {}, 'Броня'), armour,
           el('p', { class: 'small' }, el('a', { href: '#trophies?mob=' + m.id }, 'Все диорамы и зал трофеев →'))),
-        el('aside', {}, el('h3', {}, 'Голова'), icon ? el('img', { class: 'sc-px', src: icon.texture, alt: 'Значок: голова', width: 64, height: 64 }) : null,
-          el('p', { class: 'small' }, 'soulscraft:' + m.id + '_head, на стене soulscraft:' + m.id + '_wall_head. Масштаб ' + fmt(t.head.floor.scale) + '.'))));
+        el('aside', {}, el('h3', {}, 'Голова'), icon ? SC.ui.itemStage(m.id + '_head') : null,
+          el('p', { class: 'small' }, 'Предмет soulscraft:' + m.id + '_head, блок на полу soulscraft:' + m.id + '_head_stand, на стене soulscraft:' + m.id + '_head_mount. Масштаб ' + fmt(t.head.floor.scale) + '.'))));
     whenReady(box, () => box.append(dioramaPanel(params, m.id)));
   });
 })();

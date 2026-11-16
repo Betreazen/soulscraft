@@ -71,8 +71,49 @@ fn forced_overhead_runs_its_phases_on_the_data_ticks() {
     assert!(s[0].1.hits_target);
     assert_eq!(out[0].label, "overhead:windup 0");
     assert_eq!(b.clip().name, "");
-    assert!(out[10].look_at.is_none(), "a held blow stops tracking");
+    assert!(out[18].look_at.is_some(), "the blow faces the target");
     assert!(!out[5].guarding, "the shield is down while it attacks");
+}
+
+/// The revenant's held blow follows the target: it looks at it and steps after it at
+/// `hold_step_speed`; the blow itself still lands only on a target in reach on the hit tick.
+#[test]
+fn hold_tracks_target() {
+    let m = mob("revenant");
+    let step = m.param("hold_step_speed").expect("hold_step_speed in the data");
+    let mut b = Brain::new(Style::Duelist, 1, 0);
+    b.force(m.attack_index("overhead").unwrap());
+    // The target steps back to 4 blocks as the hold starts.
+    let out = run(&mut b, &m, 0.0, 0, 20, |n| senses(n, if n < 10 { 2.0 } else { 4.0 }));
+    for t in &out[10..18] {
+        assert_eq!(t.look_at, Some([0.0, 1.5, 4.0]), "{}", t.label);
+        match t.order {
+            Order::Walk { to, speed } => {
+                assert_eq!(to, [0.0, 0.0, 4.0]);
+                assert!((speed - step).abs() < 1e-9);
+            }
+            o => panic!("{}: {o:?}", t.label),
+        }
+    }
+    assert_eq!(out[9].order, Order::Stay, "the windup stands");
+}
+
+/// Stepping away during the hold is followed; stepping away on the blow's tick is a miss.
+#[test]
+fn dodge_during_hit_misses() {
+    let m = mob("revenant");
+    let mut b = Brain::new(Style::Duelist, 1, 0);
+    b.force(m.attack_index("overhead").unwrap());
+    // In reach through the hold (the mob kept up), out of reach from the hit tick (18).
+    let out = run(&mut b, &m, 0.0, 0, 30, |n| senses(n, if n < 18 { 2.0 } else { 4.0 }));
+    let s = strikes(&out);
+    assert_eq!(s.len(), 1);
+    assert_eq!(s[0].0, 18);
+    assert!(!s[0].1.hits_target);
+    let mut b = Brain::new(Style::Duelist, 1, 0);
+    b.force(m.attack_index("overhead").unwrap());
+    let kept = run(&mut b, &m, 0.0, 0, 30, |n| senses(n, 2.0));
+    assert!(strikes(&kept)[0].1.hits_target, "a target that stayed is hit");
 }
 
 #[test]
@@ -234,6 +275,186 @@ fn stalker_flees_when_hurt_and_comes_back() {
     assert_eq!(out[10].label, "flee");
     assert!(matches!(out[10].order, Order::Walk { to, speed } if to[2] < 0.0 && speed > 1.0));
     assert!(out[205].label != "flee", "back after return_after_ticks");
+}
+
+/// A stalker 2 blocks from a target facing it (yaw 180: north, at the mob).
+fn facing_stalker(n: u64, seen: bool) -> Senses {
+    let mut s = senses(n, 2.0);
+    let t = s.target.as_mut().unwrap();
+    t.yaw = 180.0;
+    t.looking_at_me = seen;
+    s
+}
+
+#[test]
+fn stalker_waits_while_seen() {
+    let m = mob("stalker");
+    let max = m.param("flank_max_ticks").expect("flank_max_ticks in the data") as usize;
+    let mut b = Brain::new(Style::Skirmisher, 2, 0);
+    let out = run(&mut b, &m, 0.0, 0, max as u64, |n| facing_stalker(n, true));
+    assert!(starts(&out).is_empty(), "no attack while seen, before flank_max_ticks");
+    assert_eq!(out[1].label, "circle");
+    let (lo, hi) = m.param_range("circle_radius_blocks").unwrap();
+    let tg = [0.0, 0.0, 2.0];
+    match out[1].order {
+        Order::Walk { to, .. } => {
+            let off = geom::off_facing(tg, 180.0, to);
+            assert!(off > 90.0, "the flank point is beside or behind the target: {off:.0}°");
+            let r = geom::flat_dist(tg, to);
+            assert!(r >= lo - 1e-9 && r <= hi + 1e-9, "on the ring: {r}");
+        }
+        o => panic!("{o:?}"),
+    }
+}
+
+#[test]
+fn stalker_strikes_when_unseen() {
+    let m = mob("stalker");
+    let mut b = Brain::new(Style::Skirmisher, 2, 0);
+    let out = run(&mut b, &m, 0.0, 0, 3, |n| facing_stalker(n, false));
+    assert_eq!(starts(&out), vec![(0, m.attack_index("double_slash").unwrap())]);
+}
+
+#[test]
+fn stalker_strikes_after_timeout() {
+    let m = mob("stalker");
+    let max = m.param("flank_max_ticks").unwrap() as usize;
+    let mut b = Brain::new(Style::Skirmisher, 2, 0);
+    let out = run(&mut b, &m, 0.0, 0, max as u64 + 30, |n| facing_stalker(n, true));
+    let st = starts(&out);
+    assert!(!st.is_empty(), "attacks after flank_max_ticks even when seen");
+    assert!(st[0].0 >= max && st[0].0 <= max + 20, "at {}", st[0].0);
+    assert_eq!(st[0].1, m.attack_index("double_slash").unwrap());
+}
+
+/// Back from fleeing, a stalker that is seen flanks again from the start: the time spent fleeing
+/// does not count towards `flank_max_ticks`.
+#[test]
+fn stalker_flanks_anew_after_fleeing() {
+    let m = mob("stalker");
+    let max = m.param("flank_max_ticks").unwrap() as usize;
+    let back = m.param("return_after_ticks").unwrap() as usize;
+    let mut b = Brain::new(Style::Skirmisher, 2, 0);
+    // Seen all along; hurt at tick 40 (a decision tick at P 0): it flees until 40 + back.
+    let out = run(&mut b, &m, 0.0, 0, (40 + back + max + 30) as u64, |n| {
+        let mut s = facing_stalker(n, true);
+        s.health_frac = if n < 40 { 1.0 } else { 0.2 };
+        s
+    });
+    assert!(out[40].events.contains(&Event::Mode("flee")));
+    let st = starts(&out);
+    assert!(!st.is_empty());
+    assert!(st[0].0 >= 40 + back + max, "struck at {} while seen, back at {}", st[0].0, 40 + back);
+}
+
+/// A wall the marksman reloads behind: 3 wide (x 4..6) and 3 high (y 0..2) at z 3, the target
+/// 11 blocks south of a marksman at the origin, the floor at y −1.
+fn reload_wall(c: [i32; 3]) -> bool {
+    c[1] == -1 || ((4..=6).contains(&c[0]) && c[2] == 3 && (0..=2).contains(&c[1]))
+}
+
+#[test]
+fn marksman_reloads_behind_cover() {
+    let m = mob("marksman");
+    let shot = m.attack_index("aimed_shot").unwrap();
+    let k = m.param("reload_cover_blocks").expect("reload_cover_blocks in the data") as i32;
+    let top = m.param("cover_min_height_blocks").unwrap();
+    let eye = m.hitbox_at(0).eye;
+    let target_eye = [0.5, 2.3, 11.5];
+    let sight = |a: V3, b: V3| crate::cover::clear_line(a, b, &reload_wall);
+    let spots: Vec<V3> = (-k..=k)
+        .flat_map(|x| (-k..=k).map(move |z| [f64::from(x) + 0.5, 0.0, f64::from(z) + 0.5]))
+        .filter(|p| !reload_wall([p[0].floor() as i32, 0, p[2].floor() as i32]))
+        .collect();
+    let from = [0.5, 0.0, 0.5];
+    let spot = crate::cover::reload_cover(from, &spots, &[eye, top], target_eye, &sight).expect("a spot behind the wall");
+    let s = crate::cover::ARRIVAL_SLACK;
+    for (dx, dz) in [(0.0, 0.0), (-s, -s), (s, -s), (-s, s), (s, s)] {
+        for h in [eye, top] {
+            assert!(!sight(target_eye, geom::add(spot, [dx, h, dz])), "hidden wherever its walk ends: {spot:?}");
+        }
+    }
+    assert!(geom::flat_dist(from, spot) <= f64::from(k) * 1.5, "near: {spot:?}");
+    // No wall: no cover, the old step back.
+    let open = |a: V3, b: V3| crate::cover::clear_line(a, b, &|c: [i32; 3]| c[1] == -1);
+    assert_eq!(crate::cover::reload_cover(from, &spots, &[eye, top], target_eye, &open), None);
+
+    // The brain: the shot's reload asks for cover once, shows `reload` all through, walks there.
+    let mut b = Brain::new(Style::Shooter, 4, 0);
+    b.force(shot);
+    let line = Timeline::of(&m.attacks[shot]);
+    let out = run(&mut b, &m, 0.0, 0, u64::from(line.recover_start()) + 1, |n| senses(n, 11.0));
+    let r = line.recover_start() as usize;
+    assert!(out[r].wants_cover && out.iter().filter(|t| t.wants_cover).count() == 1);
+    assert_eq!(b.clip().name, "reload");
+    b.set_cover(Some(spot));
+    let sc = Scaled::at(&m.stats, 0.0);
+    let next = b.tick(&m, &sc, &senses(u64::from(line.recover_start()) + 1, 11.0));
+    assert_eq!(next.order, Order::Walk { to: spot, speed: crate::cover::COVER_SPEED });
+    assert_eq!(b.clip().name, "reload");
+    let rest = run(&mut b, &m, 0.0, u64::from(line.recover_start()) + 2, u64::from(line.recover) + 2, |n| senses(n, 11.0));
+    assert!(rest.iter().any(|t| t.events.iter().any(|e| matches!(e, Event::AttackEnd { .. }))));
+    assert_ne!(b.clip().name, "reload", "the clip ends with the reload");
+
+    // Not in its cover when the reload ends (the bench's walk took longer than the 30 ticks): it
+    // keeps going there and shoots no more until it stands in it.
+    let after = u64::from(line.end()) + 4;
+    let going = run(&mut b, &m, 0.0, after, 20, |n| senses(n, 11.0));
+    assert!(starts(&going).is_empty(), "no shot on the way to cover");
+    assert!(going.iter().all(|t| t.order == Order::Walk { to: spot, speed: crate::cover::COVER_SPEED }), "{:?}", going[0].order);
+    let there = run(&mut b, &m, 0.0, after + 20, 25, |n| {
+        let mut s = senses(n, 11.0);
+        s.pos = spot;
+        s
+    });
+    assert_eq!(starts(&there).first().map(|x| x.1), Some(shot), "shoots again once in cover");
+
+    // A cover it never gets to is given up a reload's length after the reload.
+    let mut b = Brain::new(Style::Shooter, 4, 0);
+    b.force(shot);
+    run(&mut b, &m, 0.0, 0, u64::from(line.recover_start()) + 1, |n| senses(n, 11.0));
+    b.set_cover(Some(spot));
+    let stuck = run(&mut b, &m, 0.0, u64::from(line.recover_start()) + 1, 100, |n| senses(n, 11.0));
+    let give_up = (line.recover_start() + 2 * line.recover) as usize - (line.recover_start() as usize + 1);
+    let again = starts(&stuck);
+    assert!(!again.is_empty(), "shoots again after giving up");
+    assert!(again[0].0 >= give_up && again[0].0 <= give_up + 20, "at {} (gives up at {give_up})", again[0].0);
+}
+
+#[test]
+fn marksman_prefers_high_ground() {
+    let m = mob("marksman");
+    assert!(m.param_bool("prefers_high_ground"));
+    let (lo, hi) = m.param_range("keep_distance_blocks").unwrap();
+    let target = [0.0, 0.0, 0.0];
+    let from = [0.0, 0.0, -6.0];
+    let cands = post_candidates(target, from, lo, hi);
+    assert!(cands.len() >= 5, "several candidates");
+    assert!(cands.iter().all(|c| (lo..=hi).contains(&geom::flat_dist(*c, target))));
+    // Raise one far candidate on a hill: the high ground wins over the near ones.
+    let mut ground: Vec<V3> = cands.clone();
+    let far = ground.len() - 1;
+    ground[far][1] = 4.0;
+    assert_eq!(pick_post(&ground, from, true), Some(ground[far]));
+    let near = pick_post(&ground, from, false).unwrap();
+    assert!(near[1] == 0.0, "without the preference: the nearest");
+    assert_eq!(pick_post(&[], from, true), None);
+    // In its band already, on flat ground, it stays where it is.
+    let at = [0.0, 0.0, -12.0];
+    let flat = post_candidates(target, at, lo, hi);
+    assert_eq!(pick_post(&flat, at, true), Some(at));
+
+    // The brain asks for a post on its decision and walks to the one it is given.
+    let mut b = Brain::new(Style::Shooter, 4, 0);
+    let sc = Scaled::at(&m.stats, 0.0);
+    let s0 = senses(0, 20.0);
+    let t0 = b.tick(&m, &sc, &s0);
+    assert!(t0.wants_post);
+    let post = [3.0, 4.0, 8.0];
+    b.set_post(Some(post));
+    let t1 = b.tick(&m, &sc, &senses(1, 20.0));
+    assert_eq!(t1.order, Order::Walk { to: post, speed: 1.0 });
+    assert!(!t1.wants_post);
 }
 
 #[test]
@@ -622,6 +843,8 @@ fn a_turn_held_too_long_lapses_and_a_dead_holder_lets_go() {
         label: String::new(),
         hold: None,
         shadow: None,
+        wants_cover: false,
+        wants_post: false,
     };
     turns.note(5, 1, 100, &t, 46);
     assert!(turns.waits(5, 2, 120));

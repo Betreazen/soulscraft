@@ -126,6 +126,22 @@ pub fn group_power(at: [f64; 3], players: &[([f64; 3], f64)]) -> Option<f64> {
     Some(clamp_p(group.iter().sum::<f64>() / group.len() as f64))
 }
 
+/// The power an altar's event scales its mobs by: the mean P of all its participants in the zone
+/// at the start (06-altar.md), clamped; 0 with nobody.
+pub fn participant_power(powers: &[f64]) -> f64 {
+    if powers.is_empty() {
+        return 0.0;
+    }
+    clamp_p(powers.iter().sum::<f64>() / powers.len() as f64)
+}
+
+/// The highest P among the players within `radius` blocks of `at` (the natural spawn's tier gate,
+/// data/mobs.json `natural.tier_gate_blocks`); None when nobody is that near.
+pub fn best_power_near(at: [f64; 3], players: &[([f64; 3], f64)], radius: f64) -> Option<f64> {
+    let d2 = |a: [f64; 3], b: [f64; 3]| (0..3).map(|i| (a[i] - b[i]).powi(2)).sum::<f64>();
+    players.iter().filter(|p| d2(p.0, at) <= radius * radius).map(|p| p.1).reduce(f64::max)
+}
+
 /// The entity tag Path-of-craft-tree reads the kill experience multiplier from (Г3, variant A;
 /// PCT v0.4.6): `pct.xp145` is × 1.45. One on each mob; PCT takes the largest if there are more.
 pub const XP_TAG_PREFIX: &str = "pct.xp";
@@ -361,5 +377,27 @@ mod tests {
         let players = [([10.0, 0.0, 0.0], 0.2), ([30.0, 0.0, 0.0], 0.6), ([200.0, 0.0, 0.0], 1.0)];
         assert!(close(group_power([0.0; 3], &players).unwrap(), 0.4));
         assert!(close(group_power([190.0, 0.0, 0.0], &players).unwrap(), 1.0));
+    }
+
+    #[test]
+    fn group_power_is_participant_mean() {
+        // Every participant counts, however far apart in the zone (Г5's 32 blocks do not apply).
+        assert!(close(participant_power(&[0.2, 0.6]), 0.4));
+        assert!(close(participant_power(&[0.1, 0.2, 0.9]), 0.4));
+        assert_eq!(participant_power(&[]), 0.0);
+        assert_eq!(participant_power(&[1.4, 1.2]), 1.0);
+        // Unlike group_power, which takes only those near the nearest player.
+        let spread = [([0.0, 0.0, 0.0], 0.2), ([40.0, 0.0, 0.0], 0.6)];
+        assert!(close(group_power([0.0; 3], &spread).unwrap(), 0.2));
+        assert!(close(participant_power(&spread.map(|p| p.1)), 0.4));
+    }
+
+    #[test]
+    fn the_strongest_player_near_decides_the_tier() {
+        let players = [([0.0, 64.0, 0.0], 0.1), ([100.0, 64.0, 0.0], 0.4), ([300.0, 64.0, 0.0], 1.0)];
+        assert_eq!(best_power_near([10.0, 64.0, 0.0], &players, 128.0), Some(0.4));
+        assert_eq!(best_power_near([-100.0, 64.0, 0.0], &players, 128.0), Some(0.1));
+        assert_eq!(best_power_near([1000.0, 64.0, 0.0], &players, 128.0), None);
+        assert_eq!(best_power_near([0.0; 3], &[], 128.0), None);
     }
 }

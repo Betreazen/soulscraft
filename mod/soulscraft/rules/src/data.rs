@@ -318,6 +318,9 @@ pub struct MoveDef {
     pub id: String,
     #[serde(default)]
     pub clip: Option<String>,
+    /// What the move sounds like when it starts (the marksman's reload behind cover).
+    #[serde(default)]
+    pub cue: Option<crate::vanilla::Cue>,
 }
 
 /// The kin groups of the kin banners (data/altar.json `kin_names`).
@@ -348,6 +351,12 @@ pub struct SizeDef {
 #[derive(Clone, Debug, Deserialize)]
 pub struct EventDef {
     pub id: String,
+    /// What players read: the altar menu and the event's bar (`Ночь мертвецов`).
+    #[serde(default)]
+    pub name: String,
+    /// The banner-bearer's `minecraft:scale` (a big zombie); 1 for an event without one.
+    #[serde(default = "one")]
+    pub bearer_scale: f64,
     #[serde(default)]
     pub rest_seconds: Vec<f64>,
     /// The altar's health at the start, before the resilience banner (hypothesis Г12).
@@ -367,6 +376,10 @@ pub struct EventDef {
     pub defense: Map<String, Value>,
     #[serde(default)]
     pub waves: Vec<EventWave>,
+}
+
+fn one() -> f64 {
+    1.0
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -684,6 +697,28 @@ mod tests {
         let text = EMBEDDED.replacen(", \"jump_clear_blocks\": 0.5", "", 1);
         assert_ne!(text, EMBEDDED, "the brute's jump_clear_blocks was found");
         assert!(MobsFile::parse(&text).unwrap_err().contains("jump_clear_blocks"));
+    }
+
+    #[test]
+    fn own_mobs_cue_their_attacks() {
+        let f = MobsFile::embedded();
+        let r = f.mob("revenant").unwrap();
+        let swing = r.attack("slash").unwrap().cue.as_ref().unwrap();
+        assert_eq!(swing.cue.sound.as_deref(), Some("minecraft:entity.zombie.attack_iron_door"));
+        assert_eq!(swing.on, CueOn::Windup);
+        let bash = r.attack("shield_bash").unwrap().cue.as_ref().unwrap();
+        assert_eq!(bash.cue.sound.as_deref(), Some("minecraft:item.shield.block"));
+        assert_eq!(bash.on, CueOn::Hit);
+        let lunge = f.mob("stalker").unwrap().attack("lunge").unwrap().cue.as_ref().unwrap();
+        assert_eq!(lunge.cue.sound.as_deref(), Some("minecraft:entity.fox.screech"));
+        let m = f.mob("marksman").unwrap();
+        let shot = m.attack("aimed_shot").unwrap().cue.as_ref().unwrap();
+        assert_eq!((shot.cue.sound.as_deref(), shot.on), (Some("minecraft:item.crossbow.shoot"), CueOn::Hit));
+        let hide = m.moves.iter().find(|x| x.id == "hide").and_then(|x| x.cue.as_ref()).unwrap();
+        assert_eq!(hide.sound.as_deref(), Some("minecraft:item.crossbow.loading_start"));
+        // A vanilla group's cue stays its own (`VanillaAttack.cue`), not its attack's.
+        assert!(f.vanilla.groups.iter().flat_map(|g| &g.attacks).all(|a| a.def.cue.is_none()));
+        assert!(f.vanilla.groups.iter().flat_map(|g| &g.attacks).any(|a| a.cue.sound.is_some()));
     }
 
     #[test]

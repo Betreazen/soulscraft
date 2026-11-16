@@ -1,6 +1,7 @@
 'use strict';
-// Pages of the bestiary: #bestiary (index of all mobs), #mob/<id>, #event; more pages come from
-// SC.page() (js/altar.js: #altar, #altar/blocks, #banner/<id>), more nav sections from SC.navSection().
+// Pages of the handbook: #bestiary (index of all mobs), #mob/<id>, #event (the four events) and
+// #event/<id>; more pages come from SC.page() (js/altar.js: #altar, #altar/blocks, #banner/<id>;
+// js/defense.js, js/vanilla.js, js/recipes.js, js/trophies.js, js/book.js), more nav sections from SC.navSection().
 (function () {
   const el = SC.el;
   const main = document.getElementById('main');
@@ -31,7 +32,10 @@
     }
     nav.append(ul);
     nav.append(el('h3', {}, 'Ивенты'));
-    nav.append(el('ul', {}, el('li', {}, el('a', { href: '#event', class: active === 'event' ? 'on' : '' }, el('span', { class: 'nm' }, 'Тестовый ивент')))));
+    nav.append(el('ul', {},
+      el('li', {}, el('a', { href: '#event', class: active === 'event' ? 'on' : '' }, el('span', { class: 'nm' }, 'Все ступени'))),
+      SC.DATA.events.map((ev) => el('li', {}, el('a', { href: '#event/' + ev.id, class: active === 'event/' + ev.id ? 'on' : '' },
+        el('span', { class: 'nm' }, ev.tier + '. ' + ev.name))))));
     for (const section of SC.NAV) {
       const [title, links] = section(active);
       nav.append(el('h3', {}, title));
@@ -43,8 +47,8 @@
   // ------------------------------------------------------------------ index
   function bestiary() {
     buildNav('bestiary');
-    main.append(el('h1', {}, 'Бестиарий первого среза'));
-    main.append(el('p', { class: 'sum' }, 'Семь мобов, и каждый задаёт игроку свой вопрос. Замах пропорционален урону, после сильной атаки моб открыт. Числа — гипотезы до плейтестов.'));
+    main.append(el('h1', {}, 'Бестиарий'));
+    main.append(el('p', { class: 'sum' }, 'Семь мобов SoulsCraft, и каждый задаёт игроку свой вопрос. Замах пропорционален урону, после сильной атаки моб открыт. Ванильные мобы с новыми приёмами — на странице «Ванильные мобы». Версия 0.7.0, числа — гипотезы до плейтестов с людьми.'));
     const grid = el('div', { class: 'sc-grid' });
     for (const m of SC.DATA.mobs) {
       const ready = !!SC.GLB[m.id];
@@ -69,14 +73,15 @@
 
   // ------------------------------------------------------------------ mob page
   function statsTable(m) {
-    const rows = [['Id', m.key], ['Среда', ENV[m.env]], ['Ступень силы игрока', 'от ' + SC.num(m.tier_p)], ['Где', m.spawn],
+    const rows = [['Id', m.key], ['Среда', ENV[m.env]], ['Появляется от силы P', SC.num(m.tier_p)], ['Где', m.spawn],
       ['Здоровье', m.stats.health], ['Удар', m.stats.damage + (m.damage_note ? ' (' + m.damage_note + ')' : '')], ['Броня', m.stats.armor]];
     if (m.stats.speed != null) rows.push(['Скорость', SC.num(m.stats.speed)]);
     if (m.stats.knockback_resistance != null) rows.push(['Сопротивление отбрасыванию', SC.num(m.stats.knockback_resistance)]);
     if (m.height_px) rows.push(['Рост', m.height_px + ' пикселей']);
     const z = SC.DATA.vanilla_zombie;
     return el('table', { class: 'stats' }, el('tbody', {}, rows.map(([k, v]) => el('tr', {}, el('td', {}, k), el('td', {}, v)))),
-      el('caption', { class: 'sc-cap' }, 'Ванильный зомби: здоровье ' + z.health + ', удар ' + z.damage + ', броня ' + z.armor + ', скорость ' + SC.num(z.speed) + '.'));
+      el('caption', { class: 'sc-cap' }, 'Ванильный зомби: здоровье ' + z.health + ', удар ' + z.damage + ', броня ' + z.armor + ', скорость ' + SC.num(z.speed) + '. ' +
+        'Естественный спавн и спавнер удильщика отменяются, если ни у одного игрока в 128 блоках сила P не ниже ступени моба. В ивентах и при учащённом спавне алтаря ступень не действует: там сила берётся от группы.'));
   }
 
   // Effects an attack puts on the player (mobs.json attacks[].effects): name, and for the
@@ -131,6 +136,23 @@
     });
     return el('div', { class: 'wide' }, el('table', { class: 'sc-moves sc-moveset' }, el('thead', {}, head), el('tbody', {}, rows)),
       el('p', { class: 'small sc-cap' }, 'т — тики, 20 в секунду. Фаза удара (2 тика, у бросков дольше) — наше предположение: в бестиарии её нет.'));
+  }
+
+  // Sounds and the data fields that work in 0.7.0 (what a mob script gives as `sounds` and `fields`):
+  // «когда → id звука» and «поле → значение: что делает». Every value is a hypothesis.
+  function factsPanel(def) {
+    const out = [];
+    if (def && def.sounds && def.sounds.length)
+      out.push(el('h2', {}, 'Звуки'), el('div', { class: 'wide' }, el('table', { class: 'sc-moves' },
+        el('thead', {}, el('tr', {}, el('th', {}, 'Когда'), el('th', {}, 'Звук'))),
+        el('tbody', {}, def.sounds.map(([when, id]) => el('tr', {}, el('td', {}, when), el('td', {}, el('code', {}, id))))),
+        el('caption', { class: 'sc-cap' }, 'Звуки ванильные, выбор — гипотеза до плейтестов: что звучит, правят данные, а не код.'))));
+    if (def && def.fields && def.fields.length)
+      out.push(el('h2', {}, 'Поля данных, которые работают'), el('div', { class: 'wide' }, el('table', { class: 'sc-moves' },
+        el('thead', {}, el('tr', {}, el('th', {}, 'Поле или правило'), el('th', {}, 'Значение'), el('th', {}, 'Что делает'))),
+        el('tbody', {}, def.fields.map(([k, v, what]) => el('tr', {}, el('td', {}, el('code', {}, k)), el('td', {}, v), el('td', {}, what)))),
+        el('caption', { class: 'sc-cap' }, 'Числа в data/mobs.json, все — гипотезы.'))));
+    return out;
   }
 
   function placeholder(m) {
@@ -418,6 +440,7 @@
     main.append(el('h2', {}, 'Мувсет'), movesetTable(m));
     if (m.moves && m.moves.length)
       main.append(el('table', { class: 'sc-moves' }, el('tbody', {}, m.moves.map((mv) => el('tr', {}, el('td', {}, mv.name), el('td', {}, mv.note))))));
+    main.append(...factsPanel(def));
     if (def && def.scenes && SC.GLB[id]) {
       main.append(el('h2', {}, 'Сцены поведения'));
       main.append(scenesPanel(m, def));
@@ -432,17 +455,130 @@
     }
   }
 
-  function eventPage() {
-    buildNav('event');
-    for (const ev of SC.DATA.events) {
-      main.append(el('h1', {}, ev.name));
-      main.append(el('p', { class: 'sum' }, 'Передышка ' + ev.rest_seconds.join('–') + ' с. Здоровье алтаря ' + ev.altar_health + '. Цель: ' + ev.target + '.'));
-      main.append(el('table', { class: 'sc-moves' },
-        el('thead', {}, el('tr', {}, el('th', {}, 'Волна'), el('th', {}, 'Мобы'))),
-        el('tbody', {}, ev.waves.map((w) => el('tr', {}, el('td', {}, w.wave),
-          el('td', {}, w.mobs.map((x) => (x.name || 'зомби') + ' × ' + x.count + (x.armored ? ', из них в броне ' + x.armored : '') + (x.health_mult ? ', здоровье × ' + x.health_mult : '')).join('; ')))))));
-      main.append(el('p', { class: 'small sc-cap' }, 'Источник: ' + ev.source + '.'));
+  // ------------------------------------------------------------------ events
+  const plural = (n, one, few, many) => (n % 10 === 1 && n % 100 !== 11 ? one : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? few : many);
+  const hornName = (ev) => SC.itemName(ev.item);
+  const tierReward = (ev) => SC.TROPHY_DATA.tiers.find((t) => t.tier === ev.tier);
+  const itemIcon = (id, size) => {
+    const it = SC.ITEMS[id.split(':')[1]];
+    return it && !it.model.elements ? el('img', { class: 'sc-px sc-inline', src: it.texture, alt: '', width: size || 32, height: size || 32 }) : null;
+  };
+  // The own mobs of an event, from its waves (a vanilla type is not an own mob).
+  const eventMobs = (ev) => {
+    const ids = [];
+    for (const w of ev.waves) for (const x of w.mobs) {
+      const own = SC.DATA.mobs.find((m) => m.id === x.type);
+      if (own && !ids.includes(own.id)) ids.push(own.id);
     }
+    return ids.map(SC.mobById);
+  };
+  // The names of the types that drop a head: every type of the event but the banner-bearer.
+  const headMobs = (ev) => {
+    const names = [];
+    for (const w of ev.waves) for (const x of w.mobs) {
+      if (x.type === 'banner_zombie') continue;
+      const n = SC.waveName({ type: x.type });
+      if (!names.includes(n)) names.push(n);
+    }
+    return names;
+  };
+
+  function waveRows(ev) {
+    return ev.waves.map((w) => {
+      const total = w.mobs.reduce((n, x) => n + x.count, 0);
+      return el('tr', {}, el('td', {}, w.wave), el('td', {}, total),
+        el('td', {}, w.mobs.map((x) => SC.waveName(x) + ' × ' + x.count + (x.armored ? ', из них в броне ' + x.armored : '') +
+          (x.health_mult ? ', здоровье × ' + SC.num(x.health_mult) : '')).join('; ')));
+    });
+  }
+
+  function rewardList(ev) {
+    const d = SC.TROPHY_DATA.drops, tr = tierReward(ev), step = SC.num(d.banner_step);
+    const own = eventMobs(ev);
+    const pieces = [];
+    for (const m of own) for (const l of m.loot) if (!pieces.includes(l.item)) pieces.push(l.item);
+    const items = [
+      el('li', {}, el('b', {}, 'Голова. '), 'Одна за победу, голова одного из мобов ивента: ' + headMobs(ev).join(', ') + '. Плюс по одной за каждое знамя «сложнее», минус по одной за «проще», но не меньше одной.'),
+      pieces.length
+        ? el('li', {}, el('b', {}, 'Броня. '), 'Каждая часть: ' + pieces.map(SC.itemName).join(', ') + '. Шанс каждой ' + SC.num(d.armor.event * 100) + '%, умноженные на множитель знамён.')
+        : el('li', {}, el('b', {}, 'Броня. '), 'Своих мобов с бронёй в ивенте нет.'),
+      el('li', {}, el('b', {}, 'Диорама. '), own.length
+        ? 'Одного из мобов SoulsCraft ивента, если алтарь уровня ' + d.diorama.min_altar_level + ' и выше.'
+        : 'Нет: в ивенте только ванильные мобы.'),
+      el('li', {}, itemIcon('soulscraft:soul_shard', 24), el('b', {}, ' Осколки души × ' + tr.shards + '. '), 'Всегда, за победу.'),
+    ];
+    if (tr.item)
+      items.push(el('li', {}, itemIcon(tr.item, 24), el('b', {}, ' ' + SC.itemName(tr.item) + '. '),
+        SC.num(tr.chance * 100) + '% за победу, шанс умножается на множитель знамён, но не выше 100%. Больше нигде не добыть, рецепта нет.'));
+    else items.push(el('li', {}, el('b', {}, 'Предмет ступени. '), 'Нет: первая ступень даёт только осколки.'));
+    items.push(el('li', {}, el('b', {}, 'Множитель знамён. '), '1 + ' + step + ' × (сложнее − проще), не меньше нуля. С двумя знамёнами «сложнее»: ×' + SC.num(1 + 2 * d.banner_step) +
+      (tr.item ? ', шанс предмета ' + SC.num(Math.min(100, Math.round(tr.chance * (1 + 2 * d.banner_step) * 1000) / 10)) + '%.' : '.')));
+    return el('ul', { class: 'sc-list' }, items);
+  }
+
+  function eventOne(ev) {
+    buildNav('event/' + ev.id);
+    const flow = ev.flow, tr = tierReward(ev);
+    main.append(el('h1', {}, ev.name));
+    main.append(el('p', { class: 'sum' }, 'Ступень ' + ev.tier + ' из ' + SC.DATA.events.length + '. Цель: ' + ev.target + '.'));
+    const rows = [
+      ['Горн', el('span', {}, itemIcon(ev.item, 24), ' ' + hornName(ev) + ' (' + ev.item + ')')],
+      ['Нужный уровень алтаря', 'не ниже ' + ev.tier + ': горн ступени выше уровня алтаря ивент не запускает'],
+      ['Здоровье алтаря', ev.altar_health + ' (знамя стойкости: +50% за каждое)'],
+      ['Волн', ev.waves.length],
+      ['Передышка', ev.rest_seconds.join('–') + ' с, случайная для каждой волны'],
+      ['Сигнал перед волной', SC.num(flow.telegraph_ticks / SC.TICK) + ' с: места появления видны заранее'],
+      ['Зона', flow.zone_chunks + '×' + flow.zone_chunks + ' чанка с чанком алтаря в центре; контур зоны виден несколько секунд после старта'],
+      ['Сила врагов', 'средняя сила P всех участников в зоне на старте плюс знамёна'],
+      ['Награда ступени', 'осколки души × ' + tr.shards + (tr.item ? ', ' + SC.itemName(tr.item) + ' — ' + SC.num(tr.chance * 100) + '%' : '')],
+    ];
+    main.append(el('table', { class: 'stats' }, el('tbody', {}, rows.map(([k, v]) => el('tr', {}, el('td', {}, k), el('td', {}, v))))));
+    main.append(el('h2', {}, 'Волны'),
+      el('div', { class: 'wide' }, el('table', { class: 'sc-moves' },
+        el('thead', {}, el('tr', {}, el('th', {}, 'Волна'), el('th', {}, 'Врагов'), el('th', {}, 'Мобы'))), el('tbody', {}, waveRows(ev)),
+        el('caption', { class: 'sc-cap' }, 'Знамя орды добавляет к волне 25% врагов, затишья убирает. Знамя рода меняет часть слотов волны на мобов рода.'))));
+    const roles = { assault: 'штурмовик', hunter: 'охотник', ranged: 'стрелок' };
+    const types = [];
+    for (const w of ev.waves) for (const x of w.mobs) if (!types.includes(x.type)) types.push(x.type);
+    const roleOf = (t) => {
+      const own = SC.DATA.mobs.find((m) => m.id === t);
+      if (own) return own.wave_role;
+      if (t === 'banner_zombie') return 'assault';
+      const g = SC.DATA.vanilla.groups.find((g) => g.types.includes(t));
+      return g ? g.wave_role : 'assault';
+    };
+    main.append(el('p', { class: 'small' }, 'Роли в этом ивенте: ' + types.map((t) => SC.waveName({ type: t }) + ' — ' + roles[roleOf(t)]).join('; ') + '. ',
+      el('a', { href: '#defense' }, 'Что делает роль и как защищается алтарь →')));
+    main.append(el('h2', {}, 'Награда'), rewardList(ev));
+    const i = SC.DATA.events.indexOf(ev), list = SC.DATA.events;
+    main.append(el('p', { class: 'sc-pager' },
+      i ? el('a', { href: '#event/' + list[i - 1].id }, '← ' + list[i - 1].name) : el('a', { href: '#event' }, '← Все ступени'),
+      el('a', { href: '#event' }, 'Все ступени'),
+      i < list.length - 1 ? el('a', { href: '#event/' + list[i + 1].id }, list[i + 1].name + ' →') : el('a', { href: '#defense' }, 'Оборона алтаря →')));
+    main.append(el('p', { class: 'small sc-cap' }, 'Источник: ' + ev.source + '.'));
+  }
+
+  function eventIndex() {
+    buildNav('event');
+    main.append(el('h1', {}, 'Ивенты алтаря'));
+    main.append(el('p', { class: 'sum' }, 'Четыре ступени. Горн своей ступени кладут на подставку алтаря не ниже этого уровня: ивент начинается, горн тратится. Волны идут к алтарю, между ними передышка, за победу — головы, броня, осколки и предмет ступени.'));
+    const head = el('tr', {}, ['Ступень', 'Ивент', 'Горн', 'Алтарь', 'Здоровье алтаря', 'Волн', 'Передышка', 'Награда ступени'].map((h) => el('th', {}, h)));
+    const rows = SC.DATA.events.map((ev) => {
+      const tr = tierReward(ev);
+      return el('tr', {}, el('td', {}, ev.tier), el('td', {}, el('a', { href: '#event/' + ev.id }, ev.name)),
+        el('td', {}, itemIcon(ev.item, 20), ' ' + hornName(ev)), el('td', {}, 'уровень ' + ev.tier + ' и выше'), el('td', {}, ev.altar_health),
+        el('td', {}, ev.waves.length), el('td', {}, ev.rest_seconds.join('–') + ' с'),
+        el('td', {}, tr.shards + ' ' + plural(tr.shards, 'осколок', 'осколка', 'осколков') + (tr.item ? ', ' + SC.itemName(tr.item) + ' ' + SC.num(tr.chance * 100) + '%' : '')));
+    });
+    main.append(el('div', { class: 'wide' }, el('table', { class: 'sc-moves' }, el('thead', {}, head), el('tbody', {}, rows),
+      el('caption', { class: 'sc-cap' }, 'Сигнал за 3 секунды до каждой волны. Числа — гипотезы Г7, Г12 и Г19.'))));
+    main.append(el('p', {}, el('a', { href: '#recipes' }, 'Где взять горны →'), ' ', el('a', { href: '#defense' }, 'Оборона алтаря →')));
+  }
+
+  function eventPage(id) {
+    const ev = SC.DATA.events.find((e) => e.id === id);
+    if (ev) eventOne(ev);
+    else eventIndex();
   }
 
   // #mob/<id>?clip=<name>&ct=<tick>&scene=<id>&t=<tick> opens a clip or a scene paused there;
@@ -455,7 +591,7 @@
     const page = SC.PAGES[h.split('/')[0]];
     if (page) page(h.split('/').slice(1).join('/'), params);
     else if (h.startsWith('mob/')) mobPage(h.slice(4));
-    else if (h === 'event') eventPage();
+    else if (h === 'event' || h.startsWith('event/')) eventPage(h.slice(6));
     else bestiary();
     window.scrollTo(0, 0);
   }

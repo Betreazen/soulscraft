@@ -55,6 +55,12 @@ pub(super) const CASES: &[(&str, u64)] = &[
     ("fit_wave_spawn_under_roof", 40),
     ("template_lurker_stays_under_water", 1000),
     ("template_brute_no_reinforcements", 90),
+    ("wave_skeleton_keeps_group", 120),
+    ("event_group_power", 30),
+    ("event_one_life", 40),
+    ("event_hardcore_spare", 40),
+    ("altar_horn_tier_gate", 80),
+    ("event_restore_orphans", 30),
 ];
 
 #[derive(Default)]
@@ -220,6 +226,12 @@ pub(super) fn step(game: &mut Game<'_>, now: u64, name: &str, first: bool) -> Op
         "fit_wave_spawn_under_roof" => fit_roof(game, t, c),
         "template_lurker_stays_under_water" => stays_lurker(game, t, c),
         "template_brute_no_reinforcements" => no_reinforcements(game, t, c),
+        "wave_skeleton_keeps_group" => skeleton_group(game, now, t, c),
+        "event_group_power" => group_power(game, now, t, c),
+        "event_one_life" => one_life(game, now, t, c),
+        "event_hardcore_spare" => hardcore_spare(game, now, t, c),
+        "altar_horn_tier_gate" => horn_tier_gate(game, now, t, c),
+        "event_restore_orphans" => restore_orphans(game, now, t),
         other => crate::game::soulscraft_selftest_trophy::step(game, now, t, other, c),
     };
     out
@@ -1000,4 +1012,256 @@ fn wave_no_moves(game: &mut Game<'_>, now: u64, t: u64, c: &mut Case) -> Option<
     }
     let left = ids.iter().all(|id| v.skipped.contains(id));
     Some(if left && ids.len() == 3 { Ok(()) } else { Err(format!("{} zombies, all left alone {left}", ids.len())) })
+}
+
+/// A skeleton in a wave is its vanilla group's (0.7.0): the vanilla mind adopts it with the
+/// event's P (its group's numbers and moves, its own goals kept behind the gate), the event gives it
+/// the role `ranged` and does not take it as a zombie (no zombie numbers, goals not cleared).
+fn skeleton_group(game: &mut Game<'_>, now: u64, t: u64, c: &mut Case) -> Option<Result<(), String>> {
+    const P: f64 = 0.4;
+    if t == 1 {
+        build(game, 1);
+        return None;
+    }
+    if t == 4 {
+        level(game, now)?;
+        c.golem = golem(game, FAR_STAND_IN);
+        let skeleton = SpawnMob { role: Role::Ranged, ..SpawnMob::vanilla("minecraft:skeleton") };
+        let ov = Overrides {
+            waves: Some(vec![vec![skeleton]]),
+            telegraph_ticks: Some(5),
+            power: Some(P),
+            curse_after_ticks: Some(10_000),
+            stand_ins: c.golem.into_iter().collect(),
+            ..Overrides::default()
+        };
+        return start(game, now, ov).err().map(Err);
+    }
+    if t < 5 {
+        return None;
+    }
+    let ids = event::wave_ids(DIM, CORE);
+    let Some(&id) = ids.first() else { return None };
+    // The vanilla mind adopts on its level tick: give it two.
+    if c.since == 0 {
+        c.since = now;
+        return None;
+    }
+    if now - c.since < 3 {
+        return None;
+    }
+    let snap = event::snapshot(DIM, CORE, None)?;
+    let role = snap.mobs.iter().find(|m| m.0 == id).map(|m| m.1.clone()).unwrap_or_default();
+    let (group, p) = {
+        let v = crate::game::soulscraft_vanilla::state();
+        match v.mobs.get(&id) {
+            Some(m) => (Some(m.group), m.p),
+            None => (None, 0.0),
+        }
+    };
+    let groups = crate::game::soulscraft_server::state().data.vanilla.groups.clone();
+    let group_id = group.and_then(|g| groups.get(g)).map(|g| g.id.clone()).unwrap_or_default();
+    let gate = game.mobs.iter().find(|m| m.id == id).is_some_and(|m| m.ai.goals.has("SoulscraftGate"));
+    let kind = game.mobs.iter().find(|m| m.id == id).map(|m| m.kind.id.to_string()).unwrap_or_default();
+    Some(
+        if kind == "minecraft:skeleton" && group_id == "skeleton" && (p - P).abs() < 0.011 && gate && role == "ranged" && !event::is_wave(id) {
+            Ok(())
+        } else {
+            Err(format!("kind {kind}, vanilla group {group_id:?} p {p:.2}, gate {gate}, role {role:?}, the event leads it {}", event::is_wave(id)))
+        },
+    )
+}
+
+/// A stand-in with a P tag (a player's P in a bench without players).
+fn tagged_golem(game: &mut Game<'_>, c: [i32; 3], p: f64) -> Option<u32> {
+    let snbt = format!("{{NoAI:1b,Invulnerable:1b,PersistenceRequired:1b,Tags:[\"{}{p:.2}\"]}}", event::P_TAG);
+    let Ok((crate::mod_api::Tag::Compound(nbt), _)) = crate::mod_api::parse_snbt(&snbt) else { return None };
+    game.native_summon(DIM, "minecraft:iron_golem", centre(at(c)), nbt)
+}
+
+/// The event's P is the mean of all its participants at the start (0.7.0, 06-altar.md): two
+/// stand-ins of P 0.2 and 0.6 far apart in the zone (44 blocks: Г5's group of 32 round the nearest
+/// would take one of them) give 0.40. `/sc p` is set aside for the run and put back.
+fn group_power(game: &mut Game<'_>, now: u64, t: u64, c: &mut Case) -> Option<Result<(), String>> {
+    if t == 1 {
+        build(game, 1);
+        return None;
+    }
+    if t == 4 {
+        level(game, now)?;
+        c.golem = tagged_golem(game, [-16, 0, -14], 0.2);
+        let other = tagged_golem(game, [16, 0, 16], 0.6);
+        let (Some(a), Some(b)) = (c.golem, other) else { return Some(Err("a stand-in was not summoned".into())) };
+        let over = crate::game::soulscraft_server::state().p_override.take();
+        let ov = Overrides { waves: Some(vec![zombies(1)]), telegraph_ticks: Some(400), stand_ins: vec![a, b], ..Overrides::default() };
+        let started = start(game, now, ov);
+        crate::game::soulscraft_server::state().p_override = over;
+        return started.err().map(Err);
+    }
+    if t < 6 {
+        return None;
+    }
+    let power = event::events().get(&(DIM.to_owned(), CORE)).map(|r| r.plan.power)?;
+    let line = event::records().into_iter().find(|r| r.starts_with("start ")).unwrap_or_default();
+    Some(if (power - 0.4).abs() < 1e-6 && line.contains("power=0.40") { Ok(()) } else { Err(format!("power {power:.3}, start line {line:?}")) })
+}
+
+/// A participant the bench cannot have (no players): a fixed uuid joined to the run by hand.
+const GHOST: u128 = 0x5C5C_0000_0000_0000_0000_0000_0000_0001;
+
+/// The run of the death scenarios: a level-1 altar, a stand-in, a long telegraph, the ghost joined.
+fn death_run(game: &mut Game<'_>, now: u64, t: u64, c: &mut Case) -> Option<Option<Result<(), String>>> {
+    if t == 1 {
+        build(game, 1);
+        return Some(None);
+    }
+    if t == 4 {
+        if level(game, now).is_none() {
+            return Some(Some(Err("the altar was not registered".into())));
+        }
+        c.golem = golem(game, STAND_IN);
+        let ov = Overrides { waves: Some(vec![zombies(1)]), telegraph_ticks: Some(400), power: Some(0.0), stand_ins: c.golem.into_iter().collect(), ..Overrides::default() };
+        if let Err(e) = start(game, now, ov) {
+            return Some(Some(Err(e)));
+        }
+        if let Some(r) = event::events().get_mut(&(DIM.to_owned(), CORE)) {
+            r.joined.insert(GHOST, "ghost".into());
+        }
+        return Some(None);
+    }
+    if t < 5 {
+        return Some(None);
+    }
+    None
+}
+
+/// One life (06-altar.md, «Оборона алтаря»): a participant who dies in the run is out of it. The
+/// death `guest_die` hears (event::spare_death) takes them out on the next tick; a second death
+/// is no participant's: nothing spares it, and they never count as one again.
+fn one_life(game: &mut Game<'_>, now: u64, t: u64, c: &mut Case) -> Option<Result<(), String>> {
+    if let Some(early) = death_run(game, now, t, c) {
+        return early;
+    }
+    let out = |g: u128| event::events().get(&(DIM.to_owned(), CORE)).is_some_and(|r| r.out.contains(&g));
+    match c.phase {
+        0 => {
+            if out(GHOST) {
+                return Some(Err("out before dying".into()));
+            }
+            if !event::spare_death(GHOST) {
+                return Some(Err("a participant's death was not heard".into()));
+            }
+            c.phase = 1;
+            None
+        }
+        _ => {
+            if !out(GHOST) {
+                return (t > 20).then(|| Err("the dead participant is still in the run".into()));
+            }
+            let again = event::spare_death(GHOST);
+            let running = event::running(DIM, CORE);
+            Some(if !again && running { Ok(()) } else { Err(format!("second death spared {again}, run going {running}")) })
+        }
+    }
+}
+
+/// The hardcore guard (round 2): a participant's death in a run is turned away (the hook keeps
+/// them at 1 health: `spare_death` says so) and the spot they are put on lies outside the zone
+/// on a floor with two free cells; a stranger's death is not touched.
+fn hardcore_spare(game: &mut Game<'_>, now: u64, t: u64, c: &mut Case) -> Option<Result<(), String>> {
+    if let Some(early) = death_run(game, now, t, c) {
+        return early;
+    }
+    if c.phase == 0 {
+        let stranger = event::spare_death(GHOST + 1);
+        let spared = event::spare_death(GHOST);
+        if stranger || !spared {
+            return Some(Err(format!("stranger spared {stranger}, participant spared {spared}")));
+        }
+        c.phase = 1;
+        return None;
+    }
+    let flow = event::events().get(&(DIM.to_owned(), CORE)).map(|r| r.flow.clone())?;
+    // From where the participant stood, beside the altar.
+    let to = event::outside_zone(game, CORE, &flow, centre(at(STAND_IN)));
+    let feet = [to[0].floor() as i32, to[1].floor() as i32, to[2].floor() as i32];
+    let free = |p: [i32; 3]| matches!(game.native_block(p).as_str(), "minecraft:air" | "minecraft:cave_air");
+    let floor = !free([feet[0], feet[1] - 1, feet[2]]) && free(feet) && free([feet[0], feet[1] + 1, feet[2]]);
+    let outside = !flow.in_zone(CORE, to[0], to[2]);
+    let gone = event::events().get(&(DIM.to_owned(), CORE)).is_some_and(|r| r.out.contains(&GHOST));
+    if !gone {
+        return (t > 20).then(|| Err("the spared participant was not taken out".into()));
+    }
+    Some(if outside && floor { Ok(()) } else { Err(format!("landing {to:?}: outside {outside}, floor {floor}")) })
+}
+
+/// The horn's tier (06-altar.md): the storm horn (tier 3) on a level-2 altar starts nothing and
+/// stays on the pedestal; the grave horn (tier 2) then starts the event.
+fn horn_tier_gate(game: &mut Game<'_>, now: u64, t: u64, c: &mut Case) -> Option<Result<(), String>> {
+    let pedestal = at([0, 1, 0]);
+    match t {
+        1 => build(game, 2),
+        5 => {
+            let (lv, ..) = level(game, now)?;
+            if lv != 2 {
+                return Some(Err(format!("altar level {lv}, wanted 2")));
+            }
+            c.golem = golem(game, STAND_IN);
+            altar::put(DIM, pedestal, "soulscraft:storm_horn");
+        }
+        6..=30 => {
+            if event::running(DIM, CORE) || has(&event::records(), "start ") {
+                return Some(Err(format!("the tier-3 horn started an event at t={t}")));
+            }
+        }
+        31 => {
+            let left = altar::pedestal_item(game, pedestal);
+            if left.as_deref() != Some("soulscraft:storm_horn") {
+                return Some(Err(format!("pedestal holds {left:?} after the refused horn")));
+            }
+            altar::put(DIM, pedestal, "soulscraft:grave_horn");
+        }
+        32..=70 => {
+            if has(&event::records(), "start ") {
+                let ev = event::events().get(&(DIM.to_owned(), CORE)).map(|r| r.event.clone()).unwrap_or_default();
+                return Some(if ev == "grave_night" { Ok(()) } else { Err(format!("started {ev:?}")) });
+            }
+        }
+        _ => {}
+    }
+    None
+}
+
+/// An event cut off by a restart left its broken blocks in the core's book: `restore_orphans`
+/// (called when the core is registered again) puts the wall back and clears the book.
+fn restore_orphans(game: &mut Game<'_>, now: u64, t: u64) -> Option<Result<(), String>> {
+    let wall = at([6, 0, 0]);
+    match t {
+        1 => build(game, 1),
+        5 => {
+            level(game, now)?;
+            if game.native_block(wall) != "minecraft:air" {
+                return Some(Err(format!("the wall's place holds {}", game.native_block(wall))));
+            }
+            let mut b = soulscraft_rules::defense::Breaches::default();
+            b.record(wall, "minecraft:cobblestone");
+            altar::set_core_lines(game, CORE, altar::BREACHED_KEY, &b.to_lines());
+            if altar::core_lines(game, CORE, altar::BREACHED_KEY).is_empty() {
+                return Some(Err("the core keeps no book".into()));
+            }
+            event::restore_orphans(game, DIM, CORE);
+        }
+        6 => {
+            let block = game.native_block(wall);
+            let left = altar::core_lines(game, CORE, altar::BREACHED_KEY);
+            let rec = has(&event::records(), "restored blocks=1");
+            return Some(if block == "minecraft:cobblestone" && left.is_empty() && rec {
+                Ok(())
+            } else {
+                Err(format!("wall {block}, book left {left:?}, record {rec}"))
+            });
+        }
+        _ => {}
+    }
+    None
 }

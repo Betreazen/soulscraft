@@ -30,6 +30,8 @@ pub struct Flow {
     pub participant_grace_ticks: u64,
     /// A mob this close to the core on the ground drains it.
     pub drain_blocks: f64,
+    /// Clients draw the zone's border this long from the start.
+    pub outline_ticks: u64,
 }
 
 impl Flow {
@@ -51,6 +53,7 @@ impl Flow {
             telegraph_ticks: n("telegraph_ticks", 60.0) as u64,
             participant_grace_ticks: n("participant_grace_ticks", 60.0) as u64,
             drain_blocks: n("drain_blocks", 3.0),
+            outline_ticks: n("outline_ticks", 100.0) as u64,
         }
     }
 
@@ -63,6 +66,12 @@ impl Flow {
         let min = [(cx - half) * 16, (cz - half) * 16];
         let max = [(cx + half) * 16 + 15, (cz + half) * 16 + 15];
         (min, max)
+    }
+
+    /// The zone's border as clients draw it, at the core's height.
+    pub fn outline(&self, core: [i32; 3]) -> crate::view::Outline {
+        let (min, max) = self.zone(core);
+        crate::view::Outline { min, max, y: core[1] }
     }
 
     pub fn in_zone(&self, core: [i32; 3], x: f64, z: f64) -> bool {
@@ -92,6 +101,13 @@ impl SpawnMob {
         Self { kind: kind.to_owned(), role: Role::Assault, armored: false, banner: false, health_mult: 1.0, height: 2 }
     }
 
+    /// A vanilla mob of a changed type other than the zombie (a skeleton): its own vanilla group
+    /// leads it (numbers, moves, its own goals) and the event only takes its role (`ranged`).
+    /// The zombie and the banner-bearer are the event's to walk and swing.
+    pub fn led_by_vanilla(&self, mobs: &MobsFile) -> bool {
+        !self.banner && self.kind != "minecraft:zombie" && self.kind.starts_with("minecraft:") && mobs.vanilla.group_of(&self.kind).is_some()
+    }
+
     /// One of SoulsCraft's mobs, with its wave role and its box's height.
     pub fn of(def: &MobDef) -> Self {
         Self {
@@ -103,6 +119,20 @@ impl SpawnMob {
             height: def.hitbox.map_or(2, |h| h.height.ceil() as i32),
         }
     }
+}
+
+/// The weapon vanilla's `finalizeSpawn` hands a mob of `kind` (`populateDefaultEquipmentSlots`),
+/// which a summon with a tag skips (`SummonCommand`: no finalize for a given compound); none for
+/// a type that fights bare-handed.
+pub fn vanilla_weapon(kind: &str) -> Option<&'static str> {
+    Some(match kind {
+        "minecraft:skeleton" | "minecraft:stray" | "minecraft:bogged" => "minecraft:bow",
+        "minecraft:pillager" => "minecraft:crossbow",
+        "minecraft:vindicator" => "minecraft:iron_axe",
+        "minecraft:piglin_brute" => "minecraft:golden_axe",
+        "minecraft:wither_skeleton" => "minecraft:stone_sword",
+        _ => return None,
+    })
 }
 
 /// The mobs of a kin a kin banner brings into a wave: SoulsCraft's of that kin that walk on land
@@ -151,8 +181,15 @@ pub fn kin_bias(wave: &mut [SpawnMob], mobs: &MobsFile, effects: &Effects) {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Plan {
     pub event: String,
+    /// The event's name for players (`events[].name`).
+    pub name: String,
     pub waves: Vec<Vec<SpawnMob>>,
+    /// The mean rest (its log line and old callers); each rest is rolled in [`Plan::rest_span_ticks`].
     pub rest_ticks: u64,
+    /// The shortest and longest rest after the banners (`rest_seconds`, never under 5 s).
+    pub rest_span_ticks: [u64; 2],
+    /// The banner-bearer's `minecraft:scale`.
+    pub bearer_scale: f64,
     pub altar_health: f64,
     /// The power P the mobs are scaled by (participants' mean plus the weight banners).
     pub power: f64,
@@ -175,7 +212,7 @@ pub fn plan(event: &EventDef, mobs: &MobsFile, effects: &Effects, power: f64) ->
                 let armored = (f64::from(g.armored) * size).round() as u32;
                 let banner = g.kind == "banner_zombie";
                 let base = if banner {
-                    SpawnMob::vanilla("minecraft:zombie")
+                    SpawnMob { height: bearer_height(event.bearer_scale), ..SpawnMob::vanilla("minecraft:zombie") }
                 } else if g.kind.starts_with("minecraft:") {
                     // A changed vanilla type takes its role from data/mobs.json `vanilla`.
                     let role = mobs.vanilla.role_of(&g.kind).map(Role::parse);
@@ -199,15 +236,45 @@ pub fn plan(event: &EventDef, mobs: &MobsFile, effects: &Effects, power: f64) ->
     } else {
         event.rest_seconds.iter().sum::<f64>() / event.rest_seconds.len() as f64
     };
-    let rest = (rest + effects.rest_seconds).max(MIN_REST_SECONDS);
+    let ticks = |s: f64| ((s + effects.rest_seconds).max(MIN_REST_SECONDS) * 20.0).round() as u64;
+    let lo = event.rest_seconds.iter().copied().reduce(f64::min).unwrap_or(rest);
+    let hi = event.rest_seconds.iter().copied().reduce(f64::max).unwrap_or(rest);
     Plan {
         event: event.id.clone(),
+        name: if event.name.is_empty() { event.id.clone() } else { event.name.clone() },
         waves,
-        rest_ticks: (rest * 20.0).round() as u64,
+        rest_ticks: ticks(rest),
+        rest_span_ticks: [ticks(lo), ticks(hi)],
+        bearer_scale: if event.bearer_scale > 0.0 { event.bearer_scale } else { 1.0 },
         altar_health: (if event.altar_health > 0.0 { event.altar_health } else { 200.0 }) * (1.0 + effects.altar_health).max(0.1),
         power: crate::scale::clamp_p(power + effects.power),
         effects: effects.clone(),
     }
+}
+
+/// The cells a zombie of `scale` needs above its feet (the vanilla box is 1.95 tall).
+fn bearer_height(scale: f64) -> i32 {
+    ((crate::data::Hitbox::ZOMBIE.height * scale.max(0.1)) - 1e-9).ceil().max(2.0) as i32
+}
+
+impl Plan {
+    /// Each rest of a run, rolled from its seed (06-altar.md: a rest of 30 to 45 seconds, one roll
+    /// a rest): one for every wave after the first.
+    pub fn rests(&self, seed: u64) -> Vec<u64> {
+        let [lo, hi] = self.rest_span_ticks;
+        let mut rng = Rng::new(seed ^ 0x5E57_5EED);
+        let span = hi.saturating_sub(lo) as usize + 1;
+        (1..self.waves.len()).map(|_| lo + rng.below(span) as u64).collect()
+    }
+}
+
+/// What the end line of a run adds for the playtests (Г10, Г12): the altar's loss by the wave
+/// role that took it, whether the participants walled the altar off (a mob had no way and cursed
+/// it), and the banners as harder, easier and kin counts.
+pub fn end_telemetry(by_role: &BTreeMap<String, f64>, sealed: bool, effects: &Effects) -> String {
+    let damage = if by_role.is_empty() { "none".to_owned() } else { by_role.iter().map(|(r, v)| format!("{r}:{v:.2}")).collect::<Vec<_>>().join(",") };
+    let kin: u32 = effects.kin.values().sum();
+    format!("altar_damage_by={damage} walls_sealed={sealed} modifiers={},{},{kin}", effects.more, effects.less)
 }
 
 /// Why a run ended without a win.
@@ -260,6 +327,9 @@ pub enum Step {
 pub struct Run {
     pub phase: Phase,
     pub waves: usize,
+    /// The rest before each wave after the first ([`Plan::rests`]).
+    pub rests: Vec<u64>,
+    /// A rest the list does not hold (a plan changed after the start).
     pub rest_ticks: u64,
     pub telegraph_ticks: u64,
     pub grace_ticks: u64,
@@ -267,17 +337,23 @@ pub struct Run {
 }
 
 impl Run {
-    /// A run that starts telegraphing wave 1 at `now`.
-    pub fn start(plan: &Plan, flow: &Flow, now: u64) -> (Self, Step) {
+    /// A run that starts telegraphing wave 1 at `now`, its rests rolled from `seed`.
+    pub fn start(plan: &Plan, flow: &Flow, now: u64, seed: u64) -> (Self, Step) {
         let run = Self {
             phase: Phase::Telegraph { wave: 0, until: now + flow.telegraph_ticks },
             waves: plan.waves.len(),
+            rests: plan.rests(seed),
             rest_ticks: plan.rest_ticks,
             telegraph_ticks: flow.telegraph_ticks,
             grace_ticks: flow.participant_grace_ticks,
             empty_since: None,
         };
         (run, Step::Telegraph(0))
+    }
+
+    /// The rest before wave `next` (from 0; wave 0 has none).
+    pub fn rest_before(&self, next: usize) -> u64 {
+        next.checked_sub(1).and_then(|i| self.rests.get(i)).copied().unwrap_or(self.rest_ticks)
     }
 
     pub fn over(&self) -> bool {
@@ -318,7 +394,7 @@ impl Run {
                 if wave + 1 >= self.waves {
                     Some(self.end(Phase::Won, Step::Won))
                 } else {
-                    self.phase = Phase::Rest { next: wave + 1, until: now + self.rest_ticks };
+                    self.phase = Phase::Rest { next: wave + 1, until: now + self.rest_before(wave + 1) };
                     Some(Step::Rest(wave + 1))
                 }
             }
@@ -562,7 +638,10 @@ mod tests {
         assert_eq!(f.zone_chunks, 3);
         assert_eq!((f.spawn_near, f.spawn_far), (12.0, 20.0));
         assert_eq!(f.telegraph_ticks, 60);
+        assert_eq!(f.outline_ticks, 100);
         assert_eq!(Flow::from_map(&Map::new()), f);
+        let o = f.outline([-600, 100, 600]);
+        assert_eq!((o.min, o.max, o.y), ([-624, 576], [-577, 623], 100));
     }
 
     #[test]
@@ -629,23 +708,110 @@ mod tests {
         e.waves.truncate(2);
         let p = plan(&e, &mobs, &Effects::default(), 0.0);
         let f = Flow::of(&e);
-        let (r, step) = Run::start(&p, &f, 100);
+        let (r, step) = Run::start(&p, &f, 100, 7);
         assert_eq!(step, Step::Telegraph(0));
         (r, p, f)
     }
 
     #[test]
+    fn rest_in_range() {
+        let mobs = MobsFile::embedded();
+        let altar = AltarFile::embedded();
+        let p = plan(&event(), &mobs, &Effects::default(), 0.0);
+        // [30, 45] s: 600 to 900 ticks, one roll a rest (four rests between five waves).
+        assert_eq!(p.rest_span_ticks, [600, 900]);
+        let mut all = Vec::new();
+        for seed in 0..400 {
+            let r = p.rests(seed);
+            assert_eq!(r.len(), 4);
+            assert!(r.iter().all(|t| (600..=900).contains(t)), "{r:?}");
+            // The same seed, the same rests.
+            assert_eq!(p.rests(seed), r);
+            all.extend(r);
+        }
+        assert!(*all.iter().min().unwrap() < 620 && *all.iter().max().unwrap() > 880, "spread {:?}", (all.iter().min(), all.iter().max()));
+        // Rests of one run differ from wave to wave, and runs differ.
+        assert!((0..50).any(|s| p.rests(s).windows(2).any(|w| w[0] != w[1])));
+        assert_ne!(p.rests(1), p.rests(2));
+        // The haste banner shortens both ends; never under 5 s.
+        let haste = plan(&event(), &mobs, &effects(&altar, &ids(&["haste"])), 0.0);
+        assert_eq!(haste.rest_span_ticks, [400, 700]);
+        let calm = effects(&altar, &ids(&["haste"; 8]));
+        let fast = plan(&event(), &mobs, &calm, 0.0);
+        assert_eq!(fast.rest_span_ticks, [100, 100]);
+        assert!(fast.rests(3).iter().all(|t| *t == 100));
+        // The run waits the rolled rest before each wave.
+        let (mut run, _) = Run::start(&p, &Flow::of(&event()), 0, 9);
+        let want = p.rests(9);
+        assert_eq!(run.rest_before(1), want[0]);
+        assert_eq!(run.step(60, 0, 1, false), Some(Step::Spawn(0)));
+        assert_eq!(run.step(100, 0, 1, false), Some(Step::Rest(1)));
+        assert_eq!(run.step(100 + want[0] - 1, 0, 1, false), None);
+        assert_eq!(run.step(100 + want[0], 0, 1, false), Some(Step::Telegraph(1)));
+    }
+
+    #[test]
+    fn wave_skeletons_are_left_to_their_vanilla_group() {
+        let mobs = MobsFile::embedded();
+        let night = mobs.events.iter().find(|e| e.id == "grave_night").unwrap();
+        let p = plan(night, &mobs, &Effects::default(), 0.0);
+        let skeleton = p.waves[1].iter().find(|m| m.kind == "minecraft:skeleton").unwrap();
+        assert_eq!(skeleton.role, Role::Ranged);
+        assert!(skeleton.led_by_vanilla(&mobs));
+        let zombie = p.waves[1].iter().find(|m| m.kind == "minecraft:zombie").unwrap();
+        assert!(!zombie.led_by_vanilla(&mobs));
+        assert!(!SpawnMob::of(mobs.mob("marksman").unwrap()).led_by_vanilla(&mobs));
+        let bearer = plan(&event(), &mobs, &Effects::default(), 0.0).waves[4].iter().find(|m| m.banner).cloned().unwrap();
+        assert!(!bearer.led_by_vanilla(&mobs));
+        // A vanilla type no group changes stays the event's.
+        assert!(!SpawnMob::vanilla("minecraft:creeper").led_by_vanilla(&mobs));
+        // Summoned with a tag, a mob skips vanilla's finalizeSpawn: it gets the weapon it would.
+        assert_eq!(vanilla_weapon("minecraft:skeleton"), Some("minecraft:bow"));
+        assert_eq!(vanilla_weapon("minecraft:pillager"), Some("minecraft:crossbow"));
+        assert_eq!(vanilla_weapon("minecraft:witch"), None);
+    }
+
+    #[test]
+    fn events_carry_their_names_and_the_bearer_scale() {
+        let mobs = MobsFile::embedded();
+        let names: Vec<&str> = mobs.events.iter().map(|e| e.name.as_str()).collect();
+        assert!(names.iter().all(|n| !n.is_empty()), "{names:?}");
+        assert!(names.contains(&"Ночь мертвецов"));
+        let p = plan(&event(), &mobs, &Effects::default(), 0.0);
+        assert_eq!(p.name, event().name);
+        assert_eq!(p.bearer_scale, 1.3);
+        // The bearer needs room for its grown box (1.95 × 1.3 is over two cells).
+        let bearer = p.waves[4].iter().find(|m| m.banner).unwrap();
+        assert_eq!(bearer.height, 3);
+        assert!(p.waves[4].iter().filter(|m| !m.banner).all(|m| m.height == 2));
+        let night = mobs.events.iter().find(|e| e.id == "grave_night").unwrap();
+        assert_eq!(plan(night, &mobs, &Effects::default(), 0.0).bearer_scale, 1.0);
+    }
+
+    #[test]
+    fn the_end_line_counts_damage_by_role_walls_and_banners() {
+        let altar = AltarFile::embedded();
+        let mut by = BTreeMap::new();
+        by.insert("assault".to_owned(), 12.5);
+        by.insert("ranged".to_owned(), 3.0);
+        let e = effects(&altar, &ids(&["weight", "horde", "mercy", "kin_undead"]));
+        assert_eq!(end_telemetry(&by, true, &e), "altar_damage_by=assault:12.50,ranged:3.00 walls_sealed=true modifiers=2,1,1");
+        assert_eq!(end_telemetry(&BTreeMap::new(), false, &Effects::default()), "altar_damage_by=none walls_sealed=false modifiers=0,0,0");
+    }
+
+    #[test]
     fn a_run_goes_through_its_waves_to_a_win() {
-        let (mut r, p, _) = small_run();
+        let (mut r, _, _) = small_run();
+        let rest = r.rest_before(1);
         assert_eq!(r.step(150, 0, 1, false), None);
         assert_eq!(r.step(160, 0, 1, false), Some(Step::Spawn(0)));
         assert_eq!(r.step(161, 6, 1, false), None);
         assert_eq!(r.wave(), 0);
         assert_eq!(r.step(300, 0, 1, false), Some(Step::Rest(1)));
         assert_eq!(r.wave(), 1);
-        assert_eq!(r.step(300 + p.rest_ticks - 1, 0, 1, false), None);
-        assert_eq!(r.step(300 + p.rest_ticks, 0, 1, false), Some(Step::Telegraph(1)));
-        assert_eq!(r.step(300 + p.rest_ticks + 60, 0, 1, false), Some(Step::Spawn(1)));
+        assert_eq!(r.step(300 + rest - 1, 0, 1, false), None);
+        assert_eq!(r.step(300 + rest, 0, 1, false), Some(Step::Telegraph(1)));
+        assert_eq!(r.step(300 + rest + 60, 0, 1, false), Some(Step::Spawn(1)));
         assert_eq!(r.step(2000, 0, 1, false), Some(Step::Won));
         assert!(r.over());
         assert_eq!(r.step(2001, 0, 1, false), None);

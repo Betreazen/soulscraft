@@ -29,10 +29,10 @@
       "stats": { "health": 30, "damage": 4, "armor": 6, "speed": 0.22, "knockback_resistance": 0.3 },
       "hitbox": { "width": 0.6, "height": 1.95, "eye": 1.8 },
       "attacks": [
-        { "id": "thrust", "name": "Укол", "clip": "attack_thrust", "windup": 6, "hold": 0, "hit": 2, "recover": 10, "damage": 0.7, "tell": "меч отводится назад" },
-        { "id": "slash", "name": "Рубящий удар", "clip": "attack_slash", "windup": 10, "hold": 0, "hit": 2, "recover": 12, "damage": 1.0, "tell": "меч над плечом" },
-        { "id": "overhead", "name": "Задержанный удар сверху", "clip": "attack_overhead", "windup": 10, "hold": 8, "hit": 2, "recover": 16, "damage": 1.3, "tell": "меч поднят над головой и замирает" },
-        { "id": "shield_bash", "name": "Удар щитом", "clip": "shield_bash", "windup": 8, "hold": 0, "hit": 2, "recover": 8, "damage": 0.5, "knockback": true, "tell": "щит отводится к груди" }
+        { "id": "thrust", "name": "Укол", "clip": "attack_thrust", "windup": 6, "hold": 0, "hit": 2, "recover": 10, "damage": 0.7, "tell": "меч отводится назад", "cue": { "sound": "minecraft:entity.zombie.attack_iron_door", "pitch": 1.2 } },
+        { "id": "slash", "name": "Рубящий удар", "clip": "attack_slash", "windup": 10, "hold": 0, "hit": 2, "recover": 12, "damage": 1.0, "tell": "меч над плечом", "cue": { "sound": "minecraft:entity.zombie.attack_iron_door" } },
+        { "id": "overhead", "name": "Задержанный удар сверху", "clip": "attack_overhead", "windup": 10, "hold": 8, "hit": 2, "recover": 16, "damage": 1.3, "tell": "меч поднят над головой и замирает", "cue": { "sound": "minecraft:entity.zombie.attack_iron_door", "pitch": 0.8 } },
+        { "id": "shield_bash", "name": "Удар щитом", "clip": "shield_bash", "windup": 8, "hold": 0, "hit": 2, "recover": 8, "damage": 0.5, "knockback": true, "tell": "щит отводится к груди", "cue": { "sound": "minecraft:item.shield.block", "on": "hit" } }
       ],
       "moves": [
         { "id": "block", "name": "Щит поднят", "clip": "block", "note": "подходит со щитом; удар спереди, пока щит поднят, снижен" },
@@ -45,8 +45,12 @@
         "circle_wait_max_ticks": 60,
         "attacks_before_backstep": 2,
         "backstep_blocks": 2,
-        "shield_down_while_attacking": true
+        "shield_down_while_attacking": true,
+        "hold_step_speed": 0.71,
+        "knockback_strength": 2.0,
+        "shield_disable_ticks": 100
       },
+      "note": "hold_step_speed — множитель скорости навигации на шаге к цели в паузе задержанного удара; ванильный ход растёт как квадрат множителя, поэтому 0,71 даёт около половины обычной скорости; knockback_strength — атрибут attack_knockback на ударе с knockback (сила отброса — его половина, как у ванильного Mob.doHurtTarget); shield_disable_ticks — перезарядка поднятого щита игрока от удара щитом, как от топора: движок даёт её только ударом моба с топором в руке (5 с = 100 тиков), другое число он не умеет; звуки cue — ванильные id; всё это гипотезы (Г6)",
       "behavior": [
         "Подходит со щитом. Удар спереди, пока щит поднят, снижен на 80%; спина и бок открыты.",
         "Если игрок держит щит, латник кружит на 2–3 блоках и ждёт, пока щит опустится, но не дольше 3 секунд. Потом бьёт щитом.",
@@ -57,7 +61,7 @@
         { "item": "soulscraft:rusty_helmet", "name": "Ржавый шлем", "chance": 0.04 },
         { "item": "soulscraft:rusty_chestplate", "name": "Ржавый нагрудник", "chance": 0.04 }
       ],
-      "assumed": ["params.shield_front_reduction", "loot", "attacks.*.hit"]
+      "assumed": ["params.shield_front_reduction", "loot", "attacks.*.hit", "params.hold_step_speed", "params.knockback_strength", "params.shield_disable_ticks", "attacks.*.cue"]
     },
     {
       "id": "stalker",
@@ -79,7 +83,7 @@
       "damage_note": "удар 2 за каждый серп",
       "attacks": [
         { "id": "double_slash", "name": "Двойной взмах", "clip": "attack_double", "windup": 6, "hold": 0, "hit": 4, "recover": 8, "damage": 0.6, "strikes_at": [0, 3], "effects": [{ "id": "bleed", "seconds": 3 }], "tell": "оба серпа расходятся в стороны" },
-        { "id": "lunge", "name": "Выпад-рывок", "clip": "attack_lunge", "windup": 12, "hold": 0, "hit": 6, "recover": 15, "damage": 1.2, "dash_blocks": 6, "tell": "приседает, серпы назад", "window_note": "после рывка 15 тиков: застрял и разворачивается" }
+        { "id": "lunge", "name": "Выпад-рывок", "clip": "attack_lunge", "windup": 12, "hold": 0, "hit": 6, "recover": 15, "damage": 1.2, "dash_blocks": 6, "tell": "приседает, серпы назад", "window_note": "после рывка 15 тиков: застрял и разворачивается", "cue": { "sound": "minecraft:entity.fox.screech", "pitch": 0.8 } }
       ],
       "moves": [
         { "id": "backstep", "name": "Отскок", "clip": "backstep", "note": "прыжок назад после удара" },
@@ -89,8 +93,11 @@
         "circle_radius_blocks": [4, 6],
         "flee_below_health": 0.25,
         "return_after_ticks": 200,
-        "lunge_more_often_if_player_at_wall": true
+        "lunge_more_often_if_player_at_wall": true,
+        "flank_max_ticks": 100,
+        "flank_angle_degrees": 135
       },
+      "note": "ловчий заходит на точку кольца в flank_angle_degrees от взгляда цели (больше 90°: сбоку и сзади) и бьёт, когда цель на него не смотрит (±60°), или через flank_max_ticks захода; звук выпада cue — ванильный id; всё это гипотезы (Г6)",
       "behavior": [
         "Кружит на 4–6 блоках, заходит сбоку и сзади.",
         "После удара отскакивает.",
@@ -98,7 +105,7 @@
         "Убегает при здоровье ниже 25% и возвращается через 10 секунд."
       ],
       "loot": [{ "item": "soulscraft:stalker_hood", "name": "Капюшон ловчего", "chance": 0.05 }],
-      "assumed": ["params.flee_below_health", "params.return_after_ticks", "attacks.*.hit", "attacks.double_slash.strikes_at"]
+      "assumed": ["params.flee_below_health", "params.return_after_ticks", "attacks.*.hit", "attacks.double_slash.strikes_at", "params.flank_max_ticks", "params.flank_angle_degrees", "attacks.*.cue"]
     },
     {
       "id": "marksman",
@@ -119,19 +126,23 @@
       "hitbox": { "width": 0.65, "height": 1.95, "eye": 1.8 },
       "damage_note": "болт 5",
       "attacks": [
-        { "id": "aimed_shot", "name": "Прицельный выстрел", "clip": "attack_shoot", "windup": 16, "hold": 0, "hit": 2, "recover": 30, "damage": 1.4, "projectile": "bolt", "tell": "арбалет поднят, на наконечнике блик", "window_note": "перезарядка 30 тиков" },
+        { "id": "aimed_shot", "name": "Прицельный выстрел", "clip": "attack_shoot", "windup": 16, "hold": 0, "hit": 2, "recover": 30, "damage": 1.4, "projectile": "bolt", "tell": "арбалет поднят, на наконечнике блик", "window_note": "перезарядка 30 тиков", "cue": { "sound": "minecraft:item.crossbow.shoot", "on": "hit" } },
         { "id": "butt_strike", "name": "Удар прикладом", "clip": "attack_butt", "windup": 8, "hold": 0, "hit": 2, "recover": 10, "damage": 0.6, "knockback": true, "tell": "арбалет отводится к плечу" }
       ],
       "moves": [
-        { "id": "hide", "name": "Укрытие", "clip": "reload", "note": "на время перезарядки уходит за укрытие выше двух блоков" },
+        { "id": "hide", "name": "Укрытие", "clip": "reload", "note": "на время перезарядки уходит за укрытие выше двух блоков", "cue": { "sound": "minecraft:item.crossbow.loading_start" } },
         { "id": "hop_back", "name": "Отпрыгивает", "clip": "backstep", "note": "после удара прикладом" }
       ],
       "params": {
         "keep_distance_blocks": [10, 16],
         "cover_min_height_blocks": 2,
         "melee_below_blocks": 4,
-        "prefers_high_ground": true
+        "prefers_high_ground": true,
+        "reload_cover_blocks": 8,
+        "high_ground_scan_blocks": 6,
+        "knockback_strength": 1.0
       },
+      "note": "reload_cover_blocks — радиус поиска укрытия на перезарядке: клетка, где от глаз цели не видно ни глаз моба, ни точки в cover_min_height_blocks над его ногами; high_ground_scan_blocks — на сколько блоков вверх и вниз ищется земля под кандидатом позиции; knockback_strength — атрибут attack_knockback удара прикладом; звуки cue — ванильные id; всё это гипотезы (Г6, Г8)",
       "behavior": [
         "Держит дистанцию 10–16 блоков, ищет точку выше игрока.",
         "На время перезарядки уходит за укрытие высотой больше двух блоков, чтобы скрыть модель целиком. От турелей RustCraft прячется так же.",
@@ -139,7 +150,7 @@
       ],
       "notes": ["Арбалет — своя часть модели, а не предмет: зарядка арбалета в руке моба мода не анимируется."],
       "loot": [{ "item": "soulscraft:marksman_hood", "name": "Рваный капюшон стрелка", "chance": 0.05 }],
-      "assumed": ["attacks.*.hit"]
+      "assumed": ["attacks.*.hit", "params.reload_cover_blocks", "params.high_ground_scan_blocks", "params.knockback_strength", "attacks.*.cue", "moves.hide.cue"]
     },
     {
       "id": "brute",
@@ -479,7 +490,9 @@
       "altar_health": 200,
       "tier": 1,
       "item": "soulscraft:rotten_horn",
-      "flow": { "zone_chunks": 3, "below_blocks": 8, "above_blocks": 8, "rebuild_min_ticks": 20, "spawn_blocks": [12, 20], "telegraph_ticks": 60, "participant_grace_ticks": 60, "drain_blocks": 3, "source": "06-altar.md, «Ивент на алтаре» и «Путь к алтарю»; зона 3×3 чанка — раунд 2, остальное — предложение кода" },
+      "bearer_scale": 1.3,
+      "bearer_note": "знаменосец — большой зомби: атрибут minecraft:scale на волне 5; гипотеза задачи 3 среза 0.7.0",
+      "flow": { "zone_chunks": 3, "below_blocks": 8, "above_blocks": 8, "rebuild_min_ticks": 20, "spawn_blocks": [12, 20], "telegraph_ticks": 60, "participant_grace_ticks": 60, "drain_blocks": 3, "outline_ticks": 100, "source": "06-altar.md, «Ивент на алтаре» и «Путь к алтарю»; зона 3×3 чанка — раунд 2, остальное — предложение кода" },
       "defense": { "intercept_blocks": 6, "return_blocks": 16, "return_unseen_seconds": 10, "drain_windup_ticks": 40, "drain_per_second": 1, "altar_damage_cap_per_second": 4, "curse_after_seconds": 30, "curse_per_second": 0.25, "breach": { "hits_by_hardness": [[2, 1], [5, 2], [50, 6]], "attack": "overhead_wave", "never_namespaces": ["rustcraft:"], "never_blocks": ["minecraft:bedrock", "minecraft:barrier", "minecraft:spawner", "minecraft:reinforced_deepslate"], "never_prefixes": ["soulscraft:altar_", "soulscraft:banner_"] }, "source": "06-altar.md, «Оборона алтаря»; гипотеза Г12. Пролом: никогда блоки алтаря, знамёна, блоки с содержимым (block entity), неразрушимые и всё пространство имён rustcraft: (ответ RustCraft 2026-11-13: у рельсов монорельса нет block entity)" },
       "target": "алтарь; зомби бьют игроков, которые стоят на пути",
       "waves": [
@@ -489,7 +502,7 @@
         { "wave": 4, "mobs": [{ "type": "minecraft:zombie", "count": 12, "armored": 4 }] },
         { "wave": 5, "mobs": [{ "type": "minecraft:zombie", "count": 14 }, { "type": "banner_zombie", "name": "большой зомби-знаменосец", "count": 1, "health_mult": 3 }] }
       ],
-      "assumed": ["altar_health", "waves.*.mobs.*.armored"]
+      "assumed": ["altar_health", "waves.*.mobs.*.armored", "bearer_scale", "flow.outline_ticks"]
     },
     {
       "id": "grave_night",
@@ -499,7 +512,7 @@
       "altar_health": 300,
       "tier": 2,
       "item": "soulscraft:grave_horn",
-      "flow": { "zone_chunks": 3, "below_blocks": 8, "above_blocks": 8, "rebuild_min_ticks": 20, "spawn_blocks": [12, 20], "telegraph_ticks": 60, "participant_grace_ticks": 60, "drain_blocks": 3, "source": "как у test_zombies" },
+      "flow": { "zone_chunks": 3, "below_blocks": 8, "above_blocks": 8, "rebuild_min_ticks": 20, "spawn_blocks": [12, 20], "telegraph_ticks": 60, "participant_grace_ticks": 60, "drain_blocks": 3, "outline_ticks": 100, "source": "как у test_zombies" },
       "defense": { "intercept_blocks": 6, "return_blocks": 16, "return_unseen_seconds": 10, "drain_windup_ticks": 40, "drain_per_second": 1, "altar_damage_cap_per_second": 4, "curse_after_seconds": 30, "curse_per_second": 0.25, "breach": { "hits_by_hardness": [[2, 1], [5, 2], [50, 6]], "attack": "overhead_wave", "never_namespaces": ["rustcraft:"], "never_blocks": ["minecraft:bedrock", "minecraft:barrier", "minecraft:spawner", "minecraft:reinforced_deepslate"], "never_prefixes": ["soulscraft:altar_", "soulscraft:banner_"] }, "source": "как у test_zombies" },
       "target": "алтарь; мертвецы бьют игроков на пути, арбалетчики стреляют по защитникам",
       "waves": [
@@ -510,7 +523,7 @@
         { "wave": 5, "mobs": [{ "type": "revenant", "count": 4 }, { "type": "marksman", "count": 3 }, { "type": "stalker", "count": 2 }] },
         { "wave": 6, "mobs": [{ "type": "revenant", "count": 4 }, { "type": "marksman", "count": 2 }, { "type": "stalker", "count": 2 }, { "type": "revenant", "name": "латник-капитан", "count": 1, "health_mult": 2.5 }] }
       ],
-      "assumed": ["altar_health", "waves"]
+      "assumed": ["altar_health", "waves", "flow.outline_ticks"]
     },
     {
       "id": "claw_storm",
@@ -520,7 +533,7 @@
       "altar_health": 400,
       "tier": 3,
       "item": "soulscraft:storm_horn",
-      "flow": { "zone_chunks": 3, "below_blocks": 8, "above_blocks": 8, "rebuild_min_ticks": 20, "spawn_blocks": [12, 20], "telegraph_ticks": 60, "participant_grace_ticks": 60, "drain_blocks": 3, "source": "как у test_zombies" },
+      "flow": { "zone_chunks": 3, "below_blocks": 8, "above_blocks": 8, "rebuild_min_ticks": 20, "spawn_blocks": [12, 20], "telegraph_ticks": 60, "participant_grace_ticks": 60, "drain_blocks": 3, "outline_ticks": 100, "source": "как у test_zombies" },
       "defense": { "intercept_blocks": 6, "return_blocks": 16, "return_unseen_seconds": 10, "drain_windup_ticks": 40, "drain_per_second": 1, "altar_damage_cap_per_second": 4, "curse_after_seconds": 30, "curse_per_second": 0.25, "breach": { "hits_by_hardness": [[2, 1], [5, 2], [50, 6]], "attack": "overhead_wave", "never_namespaces": ["rustcraft:"], "never_blocks": ["minecraft:bedrock", "minecraft:barrier", "minecraft:spawner", "minecraft:reinforced_deepslate"], "never_prefixes": ["soulscraft:altar_", "soulscraft:banner_"] }, "source": "как у test_zombies" },
       "target": "алтарь; ловчие и сорокопуты охотятся на защитников, громила ломает стены",
       "waves": [
@@ -532,7 +545,7 @@
         { "wave": 6, "mobs": [{ "type": "shrike", "count": 3 }, { "type": "stalker", "count": 3 }, { "type": "marksman", "count": 2 }, { "type": "bog_slime", "count": 2 }] },
         { "wave": 7, "mobs": [{ "type": "brute", "count": 2 }, { "type": "revenant", "count": 3 }, { "type": "marksman", "count": 2 }] }
       ],
-      "assumed": ["altar_health", "waves"]
+      "assumed": ["altar_health", "waves", "flow.outline_ticks"]
     },
     {
       "id": "last_stand",
@@ -542,7 +555,7 @@
       "altar_health": 500,
       "tier": 4,
       "item": "soulscraft:abyss_horn",
-      "flow": { "zone_chunks": 3, "below_blocks": 8, "above_blocks": 8, "rebuild_min_ticks": 20, "spawn_blocks": [12, 20], "telegraph_ticks": 60, "participant_grace_ticks": 60, "drain_blocks": 3, "source": "как у test_zombies" },
+      "flow": { "zone_chunks": 3, "below_blocks": 8, "above_blocks": 8, "rebuild_min_ticks": 20, "spawn_blocks": [12, 20], "telegraph_ticks": 60, "participant_grace_ticks": 60, "drain_blocks": 3, "outline_ticks": 100, "source": "как у test_zombies" },
       "defense": { "intercept_blocks": 6, "return_blocks": 16, "return_unseen_seconds": 10, "drain_windup_ticks": 40, "drain_per_second": 1, "altar_damage_cap_per_second": 4, "curse_after_seconds": 30, "curse_per_second": 0.25, "breach": { "hits_by_hardness": [[2, 1], [5, 2], [50, 6]], "attack": "overhead_wave", "never_namespaces": ["rustcraft:"], "never_blocks": ["minecraft:bedrock", "minecraft:barrier", "minecraft:spawner", "minecraft:reinforced_deepslate"], "never_prefixes": ["soulscraft:altar_", "soulscraft:banner_"] }, "source": "как у test_zombies" },
       "target": "алтарь; всё, что есть у SoulsCraft на суше",
       "waves": [
@@ -555,7 +568,7 @@
         { "wave": 7, "mobs": [{ "type": "brute", "count": 2 }, { "type": "revenant", "count": 3 }, { "type": "stalker", "count": 2 }] },
         { "wave": 8, "mobs": [{ "type": "brute", "count": 3 }, { "type": "revenant", "count": 2 }, { "type": "marksman", "count": 3 }, { "type": "revenant", "name": "латник-капитан", "count": 1, "health_mult": 2.5 }] }
       ],
-      "assumed": ["altar_health", "waves"]
+      "assumed": ["altar_health", "waves", "flow.outline_ticks"]
     }
   ],
   "natural": {
@@ -566,11 +579,13 @@
       { "mob": "marksman", "biomes": ["plains", "meadow", "savanna", "badlands", "peaks", "slopes"], "weight": 12, "min": 1, "max": 2 },
       { "mob": "brute", "biomes_with_zombie": true, "weight": 3, "min": 1, "max": 1, "max_y": 39 },
       { "mob": "brute", "biomes": ["peaks", "slopes"], "weight": 3, "min": 1, "max": 1 },
-      { "mob": "shrike", "biomes": ["peaks", "slopes", "windswept"], "weight": 10, "min": 1, "max": 2, "min_y": 80 },
+      { "mob": "shrike", "biomes": ["peaks", "slopes", "windswept"], "weight": 10, "min": 2, "max": 3, "min_y": 80 },
       { "mob": "bog_slime", "biomes": ["swamp"], "weight": 18, "min": 1, "max": 2 }
     ],
     "lurker": { "mob": "lurker", "biomes": ["deep_ocean", "deep_cold_ocean", "deep_lukewarm_ocean", "deep_frozen_ocean"], "every_ticks": 200, "chance": 0.25, "radius_blocks": [16, 40], "max_y": 40, "near_cap": 2, "near_blocks": 64 },
-    "assumed": ["mobs", "lurker"]
+    "tier_gate_blocks": 128,
+    "tier_note": "моб SoulsCraft появляется сам (список спавна и спавнер удильщика), только если у кого-то из игроков в tier_gate_blocks P не ниже его tier_p; сорокопут — группой, как его params.group_size; в ивентах и ускорении алтаря ступень не действует (задача 3 среза 0.7.0)",
+    "assumed": ["mobs", "lurker", "tier_gate_blocks"]
   },
   "soul_shard": {
     "item": "soulscraft:soul_shard",

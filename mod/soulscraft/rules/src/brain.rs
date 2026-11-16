@@ -28,6 +28,8 @@ pub const STICK_EVERY: u64 = 20;
 pub const CHARGE_OPEN_RECOVER: u32 = 10;
 /// A jump that never lands counts as landed after this many ticks.
 pub const LANDING_TIMEOUT: u64 = 40;
+/// A walking mob stops this close to where it walks (its target, its post).
+pub const CLOSE: f64 = 1.6;
 
 /// How a mob fights, from its id. Every one runs its attacks from mobs.json.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -70,9 +72,12 @@ impl Style {
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct TargetSense {
     pub pos: V3,
+    /// Where the target faces (`Entity.getYRot`): the stalker flanks it.
+    pub yaw: f64,
     /// A shield raised and held long enough to block.
     pub shield_up: bool,
-    /// The target's view points at the mob (within 60°).
+    /// The target's view points at the mob (within 60°): the plan's `sees_me`. The lurker creeps
+    /// and the stalker strikes while it is false.
     pub looking_at_me: bool,
     /// A solid block right behind the target, away from the mob.
     pub at_wall: bool,
@@ -161,6 +166,12 @@ pub struct Tick {
     pub hold: Option<V3>,
     /// The slime in the air: its shadow shows at the landing point this tick.
     pub shadow: Option<V3>,
+    /// The marksman's reload starts: the server looks for cover from the target
+    /// (`cover::reload_cover`) and hands it to [`Brain::set_cover`].
+    pub wants_cover: bool,
+    /// The marksman needs a spot in its kept distance: the server grounds [`post_candidates`],
+    /// picks one ([`pick_post`]) and hands it to [`Brain::set_post`].
+    pub wants_post: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -232,6 +243,13 @@ pub struct Brain {
     last_stick: u64,
     /// The brute roared once its rage started.
     raged: bool,
+    /// The stalker's flank began then (it strikes unseen, or once `flank_max_ticks` passed).
+    flank_since: Option<u64>,
+    /// The marksman's cover for this reload, and the tick it gives it up when it never gets there.
+    cover: Option<V3>,
+    cover_until: u64,
+    /// The marksman's spot in its kept distance.
+    post: Option<V3>,
 }
 
 impl Brain {
@@ -251,12 +269,35 @@ impl Brain {
             fled: false,
             last_stick: 0,
             raged: false,
+            flank_since: None,
+            cover: None,
+            cover_until: 0,
+            post: None,
         }
     }
 
     /// Start this attack on the next tick, whatever the range (`/sc force`, the self-test).
     pub fn force(&mut self, attack: usize) {
         self.forced = Some(attack);
+    }
+
+    /// The cover the server found for this reload ([`Tick::wants_cover`]); none: it steps back.
+    pub fn set_cover(&mut self, spot: Option<V3>) {
+        self.cover = spot;
+    }
+
+    /// The spot the server picked in the kept distance ([`Tick::wants_post`]).
+    pub fn set_post(&mut self, spot: Option<V3>) {
+        self.post = spot;
+    }
+
+    /// The marksman's cover it is still on its way to, after the reload: not yet within
+    /// `cover::ARRIVAL_SLACK` of it on both ground axes (the square that is hidden), and not given up.
+    fn cover_walk(&self, s: &Senses) -> Option<V3> {
+        let near = |a: f64, b: f64| (a - b).abs() <= crate::cover::ARRIVAL_SLACK;
+        self.cover
+            .filter(|_| s.now < self.cover_until)
+            .filter(|c| !(near(c[0], s.pos[0]) && near(c[2], s.pos[2])))
     }
 
     pub fn clip(&self) -> &Clip {
@@ -308,6 +349,8 @@ impl Brain {
             label: String::new(),
             hold: None,
             shadow: None,
+            wants_cover: false,
+            wants_post: false,
         };
         let decide = s.now >= self.next_decision;
         if decide {
@@ -331,6 +374,8 @@ impl Brain {
     }
 
     fn begin(&mut self, idx: usize, now: u64, events: &mut Vec<Event>) {
+        // A new attack ends the walk to the last reload's cover.
+        self.cover = None;
         self.run = Some(Run {
             idx,
             start: now,
@@ -379,10 +424,13 @@ impl Brain {
                     run.point = s.target.map(|tg| geom::add(tg.pos, [0.0, 0.5, 0.0]));
                 }
             }
-            Phase::Hold => {
-                // A delayed blow commits: it stops tracking the target while it holds.
-                out.look_at = None;
-            }
+            Phase::Hold => match (mob.param("hold_step_speed"), s.target) {
+                // The revenant's delayed blow follows: it faces the target and steps after it, so
+                // stepping back in the hold is caught up with and only the hit tick's dodge counts.
+                (Some(speed), Some(tg)) => out.order = walk_up(s.pos, tg.pos, speed),
+                // Without the number a delayed blow commits: it stops tracking the target.
+                _ => out.look_at = None,
+            },
             Phase::Hit => {
                 if t == line.hit_start() {
                     self.start_hit(&mut run, a, &line, s, out);
@@ -399,6 +447,16 @@ impl Brain {
                 }
             }
             Phase::Recover => {
+                if t == line.recover_start() && self.style == Style::Shooter && a.projectile.is_some() {
+                    // The reload: its clip (the `hide` move's) all through, and cover asked for.
+                    if let Some(clip) = mob.move_clip("hide") {
+                        self.set_clip(clip, s.now);
+                    }
+                    // Not there by the reload's end, it keeps going for one more reload's length.
+                    self.cover = None;
+                    self.cover_until = s.now + 2 * u64::from(a.recover);
+                    out.wants_cover = true;
+                }
                 if run.ends_at.is_none() && a.recover_if.as_deref() == Some("wall") && run.per_tick > 0.0 {
                     // The charge ran its length into nothing: a short window, not the wall's.
                     run.ends_at = Some(line.recover_start() + CHARGE_OPEN_RECOVER);
@@ -582,8 +640,11 @@ impl Brain {
     fn recover_order(&self, mob: &MobDef, s: &Senses) -> Order {
         let Some(tg) = s.target else { return Order::Stay };
         match self.style {
-            // The shooter reloads walking away from the target, towards cover.
-            Style::Shooter => Order::Walk { to: away(s.pos, tg.pos, 4.0), speed: 1.0 },
+            // The shooter reloads behind the cover the server found, else walking away.
+            Style::Shooter => match self.cover {
+                Some(spot) => Order::Walk { to: spot, speed: crate::cover::COVER_SPEED },
+                None => Order::Walk { to: away(s.pos, tg.pos, 4.0), speed: 1.0 },
+            },
             // The shrike climbs low over the ground.
             Style::Diver => Order::Steer {
                 to: geom::add(s.pos, [0.0, 0.25, 0.0]),
@@ -613,6 +674,7 @@ impl Brain {
                 }
             }
             Style::Skirmisher | Style::Ambusher => {
+                self.flank_since = None;
                 let until = s.now + if self.style == Style::Ambusher { AMBUSH_BACKOFF } else { 10 };
                 self.set_mode(Mode::BackOff { until, from }, s.now, events);
             }
@@ -653,6 +715,9 @@ impl Brain {
         let Some(tg) = s.target else {
             self.set_clip("", s.now);
             out.label = "idle".into();
+            self.flank_since = None;
+            self.post = None;
+            self.cover = None;
             return;
         };
         if out.rage && !self.raged {
@@ -669,7 +734,18 @@ impl Brain {
         if self.run.is_some() {
             return;
         }
-        out.order = self.order(mob, s, &tg, d);
+        let to_cover = if self.style == Style::Shooter { self.cover_walk(s) } else { None };
+        out.wants_post = decide
+            && self.style == Style::Shooter
+            && self.mode == Mode::Engage
+            && to_cover.is_none()
+            && self.held_post(mob, &tg).is_none();
+        out.order = match to_cover {
+            // After the reload, still on its way to cover: it keeps going (soulscraft_selftest
+            // `marksman_reload_cover`: the walk took longer than the reload on the bench).
+            Some(spot) => Order::Walk { to: spot, speed: crate::cover::COVER_SPEED },
+            None => self.order(mob, s, &tg, d),
+        };
         out.guarding = self.style == Style::Duelist;
         out.repath = decide || before != self.mode;
         self.set_clip(self.mode_clip(mob), s.now);
@@ -687,7 +763,7 @@ impl Brain {
                 let butt = mob.attack("butt_strike");
                 if d < melee && butt.is_some_and(|a| d <= reach_of(mob, a, self.style)) {
                     pick("butt_strike")
-                } else if (lo..=hi).contains(&d) {
+                } else if (lo..=hi).contains(&d) && self.cover_walk(s).is_none() {
                     pick("aimed_shot")
                 } else {
                     None
@@ -783,8 +859,19 @@ impl Brain {
             self.fled = true;
             let back = mob.param("return_after_ticks").unwrap_or(200.0) as u64;
             self.set_mode(Mode::Flee { until: s.now + back }, s.now, events);
+            // Back from fleeing, it flanks anew: the flight is no time spent flanking.
+            self.flank_since = None;
             return None;
         }
+        // The flank: it circles to the target's side or back while the target looks at it, and
+        // strikes once it does not, or when the flank has taken `flank_max_ticks`.
+        let since = *self.flank_since.get_or_insert(s.now);
+        let max = mob.param("flank_max_ticks").unwrap_or(100.0) as u64;
+        if tg.looking_at_me && s.now.saturating_sub(since) < max {
+            self.set_mode(Mode::Circle, s.now, events);
+            return None;
+        }
+        self.set_mode(Mode::Engage, s.now, events);
         let double = mob.attack("double_slash")?;
         if d <= reach_of(mob, double, self.style) {
             return mob.attack_index("double_slash");
@@ -794,15 +881,26 @@ impl Brain {
         if (3.0..=dash).contains(&d) && self.roll() < chance {
             return mob.attack_index("lunge");
         }
-        let (lo, hi) = mob.param_range("circle_radius_blocks").unwrap_or((4.0, 6.0));
-        match self.mode {
-            Mode::Circle if s.now - self.mode_since >= 50 => self.set_mode(Mode::Engage, s.now, events),
-            Mode::Engage if d <= hi + 1.0 && d >= lo - 1.0 && s.now - self.mode_since >= 30 => {
-                self.set_mode(Mode::Circle, s.now, events)
-            }
-            _ => {}
-        }
         None
+    }
+
+    /// The stalker's flank point: on its ring (`circle_radius_blocks`), `flank_angle_degrees` from
+    /// where the target faces, on the side the stalker is already on.
+    fn flank_point(&self, mob: &MobDef, s: &Senses, tg: &TargetSense) -> V3 {
+        let (lo, hi) = mob.param_range("circle_radius_blocks").unwrap_or((4.0, 6.0));
+        let off = mob.param("flank_angle_degrees").unwrap_or(135.0).to_radians();
+        // `ring_point` counts round from south as a yaw does, the other way: the target faces
+        // the ring angle −yaw.
+        let view = -tg.yaw.to_radians();
+        let side = wrap_angle(geom::ring_angle(tg.pos, s.pos) - view);
+        let sign = if side.abs() < 1e-6 { self.circle_dir } else { side.signum() };
+        geom::ring_point(tg.pos, (lo + hi) / 2.0, view + sign * off)
+    }
+
+    /// The marksman's post, while it stands in its kept distance from the target.
+    fn held_post(&self, mob: &MobDef, tg: &TargetSense) -> Option<V3> {
+        let (lo, hi) = mob.param_range("keep_distance_blocks").unwrap_or((10.0, 16.0));
+        self.post.filter(|p| (lo..=hi).contains(&geom::flat_dist(*p, tg.pos)))
     }
 
     fn order(&mut self, mob: &MobDef, s: &Senses, tg: &TargetSense, d: f64) -> Order {
@@ -817,6 +915,7 @@ impl Brain {
             }
             Mode::Flee { .. } => Order::Walk { to: away(s.pos, tg.pos, 12.0), speed: 1.4 },
             Mode::Pause { .. } | Mode::Roar { .. } | Mode::Grab { .. } => Order::Stay,
+            Mode::Circle if self.style == Style::Skirmisher => Order::Walk { to: self.flank_point(mob, s, tg), speed: 1.0 },
             Mode::Circle => {
                 let (lo, hi) = mob
                     .param_range("circle_radius_blocks")
@@ -831,6 +930,9 @@ impl Brain {
     fn engage_order(&mut self, mob: &MobDef, s: &Senses, tg: &TargetSense, d: f64) -> Order {
         match self.style {
             Style::Shooter => {
+                if let Some(post) = self.held_post(mob, tg) {
+                    return walk_up(s.pos, post, 1.0);
+                }
                 let (lo, hi) = mob.param_range("keep_distance_blocks").unwrap_or((10.0, 16.0));
                 let mid = (lo + hi) / 2.0;
                 if d < lo {
@@ -859,9 +961,7 @@ impl Brain {
                 }
             }
             Style::Jumper => Order::Walk { to: tg.pos, speed: 1.0 },
-            Style::Duelist | Style::Skirmisher => {
-                if d > 1.6 { Order::Walk { to: tg.pos, speed: 1.0 } } else { Order::Stay }
-            }
+            Style::Duelist | Style::Skirmisher => walk_up(s.pos, tg.pos, 1.0),
         }
     }
 
@@ -883,6 +983,45 @@ impl Brain {
 pub fn away(pos: V3, from: V3, blocks: f64) -> V3 {
     let dir = geom::flat_dir(from, pos);
     geom::add(pos, geom::scale(dir, blocks.max(0.0)))
+}
+
+/// Walk to `to` at `speed`, or stand once within [`CLOSE`] of it.
+fn walk_up(pos: V3, to: V3, speed: f64) -> Order {
+    if geom::flat_dist(pos, to) > CLOSE { Order::Walk { to, speed } } else { Order::Stay }
+}
+
+/// An angle in radians brought into −π..π.
+fn wrap_angle(a: f64) -> f64 {
+    use std::f64::consts::{PI, TAU};
+    (a + PI).rem_euclid(TAU) - PI
+}
+
+/// Bearings round the target, from the way to the marksman, where it may take its post.
+const POST_TURNS: [f64; 5] = [-60.0, -30.0, 0.0, 30.0, 60.0];
+
+/// The marksman's possible posts in its kept distance `lo..hi` from `target`: points on three
+/// rings within the band, on bearings near its own, at the target's height (the server finds the
+/// ground under each), and where it stands when that is in the band already.
+pub fn post_candidates(target: V3, from: V3, lo: f64, hi: f64) -> Vec<V3> {
+    let bearing = geom::ring_angle(target, from);
+    let span = hi - lo;
+    let mut out: Vec<V3> = [lo + span / 4.0, lo + span / 2.0, hi - span / 4.0]
+        .into_iter()
+        .flat_map(|r| POST_TURNS.map(|turn| geom::ring_point(target, r, bearing + turn.to_radians())))
+        .collect();
+    if (lo..=hi).contains(&geom::flat_dist(from, target)) {
+        out.insert(0, from);
+    }
+    out
+}
+
+/// The post among grounded candidates (`prefers_high_ground`: the highest, the nearest of equal
+/// height; else the nearest to `from`).
+pub fn pick_post(spots: &[V3], from: V3, prefers_high: bool) -> Option<V3> {
+    spots.iter().copied().min_by(|a, b| {
+        let higher = if prefers_high { b[1].total_cmp(&a[1]) } else { std::cmp::Ordering::Equal };
+        higher.then(geom::flat_dist(*a, from).total_cmp(&geom::flat_dist(*b, from)))
+    })
 }
 
 /// When an attack of this style can land: a dive is a dash that lands until the bird is down

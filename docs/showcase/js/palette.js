@@ -13,6 +13,9 @@
     const out = [];
     const add = (group, title, sub, href, keys) => out.push({ group, title, sub: sub || '', href, keys: keys || '' });
     add('Страницы', 'Бестиарий: все мобы', 'Карточки семи мобов', '#bestiary', 'индекс главная');
+    add('Страницы', 'Оборона алтаря', 'Роли, перехват, вытягивание, проклятие, пролом, одна жизнь', '#defense', 'оборона защита перехват проклятие пролом хардкор жизнь');
+    add('Страницы', 'Ванильные мобы', '11 групп с новыми приёмами', '#vanilla', 'ванильные зомби скелет паук ведьма разбойник поборник хоглин фантом слизень');
+    add('Страницы', 'Предметы и рецепты', 'Горны, осколки, клинок, молот, Сердце бездны, 24 рецепта', '#recipes', 'рецепты крафт горн осколок клинок молот сердце сундуки');
     for (const m of SC.DATA.mobs) add('Мобы', m.name, m.role + ' · ' + m.key, '#mob/' + m.id, m.id + ' ' + m.question);
     for (const m of SC.DATA.mobs) {
       const rig = SC.RIGS[m.id];
@@ -25,10 +28,11 @@
       if (def && def.scenes && SC.GLB[m.id])
         for (const s of def.scenes) add('Сцены', s.title, 'Сцена поведения · ' + m.name, '#mob/' + m.id + '?scene=' + s.id, s.intro || '');
     }
-    for (const ev of SC.DATA.events || []) add('Страницы', ev.name, 'Ивент: волны', '#event', 'ивент волны');
+    add('Страницы', 'Ивенты алтаря: все ступени', 'Четыре ступени', '#event', 'ивент волны ступени');
+    for (const ev of SC.DATA.events || []) add('Страницы', ev.name, 'Ивент ступени ' + ev.tier + ': волны и награда', '#event/' + ev.id, 'ивент волны награда горн ' + ev.item);
     if (SC.ALTAR) {
       add('Алтарь', 'Алтарь призыва', 'Уровни, достройка, призыв, меню, знамёна', '#altar', 'алтарь');
-      for (const [only, title] of [['levels', 'Уровни алтаря'], ['build', 'Достройка и призрак'], ['summon', 'Призыв: Гнилой горн'], ['menu', 'Меню алтаря'], ['banners', 'Знамёна алтаря']])
+      for (const [only, title] of [['levels', 'Уровни алтаря'], ['build', 'Достройка и призрак'], ['summon', 'Призыв: Гнилой горн'], ['menu', 'Меню алтаря'], ['boost', 'Учащённый спавн'], ['banners', 'Знамёна алтаря']])
         add('Алтарь', title, 'Алтарь призыва', '#altar?only=' + only, 'алтарь');
       for (const lv of SC.ALTAR.levels) add('Алтарь', 'Уровень ' + lv.level + ' · ' + lv.size + '×' + lv.size, 'Алтарь в сборе', '#altar?only=levels&level=' + lv.level, lv.unlocks || '');
       add('Алтарь', 'Блоки алтаря и предметы', 'Блоки, знамёна, горн, книга', '#altar/blocks', 'блоки предметы');
