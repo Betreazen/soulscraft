@@ -74,9 +74,6 @@ pub struct TargetSense {
     pub shield_up: bool,
     /// The target's view points at the mob (within 60°).
     pub looking_at_me: bool,
-    /// The target looks at the mob: its view within 60° of it on the ground (the lurker's check,
-    /// server.rs); the stalker and the lurker move when it is false.
-    pub sees_me: bool,
     /// A solid block right behind the target, away from the mob.
     pub at_wall: bool,
     /// A roof over the target (the shrike waits).
@@ -859,7 +856,7 @@ impl Brain {
                 Order::Steer { to: geom::add(ring, [0.0, (lo + hi) / 2.0, 0.0]), speed: 0.35 }
             }
             Style::Ambusher => {
-                if !s.in_water || tg.sees_me {
+                if !s.in_water || tg.looking_at_me {
                     Order::Stay
                 } else {
                     Order::Steer { to: tg.pos, speed: 0.12 }

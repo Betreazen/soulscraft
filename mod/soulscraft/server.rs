@@ -467,9 +467,8 @@ fn tick_mob(
     drop(s);
     guard_snapshot(m, &tick, style);
     log_events(&def, m.id, now, &tick);
-    for cue in cues_of(&def, &tick) {
-        play_cue(game, m.id, m.pos, &cue);
-    }
+    play_cues(game, &def, m, &tick, size);
+    roar(game, &def, m, &tick, size);
     let leap_up = def.jump_velocity_at(size).unwrap_or(LEAP_UP);
     let path = drive(game, dimension, now, m, &tick, style, repath, path, &sc, leap_up);
     if let Some(t) = state().mobs.get_mut(&m.id) {
@@ -484,8 +483,7 @@ fn tick_mob(
     if let Some(at) = tick.shadow
         && let Some(kind) = def.params.get("shadow_particle").and_then(serde_json::Value::as_str)
     {
-        // The slime's shadow where it lands: the cue's particles, round that point.
-        play_cue(game, m.id, at, &Cue { particle: Some(kind.to_owned()), ..Cue::default() });
+        shadow(game, &def, size, at, kind);
     }
     for strike in &tick.strikes {
         deal(game, dimension, now, m, &def, &sc, strike, target.as_ref(), players, p, size);
@@ -511,40 +509,68 @@ pub(super) fn scaled(def: &MobDef, p: f64, size: u8) -> Scaled {
     sc
 }
 
-/// The cues this tick starts: an attack's windup (its `cue`), the brute's roar as its rage starts
-/// (`passives.rage.cue`).
-fn cues_of(def: &MobDef, tick: &Tick) -> Vec<Cue> {
-    tick.events
-        .iter()
-        .filter_map(|e| match e {
-            Event::AttackStart { attack } => def.attacks.get(*attack)?.cue.clone(),
-            Event::Mode("rage") => serde_json::from_value(def.passive("rage")?.get("cue")?.clone()).ok(),
-            _ => None,
-        })
-        .collect()
+/// The cues of this tick's attack phases (data/mobs.json `cue`, at its `on` phase). Task 1's
+/// `play_cues` (wip/final-1) does the same and also the marksman's reload: keep that one.
+fn play_cues(game: &mut Game<'_>, def: &MobDef, m: &Seen, tick: &Tick, size: u8) {
+    let at = geom::add(m.pos, [0.0, def.hitbox_at(size).height * 0.6, 0.0]);
+    for e in &tick.events {
+        let Event::Phase { attack, phase, .. } = e else { continue };
+        if let Some(c) = def.attacks.get(*attack).and_then(|a| a.cue.as_ref()).filter(|c| c.on.phase() == *phase) {
+            play_cue(game, m.id, at, &c.cue);
+        }
+    }
 }
 
-/// A sound's source for the hostile mobs' cues (`SoundSource.HOSTILE`, as vanilla.rs plays them).
+/// The brute's roar as its rage starts (the mode `rage`): `passives.rage.cue`.
+fn roar(game: &mut Game<'_>, def: &MobDef, m: &Seen, tick: &Tick, size: u8) {
+    if !tick.events.contains(&Event::Mode("rage")) {
+        return;
+    }
+    let Some(cue) = def.passive("rage").and_then(|r| serde_json::from_value::<Cue>(r.get("cue")?.clone()).ok()) else { return };
+    let at = geom::add(m.pos, [0.0, def.hitbox_at(size).height * 0.6, 0.0]);
+    play_cue(game, m.id, at, &cue);
+}
+
+/// The slime's shadow where it lands (`params.shadow_particle`): the cue's particle shape, sized by
+/// its box at its size, round the landing point.
+fn shadow(game: &mut Game<'_>, def: &MobDef, size: u8, at: V3, kind: &str) {
+    let hb = def.hitbox_at(size);
+    let options = ParticleOptions::named(kind.to_owned());
+    let spread = [hb.width * 0.6, hb.height * 0.3, hb.width * 0.6];
+    let low = geom::add(at, [0.0, 0.2, 0.0]);
+    game.with_level(|_, level, _| level.native_send_particles(&options, None, low, spread, 0.02, 12));
+}
+
+/// `SoundSource.HOSTILE`'s index, the source a cue sounds from.
 const HOSTILE: usize = 5;
 
-/// A cue (data/mobs.json `cue`, the vanilla cue's schema) at mob `mob_id` standing at `at`: its
-/// sound at the chest, its particles round the feet, sized by the mob's box. The windup cue of
-/// soulscraft_vanilla (vanilla.rs:639-650), shared.
+/// A cue (the vanilla groups' schema, soulscraft_rules::vanilla::Cue): its sound at `at` from the
+/// hostile source (`GameLevel::native_play_sound`, native_hooks.rs:9906), its particles round the
+/// mob's feet (`native_send_particles`, native_hooks.rs:9936) and a small hop while it stands. A
+/// copy of Task 1's (wip/final-1, taken out of vanilla.rs:639-655), same signature and body: keep
+/// either at the merge.
 pub(super) fn play_cue(game: &mut Game<'_>, mob_id: u32, at: V3, cue: &Cue) {
-    let (width, height) = crate::game::soulscraft_find::mob(game, mob_id).map_or((0.6, 1.95), |m| (m.kind.width, m.kind.height));
+    let Some((feet, width, height, on_ground)) = crate::game::soulscraft_find::mob(game, mob_id)
+        .map(|m| ([m.position.x, m.position.y, m.position.z], m.kind.width, m.kind.height, m.on_ground))
+    else {
+        return;
+    };
     if let Some(sound) = &cue.sound {
-        let chest = geom::add(at, [0.0, height * 0.6, 0.0]);
         let pitch = cue.pitch.unwrap_or(1.0);
-        game.with_level(|_, level, _| level.native_play_sound(sound, chest, HOSTILE, 1.0, pitch));
+        game.with_level(|_, level, _| level.native_play_sound(sound, at, HOSTILE, 1.0, pitch));
     }
     if let Some(kind) = &cue.particle {
         let options = ParticleOptions::named(kind.clone());
         let spread = [width * 0.6, height * 0.3, width * 0.6];
-        let feet = geom::add(at, [0.0, 0.2, 0.0]);
-        game.with_level(|_, level, _| level.native_send_particles(&options, None, feet, spread, 0.02, 12));
+        let low = geom::add(feet, [0.0, 0.2, 0.0]);
+        game.with_level(|_, level, _| level.native_send_particles(&options, None, low, spread, 0.02, 12));
+    }
+    if let Some(up) = cue.hop
+        && on_ground
+    {
+        set_velocity(game, mob_id, [0.0, up, 0.0], true);
     }
 }
-
 /// The lurker's grab: its target put at its mouth this tick (a player keeps where it looks).
 fn hold_target(game: &mut Game<'_>, dim: &str, tg: &Target, at: V3, players: &[(NativeServerPlayer, bool)]) {
     match tg.player {
@@ -736,7 +762,6 @@ fn choose_target(game: &Game<'_>, m: &Seen, players: &[(NativeServerPlayer, bool
             pos,
             shield_up: *up,
             looking_at_me: looking,
-            sees_me: looking,
             at_wall: at_wall(game, m.pos, pos),
             under_roof: under_roof(game, pos),
         },
@@ -757,7 +782,6 @@ fn target_entity(game: &Game<'_>, m: &Seen, entity: u32, players: &[(NativeServe
                 pos,
                 shield_up: *up,
                 looking_at_me: geom::off_facing(pos, f64::from(p.yaw), m.pos) <= 60.0,
-                sees_me: geom::off_facing(pos, f64::from(p.yaw), m.pos) <= 60.0,
                 at_wall: at_wall(game, m.pos, pos),
                 under_roof: under_roof(game, pos),
             },

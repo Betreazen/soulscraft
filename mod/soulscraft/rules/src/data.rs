@@ -244,10 +244,39 @@ pub struct AttackDef {
     /// The grabbed target is held this far in front of the mob (its mouth).
     #[serde(default)]
     pub mouth_ahead_blocks: Option<f64>,
-    /// What the windup sounds and shows like (the vanilla cue's schema; the server plays it when
-    /// the attack starts). A vanilla move keeps its own `VanillaAttack::cue` instead.
+    /// What an own mob's attack sounds and shows like (a vanilla group's is `VanillaAttack.cue`).
     #[serde(default)]
-    pub cue: Option<crate::vanilla::Cue>,
+    pub cue: Option<AttackCue>,
+}
+
+/// An own mob's cue: the vanilla groups' schema (`sound`, `pitch`, `particle`, `pose`, `hop`) and
+/// the phase it plays at, the windup's start unless `on` says `hit` or `recover`.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+pub struct AttackCue {
+    #[serde(flatten)]
+    pub cue: crate::vanilla::Cue,
+    #[serde(default)]
+    pub on: CueOn,
+}
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum CueOn {
+    #[default]
+    Windup,
+    Hit,
+    Recover,
+}
+
+impl CueOn {
+    /// The attack phase it plays at.
+    pub fn phase(self) -> crate::attack::Phase {
+        match self {
+            CueOn::Windup => crate::attack::Phase::Windup,
+            CueOn::Hit => crate::attack::Phase::Hit,
+            CueOn::Recover => crate::attack::Phase::Recover,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq)]
@@ -614,12 +643,13 @@ mod tests {
     #[test]
     fn own_attacks_read_their_cue_and_the_grab_its_numbers() {
         let f = MobsFile::embedded();
-        let sound = |mob: &str, attack: &str| f.mob(mob).unwrap().attack(attack).unwrap().cue.as_ref().and_then(|c| c.sound.clone());
+        let sound = |mob: &str, attack: &str| f.mob(mob).unwrap().attack(attack).unwrap().cue.as_ref().and_then(|c| c.cue.sound.clone());
         assert_eq!(sound("brute", "overhead_wave").as_deref(), Some("minecraft:entity.ravager.attack"));
         assert_eq!(sound("shrike", "dive").as_deref(), Some("minecraft:entity.phantom.swoop"));
         assert_eq!(sound("lurker", "ambush").as_deref(), Some("minecraft:entity.guardian.attack"));
         assert_eq!(sound("bog_slime", "high_jump").as_deref(), Some("minecraft:entity.slime.jump"));
         assert_eq!(sound("brute", "wide_swing"), None);
+        assert_eq!(f.mob("shrike").unwrap().attack("dive").unwrap().cue.as_ref().unwrap().on, CueOn::Windup, "on the windup");
         let roar = f.mob("brute").unwrap().passive("rage").unwrap();
         assert_eq!(roar["clip_ticks"], 20);
         assert_eq!(roar["cue"]["sound"], "minecraft:entity.ravager.roar");

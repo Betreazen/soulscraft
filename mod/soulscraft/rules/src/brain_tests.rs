@@ -374,7 +374,7 @@ fn lurker_creeps_when_unseen_and_strikes_only_from_water() {
         move |n| {
             let mut s = senses(n, 10.0);
             s.in_water = true;
-            s.target.as_mut().unwrap().sees_me = seen;
+            s.target.as_mut().unwrap().looking_at_me = seen;
             s
         }
     };
