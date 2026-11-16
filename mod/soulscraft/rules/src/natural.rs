@@ -38,11 +38,32 @@ pub struct LurkerSpawn {
     pub near_blocks: f64,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 #[serde(default)]
 pub struct NaturalSection {
     pub mobs: Vec<NaturalMob>,
     pub lurker: LurkerSpawn,
+    /// A mob comes by itself only if a player this near has P of its `tier_p` or more.
+    pub tier_gate_blocks: f64,
+}
+
+impl Default for NaturalSection {
+    fn default() -> Self {
+        Self { mobs: Vec::new(), lurker: LurkerSpawn::default(), tier_gate_blocks: 128.0 }
+    }
+}
+
+/// Whether a mob of `tier_p` may come by itself where the strongest player near has `best`
+/// (None: nobody near). The altar's events and spawn boost do not ask: their power is the group's.
+pub fn tier_allows(tier_p: f64, best: Option<f64>) -> bool {
+    best.is_some_and(|p| tier_p <= p + 1e-9)
+}
+
+impl NaturalSection {
+    /// Whether the lurker's spawner may bring one where the strongest player near has `best`.
+    pub fn lurker_allowed(&self, mobs: &crate::data::MobsFile, best: Option<f64>) -> bool {
+        mobs.mob(&self.lurker.mob).is_some_and(|d| tier_allows(d.tier_p, best))
+    }
 }
 
 /// The soul shard (Г15).
@@ -86,9 +107,12 @@ impl NaturalMob {
 }
 
 /// What SoulsCraft adds to the monster list of a position in `biome` at height `y` (the overworld
-/// only: the caller checks the dimension). A mob already in the list (a spawn boost put it there)
-/// is not added twice; two rows of one mob that both apply count once, the first.
-pub fn extras(section: &NaturalSection, mobs: &crate::data::MobsFile, biome: &str, y: i32, listed: &[&str]) -> Vec<Extra> {
+/// only: the caller checks the dimension), where the strongest player within
+/// [`NaturalSection::tier_gate_blocks`] has P `best` (None: nobody that near). A mob above that P
+/// (`tier_p`) does not come; a mob with `params.group_size` comes in groups of that size. A mob
+/// already in the list (a spawn boost put it there) is not added twice; two rows of one mob that
+/// both apply count once, the first.
+pub fn extras(section: &NaturalSection, mobs: &crate::data::MobsFile, biome: &str, y: i32, listed: &[&str], best: Option<f64>) -> Vec<Extra> {
     let has_zombie = listed.contains(&"minecraft:zombie");
     let mut out: Vec<Extra> = Vec::new();
     for row in &section.mobs {
@@ -96,9 +120,19 @@ pub fn extras(section: &NaturalSection, mobs: &crate::data::MobsFile, biome: &st
         if !row.applies(biome, y, has_zombie) || listed.contains(&def.key.as_str()) || out.iter().any(|e| e.key == def.key) {
             continue;
         }
-        out.push(Extra { key: def.key.clone(), weight: row.weight, min: row.min.max(1), max: row.max.max(row.min.max(1)) });
+        if !tier_allows(def.tier_p, best) {
+            continue;
+        }
+        let (min, max) = group_size(def).unwrap_or((row.min, row.max));
+        out.push(Extra { key: def.key.clone(), weight: row.weight, min: min.max(1), max: max.max(min.max(1)) });
     }
     out
+}
+
+/// A mob's `params.group_size` [min, max], if it has one (the shrike: pairs and threes).
+fn group_size(def: &crate::data::MobDef) -> Option<(u32, u32)> {
+    let g = def.params.get("group_size")?.as_array()?;
+    Some((g.first()?.as_u64()? as u32, g.get(1)?.as_u64()? as u32))
 }
 
 impl LurkerSpawn {
@@ -192,7 +226,7 @@ mod tests {
     #[test]
     fn plains_at_night_get_the_revenant_and_the_marksman() {
         let f = file();
-        let e = extras(&f.natural, &f, "minecraft:plains", 64, &["minecraft:zombie", "minecraft:skeleton"]);
+        let e = extras_at(&f, "minecraft:plains", 64, &["minecraft:zombie", "minecraft:skeleton"]);
         assert_eq!(keys(&e), ["soulscraft:revenant", "soulscraft:marksman"]);
         assert_eq!(e[0].weight, 20);
         assert_eq!((e[1].min, e[1].max), (1, 2));
@@ -201,31 +235,70 @@ mod tests {
     #[test]
     fn the_revenant_keeps_to_the_surface_and_the_brute_to_caves() {
         let f = file();
-        let deep = extras(&f.natural, &f, "minecraft:plains", 12, &["minecraft:zombie"]);
+        let deep = extras_at(&f, "minecraft:plains", 12, &["minecraft:zombie"]);
         assert_eq!(keys(&deep), ["soulscraft:marksman", "soulscraft:brute"]);
         // A biome without the zombie (a mushroom field) gets neither.
-        let none = extras(&f.natural, &f, "minecraft:mushroom_fields", 64, &[]);
+        let none = extras_at(&f, "minecraft:mushroom_fields", 64, &[]);
         assert!(none.is_empty());
     }
 
     #[test]
     fn biome_parts_pick_their_mobs() {
         let f = file();
-        let forest = extras(&f.natural, &f, "minecraft:birch_forest", 70, &["minecraft:zombie"]);
+        let forest = extras_at(&f, "minecraft:birch_forest", 70, &["minecraft:zombie"]);
         assert_eq!(keys(&forest), ["soulscraft:revenant", "soulscraft:stalker"]);
-        let swamp = extras(&f.natural, &f, "minecraft:mangrove_swamp", 63, &["minecraft:zombie"]);
+        let swamp = extras_at(&f, "minecraft:mangrove_swamp", 63, &["minecraft:zombie"]);
         assert!(keys(&swamp).contains(&"soulscraft:bog_slime"));
         // The shrike only high up: a peak at 120 has it, at 70 not.
-        let high = extras(&f.natural, &f, "minecraft:jagged_peaks", 120, &[]);
+        let high = extras_at(&f, "minecraft:jagged_peaks", 120, &[]);
         assert_eq!(keys(&high), ["soulscraft:marksman", "soulscraft:brute", "soulscraft:shrike"]);
-        let low = extras(&f.natural, &f, "minecraft:jagged_peaks", 70, &[]);
+        let low = extras_at(&f, "minecraft:jagged_peaks", 70, &[]);
         assert!(!keys(&low).contains(&"soulscraft:shrike"));
+    }
+
+    /// The rows as before the tier gate: a player of P 1 near.
+    fn extras_at(f: &MobsFile, biome: &str, y: i32, listed: &[&str]) -> Vec<Extra> {
+        extras(&f.natural, f, biome, y, listed, Some(1.0))
+    }
+
+    #[test]
+    fn natural_respects_tier_p() {
+        let f = file();
+        assert_eq!(f.natural.tier_gate_blocks, 128.0);
+        let plains = |p: Option<f64>| keys(&extras(&f.natural, &f, "minecraft:plains", 64, &["minecraft:zombie"], p)).into_iter().map(str::to_owned).collect::<Vec<_>>();
+        // P 0: nobody strong enough for the revenant (0.2) or the marksman (0.3).
+        assert!(plains(Some(0.0)).is_empty());
+        // P 0.3: both (tier_p not above P).
+        assert_eq!(plains(Some(0.3)), ["soulscraft:revenant", "soulscraft:marksman"]);
+        assert_eq!(plains(Some(0.2)), ["soulscraft:revenant"]);
+        // Nobody within the gate's reach: nothing.
+        assert!(plains(None).is_empty());
+        // The brute (0.5) in a cave needs P 0.5.
+        let cave = |p| keys(&extras(&f.natural, &f, "minecraft:plains", 12, &["minecraft:zombie"], Some(p))).contains(&"soulscraft:brute");
+        assert!(!cave(0.45) && cave(0.5));
+        // The lurker's own spawner keeps the same gate.
+        assert!(!f.natural.lurker_allowed(&f, Some(0.3)) && f.natural.lurker_allowed(&f, Some(0.35)));
+        assert!(!f.natural.lurker_allowed(&f, None));
+    }
+
+    #[test]
+    fn shrikes_come_in_their_group_size() {
+        let f = file();
+        let high = extras_at(&f, "minecraft:jagged_peaks", 120, &[]);
+        let shrike = high.iter().find(|e| e.key == "soulscraft:shrike").unwrap();
+        assert_eq!((shrike.min, shrike.max), (2, 3));
+        // The row agrees with the mob's own group_size.
+        let row = f.natural.mobs.iter().find(|m| m.mob == "shrike").unwrap();
+        assert_eq!((row.min, row.max), (2, 3));
+        // A mob with no group_size keeps its row's numbers.
+        let marksman = high.iter().find(|e| e.key == "soulscraft:marksman").unwrap();
+        assert_eq!((marksman.min, marksman.max), (1, 2));
     }
 
     #[test]
     fn a_mob_already_listed_is_not_added_again() {
         let f = file();
-        let e = extras(&f.natural, &f, "minecraft:plains", 64, &["minecraft:zombie", "soulscraft:revenant"]);
+        let e = extras_at(&f, "minecraft:plains", 64, &["minecraft:zombie", "soulscraft:revenant"]);
         assert_eq!(keys(&e), ["soulscraft:marksman"]);
     }
 

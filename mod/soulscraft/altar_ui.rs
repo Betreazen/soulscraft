@@ -35,12 +35,15 @@ pub(super) fn menu_of(a: &Altar, now: u64) -> view::Menu {
         unlocks.push(if a.sky { "Ивенты недоступны: достройте первое кольцо".into() } else { "Ивенты недоступны: над ядром крыша".into() });
     } else {
         unlocks.push(file.levels[a.level as usize - 1].unlocks.clone());
-        for e in &crate::game::soulscraft_server::state().data.events {
-            if e.tier <= a.level {
-                unlocks.push(format!("Ивент «{}»: положите {} на подставку", e.id, item_name(&e.item)));
-            }
-        }
     }
+    // Every event, open here or not: its name, its horn (the client names it in its language) and
+    // the level it needs (soulscraft_rules::view::menu_lines).
+    let events = crate::game::soulscraft_server::state()
+        .data
+        .events
+        .iter()
+        .map(|e| view::MenuEvent { name: if e.name.is_empty() { e.id.clone() } else { e.name.clone() }, horn: e.item.clone(), tier: e.tier.max(1) })
+        .collect();
     let effects_sum = altar::effects(&file, &a.banner_ids());
     unlocks.push(soulscraft_rules::boost::menu_line(
         &soulscraft_rules::boost::BoostDef::embedded(),
@@ -60,14 +63,13 @@ pub(super) fn menu_of(a: &Altar, now: u64) -> view::Menu {
         boost: a.boost,
         unlocks,
         event: event::menu_lines(&a.dim, a.core, now),
+        events,
     }
 }
 
-pub(super) fn item_name(item: &str) -> &str {
-    match item {
-        "soulscraft:rotten_horn" => "Гнилой горн",
-        other => other,
-    }
+/// An item's name in the server's words (the client names the menu's horns from its language).
+pub(super) fn item_name(item: &str) -> String {
+    soulscraft_rules::book_page::piece_name(item)
 }
 
 fn block_name(file: &AltarFile, block: &str) -> String {

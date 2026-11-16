@@ -116,6 +116,38 @@ pub(super) fn power_here(game: &mut Game<'_>, at: V3, players: &[V3U]) -> f64 {
     scale::group_power(at, &powers).unwrap_or(0.0)
 }
 
+/// An altar event's power (06-altar.md): the mean P of its participants at the start, `players`
+/// by their own P and `others` (stand-ins) by theirs; the `/sc p` override, else 0 with nobody.
+pub(super) fn participants_power(game: &mut Game<'_>, players: &[u128], others: &[f64]) -> f64 {
+    let (over, w) = {
+        let s = crate::game::soulscraft_server::state();
+        (s.p_override, s.data.power)
+    };
+    if let Some(p) = over {
+        return p;
+    }
+    let mut powers: Vec<f64> = players.iter().map(|u| player_power(game, *u, &w)).collect();
+    powers.extend_from_slice(others);
+    scale::participant_power(&powers)
+}
+
+/// Each living player of `dim` where they stand and their P, and the `/sc p` override, for the
+/// natural spawn's tier gate (soulscraft_natural keeps them: the spawn list hook has no
+/// `&mut Game` to read gear with).
+pub(super) fn powers_in(game: &mut Game<'_>, dim: &str) -> (Vec<(V3, f64)>, Option<f64>) {
+    let (over, w) = {
+        let s = crate::game::soulscraft_server::state();
+        (s.p_override, s.data.power)
+    };
+    let players = game.native_server_players();
+    let list = players
+        .iter()
+        .filter(|p| p.dimension == dim && p.health > 0.0 && p.game_mode != 3)
+        .map(|p| (p.position, player_power(game, p.uuid, &w)))
+        .collect();
+    (list, over)
+}
+
 /// A player as P needs them: where they stand and who they are.
 pub(super) type V3U = (V3, u128);
 

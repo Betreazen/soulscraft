@@ -28,6 +28,9 @@ pub(super) const CASES: &[(&str, u64)] = &[
     ("reward_seeded_win", 300),
     ("kin_wave", 60),
     ("boost_sector", 60),
+    ("natural_tier_gate", 10),
+    ("reward_tier_item", 300),
+    ("repair_with_shard", 5),
 ];
 
 const MOBS: [&str; 7] = ["revenant", "stalker", "marksman", "brute", "shrike", "lurker", "bog_slime"];
@@ -46,6 +49,9 @@ pub(super) fn step(game: &mut Game<'_>, now: u64, t: u64, name: &str, c: &mut Ca
         "reward_seeded_win" => seeded_win(game, now, t, c),
         "kin_wave" => kin_wave(game, now, t, c),
         "boost_sector" => boost_sector(game, now, t, c),
+        "natural_tier_gate" => natural_tier_gate(game, t),
+        "reward_tier_item" => tier_item(game, now, t, c),
+        "repair_with_shard" => repair_with_shard(game),
         other => crate::game::soulscraft_selftest_book::step(game, now, t, other, c),
     }
 }
@@ -337,12 +343,21 @@ fn kin_wave(game: &mut Game<'_>, now: u64, t: u64, c: &mut Case) -> Option<Resul
     })
 }
 
-/// What the rules add to a monster list holding `listed` at `pos` of the site's dimension. As in
-/// the hook, nothing where the chunk isn't loaded (no biome: `native_biome` gives None).
+/// What the rules add to a monster list holding `listed` at `pos` of the site's dimension, with the
+/// tier gate's P there as the hook reads it. As in the hook, nothing where the chunk isn't loaded
+/// (no biome: `native_biome` gives None).
 fn natural_extras(game: &Game<'_>, pos: [i32; 3], listed: &[&str]) -> Vec<String> {
     let mobs = soulscraft_rules::data::MobsFile::embedded();
     let Some(biome) = game.native_biome(pos) else { return Vec::new() };
-    soulscraft_rules::natural::extras(&mobs.natural, &mobs, &biome, pos[1], listed).into_iter().map(|e| e.key).collect()
+    let best = crate::game::soulscraft_natural::best_power_at([f64::from(pos[0]) + 0.5, f64::from(pos[1]), f64::from(pos[2]) + 0.5]);
+    soulscraft_rules::natural::extras(&mobs.natural, &mobs, &biome, pos[1], listed, best).into_iter().map(|e| e.key).collect()
+}
+
+/// Sets `/sc p` (None: the players' own) and has the tier gate read it now; returns the old one.
+fn set_p(game: &mut Game<'_>, p: Option<f64>) -> Option<f64> {
+    let old = std::mem::replace(&mut crate::game::soulscraft_server::state().p_override, p);
+    crate::game::soulscraft_natural::refresh_powers(game, DIM);
+    old
 }
 
 /// How long `natural_lists` waits for an altar sector of another case to close (its budget is 10).
@@ -359,6 +374,8 @@ fn natural_lists(game: &mut Game<'_>, t: u64) -> Option<Result<(), String>> {
     if !boost::sectors(DIM).is_empty() {
         return (t > NATURAL_WAIT).then(|| Err("an altar sector stays open".into()));
     }
+    // Every tier open (the bench has no players: P comes from `/sc p`), put back after.
+    let old = set_p(game, Some(1.0));
     let site = at([0, 0, 0]);
     let mut why = Vec::new();
     for y in [site[1] + 2, 12] {
@@ -383,7 +400,120 @@ fn natural_lists(game: &mut Game<'_>, t: u64) -> Option<Result<(), String>> {
     if creatures.len() != 1 {
         why.push(format!("the creature list grew to {}", creatures.len()));
     }
+    set_p(game, old);
     Some(if why.is_empty() { Ok(()) } else { Err(why.join("; ")) })
+}
+
+/// The tier gate (0.7.0, data/mobs.json `natural.tier_gate_blocks`) through the engine's own hook
+/// point, outside any altar sector: at P 0 no revenant (`tier_p` 0.2) comes to a surface list
+/// beside the site, at P 0.3 it does. `/sc p` stands in for the players' P and is put back.
+fn natural_tier_gate(game: &mut Game<'_>, t: u64) -> Option<Result<(), String>> {
+    if t < 2 {
+        return None;
+    }
+    if !boost::sectors(DIM).is_empty() {
+        return (t > NATURAL_WAIT).then(|| Err("an altar sector stays open".into()));
+    }
+    let site = at([0, 0, 0]);
+    let pos = [site[0] + 24, site[1] + 2, site[2]];
+    let old = set_p(game, Some(0.0));
+    let weak = zombie_list_extras(game, pos);
+    set_p(game, Some(0.3));
+    let strong = zombie_list_extras(game, pos);
+    let want = natural_extras(game, pos, &["minecraft:zombie"]);
+    set_p(game, old);
+    let revenant = |l: &[String]| l.iter().any(|k| k == "soulscraft:revenant");
+    Some(if !want.iter().any(|k| k == "soulscraft:revenant") {
+        Err(format!("in {:?} the rules give no revenant at P 0.3: the check proves nothing", game.native_biome(pos)))
+    } else if weak.iter().any(|k| k.starts_with("soulscraft:")) || !revenant(&strong) {
+        Err(format!("P 0: {weak:?}; P 0.3: {strong:?}"))
+    } else {
+        Ok(())
+    })
+}
+
+/// What the engine's spawn list hook adds to a zombie's list at `pos`.
+fn zombie_list_extras(game: &mut Game<'_>, pos: [i32; 3]) -> Vec<String> {
+    let mut list = vec![SpawnEntry { entity: "minecraft:zombie".into(), weight: 95, min: 4, max: 4, constant: true }];
+    boost::ask_engine(game, DIM, pos, &mut list);
+    list.iter().skip(1).map(|e| e.entity.clone()).collect()
+}
+
+/// A seeded win of a tier-2 event (Ночь мертвецов) on a level-2 altar: its 8 shards, and the
+/// revenant's blade, the seed picked so that soulscraft_rules::event::rewards rolls it.
+fn tier_item(game: &mut Game<'_>, now: u64, t: u64, c: &mut Case) -> Option<Result<(), String>> {
+    const BLADE: &str = "soulscraft:revenant_blade";
+    let kinds = vec!["minecraft:zombie".to_owned(), "soulscraft:revenant".to_owned()];
+    let data = crate::game::soulscraft_server::state().data.clone();
+    let chances = rev::TrophyChances::embedded();
+    let roll = |seed: u64| rev::rewards(&kinds, &data, &soulscraft_rules::altar::Effects::default(), 2, 2, &chances, &mut Rng::new(seed));
+    if t == 1 {
+        build(game, 2);
+        return None;
+    }
+    if t < 6 {
+        return None;
+    }
+    if t == 6 {
+        let (lv, _, _, banners) = level(game, now)?;
+        if lv != 2 || !banners.is_empty() {
+            return Some(Err(format!("altar level {lv}, banners {banners:?}")));
+        }
+        let Some(index) = data.events.iter().position(|e| e.tier == 2) else { return Some(Err("no tier-2 event".into())) };
+        let Some(seed) = (0..10_000u64).find(|s| roll(*s).contains(&Trophy::Item(BLADE.into(), 1))) else {
+            return Some(Err("no seed rolls the blade".into()));
+        };
+        c.count = seed as u32;
+        c.golem = golem(game, crate::game::soulscraft_selftest_altar::STAND_IN);
+        let revenant = data.mob("revenant").map(SpawnMob::of)?;
+        let ov = Overrides {
+            waves: Some(vec![vec![revenant, SpawnMob::vanilla("minecraft:zombie")]]),
+            telegraph_ticks: Some(5),
+            rest_ticks: Some(5),
+            power: Some(0.0),
+            seed: Some(seed),
+            stand_ins: c.golem.into_iter().collect(),
+            ..Overrides::default()
+        };
+        let a = altar::altar(DIM, crate::game::soulscraft_selftest_altar::CORE)?;
+        return event::start(game, DIM, &a, index, now, Some(ov)).err().map(Err);
+    }
+    if has(&event::records(), "won") {
+        if c.phase == 0 {
+            c.phase = 1;
+            return None;
+        }
+        let blades = items_near(game, [0, 1, 0], BLADE, 4.0);
+        let shards = items_near(game, [0, 1, 0], rev::SOUL_SHARD, 4.0);
+        let want = chances.tier(2).map_or(0, |t| t.shards);
+        return Some(if blades == 1 && shards == want { Ok(()) } else { Err(format!("seed {}: blades {blades}, shards {shards} of {want}", c.count)) });
+    }
+    for id in event::wave_ids(DIM, crate::game::soulscraft_selftest_altar::CORE) {
+        game.native_kill_mob(DIM, id);
+    }
+    None
+}
+
+/// The tier items are repaired with soul shards (`minecraft:repairable`, mod/sync.ps1): the
+/// engine's own anvil (stations::anvil_result, AnvilMenu.createResult) takes a shard off a worn
+/// blade's damage and refuses an iron ingot.
+fn repair_with_shard(game: &mut Game<'_>) -> Option<Result<(), String>> {
+    use horizon_client::items::ItemStack;
+    let mut blade = ItemStack::new("soulscraft:revenant_blade", 1);
+    blade.damage = 600;
+    let anvil = |with: &str| {
+        let addition = ItemStack::new(with, 1);
+        horizon_client::stations::anvil_result(&game.stations().enchantments, game.items(), Some(&blade), Some(&addition), None, "", false)
+    };
+    let shard = anvil(rev::SOUL_SHARD);
+    let ingot = anvil("minecraft:iron_ingot");
+    let repaired = shard.result.as_ref().map(|r| r.damage);
+    let wrong = ingot.result.as_ref().is_some_and(|r| r.damage < 600);
+    Some(if repaired.is_some_and(|d| d < 600) && shard.repair_item_count_cost >= 1 && !wrong {
+        Ok(())
+    } else {
+        Err(format!("shard: damage {repaired:?}, shards used {}; iron ingot repairs {wrong}", shard.repair_item_count_cost))
+    })
 }
 
 /// A level-2 altar's sector: active with one extra pass, three chunks out after three drift

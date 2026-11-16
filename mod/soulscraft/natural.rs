@@ -10,6 +10,11 @@
 // - The lurker: zombie placement never puts a mob in water, so every `every_ticks` each player in
 //   a deep ocean may get one lurker, with `chance`, in water below `max_y` between the radii,
 //   if fewer than `near_cap` lurkers are near.
+// - The tier gate (10-survival.md; data/mobs.json `natural.tier_gate_blocks`): a mob comes by
+//   itself only where a player within the gate has P of its `tier_p` or more (`/sc p` stands in
+//   for everyone's P). The spawn list hook has only `&Game` and P needs `&mut Game` (gear), so
+//   each player's P is read on the level tick every `TIER_REFRESH` ticks and kept here. The
+//   altar's spawn boost (soulscraft_spawn_boost, after this hook) and its events never ask it.
 // - World drops (Г15, Г18; docs/design/11-summons-rewards.md): the book's deaths
 //   (soulscraft_book::deaths) hand over each credited kill of a SoulsCraft mob; its shards, horn,
 //   head and armour are summoned here, outside the book's lock.
@@ -31,6 +36,10 @@ static CHANCES: LazyLock<soulscraft_rules::event::TrophyChances> = LazyLock::new
 static RNG: LazyLock<Mutex<Rng>> = LazyLock::new(|| Mutex::new(Rng::new(0x5EED_50_11)));
 /// Lists extended since the last read (the self-test and the cost line).
 static EXTENDED: Mutex<u64> = Mutex::new(0);
+/// The overworld's players (where, P) and the `/sc p` override, for the tier gate.
+static POWERS: Mutex<(Vec<([f64; 3], f64)>, Option<f64>)> = Mutex::new((Vec::new(), None));
+/// The players' P for the tier gate is read again this often.
+const TIER_REFRESH: u64 = 20;
 
 fn roll() -> f64 {
     RNG.lock().unwrap_or_else(PoisonError::into_inner).unit()
@@ -43,7 +52,8 @@ pub(super) fn on_potential_spawns(game: &Game<'_>, dimension: &str, category: &s
     }
     let Some(biome) = game.native_biome(pos) else { return };
     let listed: Vec<&str> = entries.iter().map(|e| e.entity.as_str()).collect();
-    let extras = soulscraft_rules::natural::extras(&MOBS.natural, &MOBS, &biome, pos[1], &listed);
+    let best = best_power_at([f64::from(pos[0]) + 0.5, f64::from(pos[1]), f64::from(pos[2]) + 0.5]);
+    let extras = soulscraft_rules::natural::extras(&MOBS.natural, &MOBS, &biome, pos[1], &listed, best);
     if extras.is_empty() {
         return;
     }
@@ -51,6 +61,20 @@ pub(super) fn on_potential_spawns(game: &Game<'_>, dimension: &str, category: &s
         entries.push(SpawnEntry { entity: e.key, weight: e.weight, min: e.min, max: e.max, constant: e.min == e.max });
     }
     *EXTENDED.lock().unwrap_or_else(PoisonError::into_inner) += 1;
+}
+
+/// The P the tier gate reads at `at`: the `/sc p` override, else the strongest player within
+/// `natural.tier_gate_blocks` (None: nobody that near).
+pub(super) fn best_power_at(at: [f64; 3]) -> Option<f64> {
+    let p = POWERS.lock().unwrap_or_else(PoisonError::into_inner);
+    p.1.or_else(|| soulscraft_rules::scale::best_power_near(at, &p.0, MOBS.natural.tier_gate_blocks))
+}
+
+/// Reads the overworld players' P and the override for the tier gate now (the level tick, and the
+/// self-test after it changes `/sc p`).
+pub(super) fn refresh_powers(game: &mut Game<'_>, dim: &str) {
+    let read = crate::game::soulscraft_power::powers_in(game, dim);
+    *POWERS.lock().unwrap_or_else(PoisonError::into_inner) = read;
 }
 
 /// Lists extended so far, and the counter cleared (the self-test).
@@ -62,6 +86,9 @@ pub(super) fn take_extended() -> u64 {
 pub(super) fn on_level_tick(game: &mut Game<'_>, dim: &str, now: u64) {
     if dim != "minecraft:overworld" {
         return;
+    }
+    if now % TIER_REFRESH == 0 {
+        refresh_powers(game, dim);
     }
     let l = &MOBS.natural.lurker;
     if l.every_ticks == 0 || now % l.every_ticks != 0 {
@@ -81,6 +108,9 @@ pub(super) fn on_level_tick(game: &mut Game<'_>, dim: &str, now: u64) {
         let [x, z] = l.spot(at, [roll(), roll()]);
         let Some(y) = water_column(game, x.floor() as i32, z.floor() as i32, l.max_y) else { continue };
         let spot = [x.floor() + 0.5, f64::from(y), z.floor() + 0.5];
+        if !MOBS.natural.lurker_allowed(&MOBS, best_power_at(spot)) {
+            continue;
+        }
         let near = game.mobs.iter().filter(|m| !m.removed && m.alive() && m.kind.id == def.key && soulscraft_rules::geom::dist([m.position.x, m.position.y, m.position.z], spot) <= l.near_blocks).count();
         if near >= l.near_cap {
             continue;

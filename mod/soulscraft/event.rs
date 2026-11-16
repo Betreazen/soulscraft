@@ -5,7 +5,9 @@
 // the boss bar with its warning, the reward of a win and the walls put back at the end.
 //
 // Wave mobs are vanilla zombies (the test event) whose own goals are dropped when the event first
-// sees them (`Mob.ai.goals`, `targets`), so this file walks them, and SoulsCraft's mobs, whose
+// sees them (`Mob.ai.goals`, `targets`), so this file walks them; other vanilla mobs of a changed
+// type (a skeleton), left to their own vanilla group (soulscraft_vanilla: its numbers and moves,
+// their own goals), the event taking only their role; and SoulsCraft's mobs, whose
 // brain still fights a player they go for (soulscraft_server asks `steering`) while this file
 // walks them to the altar. The path map is built from the world once at the start and again
 // when a block in the zone changes (the block_changed hook, through soulscraft_altar), at most
@@ -16,7 +18,8 @@
 //   soulscraft: event telegraph wave=1 points=4 tick=..   soulscraft: event spawn wave=1 mobs=6 tick=..
 //   soulscraft: event field cells=39168 open=1234 breach=2345 ms=3.1 tick=..
 //   soulscraft: event drain mob=12 hp=199.95   soulscraft: event curse mob=12   soulscraft: event breach mob=12 at=x,y,z
-//   soulscraft: event won|lost=altar|nobody|stopped core=.. wave=3 hp=..   soulscraft: event reward items=[..]
+//   soulscraft: event won|lost=altar|nobody|stopped core=.. wave=3 hp=.. altar_damage_by=assault:12.00
+//     walls_sealed=false modifiers=1,0,0   soulscraft: event reward items=[..]
 //   soulscraft: event restored blocks=4 kept=1
 use crate::game::Game;
 use crate::game::soulscraft_altar::{self as altar_srv, Altar};
@@ -91,6 +94,10 @@ pub(super) struct WaveMob {
     pub(super) role: Role,
     pub(super) soul: bool,
     pub(super) health_mult: f64,
+    /// The event's banner-bearer (its `minecraft:scale`).
+    pub(super) banner: bool,
+    /// A vanilla mob its own group leads (SpawnMob::led_by_vanilla): never walked or swung here.
+    pub(super) led: bool,
     pub(super) mind: Mind,
     pub(super) adopted: bool,
     pub(super) nav: Option<([i32; 3], u64)>,
@@ -117,6 +124,14 @@ pub(super) struct EventRun {
     pub dim: String,
     pub core: [i32; 3],
     pub event: String,
+    /// The event's name for players (`events[].name`).
+    pub name: String,
+    /// The tick it started (the zone's outline shows for `flow.outline_ticks`).
+    pub(super) started: u64,
+    /// The altar's loss by the wave role that took it (telemetry `altar_damage_by`).
+    pub(super) by_role: BTreeMap<String, f64>,
+    /// A mob found no way to the altar and cursed it (telemetry `walls_sealed`).
+    pub(super) sealed: bool,
     pub(super) plan: Plan,
     pub(super) run: Run,
     pub(super) hp: AltarHealth,
@@ -146,6 +161,8 @@ pub(super) struct EventRun {
 pub(super) static EVENTS: LazyLock<Mutex<HashMap<(String, [i32; 3]), EventRun>>> = LazyLock::new(Mutex::default);
 /// Wave mobs' ids, for the damage hook (no game there).
 static WAVE_IDS: LazyLock<Mutex<HashSet<u32>>> = LazyLock::new(Mutex::default);
+/// The wave mobs their vanilla group leads (soulscraft_vanilla adopts them).
+static LED: LazyLock<Mutex<HashSet<u32>>> = LazyLock::new(Mutex::default);
 /// Hits on wave mobs: (mob, attacker or 0).
 static HITS: Mutex<Vec<(u32, i32)>> = Mutex::new(Vec::new());
 static STEER: LazyLock<Mutex<HashMap<u32, Steering>>> = LazyLock::new(Mutex::default);
@@ -179,9 +196,10 @@ pub(super) fn running(dim: &str, core: [i32; 3]) -> bool {
     events().contains_key(&(dim.to_owned(), core))
 }
 
-/// A mob an event spawned (the vanilla changes leave it to the event).
+/// A mob an event spawned and leads (the vanilla changes leave it to the event). A wave skeleton
+/// is the event's too, but its vanilla group leads it: not one of these.
 pub(super) fn is_wave(mob: u32) -> bool {
-    WAVE_IDS.lock().unwrap_or_else(PoisonError::into_inner).contains(&mob)
+    WAVE_IDS.lock().unwrap_or_else(PoisonError::into_inner).contains(&mob) && !LED.lock().unwrap_or_else(PoisonError::into_inner).contains(&mob)
 }
 
 pub(super) fn steering(mob: u32) -> Option<Steering> {
@@ -233,10 +251,7 @@ pub(super) fn start(game: &mut Game<'_>, dim: &str, a: &Altar, index: usize, now
     let parts = players_in_zone(game, dim, a.core, &flow, &BTreeSet::new());
     let power = match ov.power {
         Some(p) => p,
-        None => {
-            let near: Vec<(V3, u128)> = parts.iter().filter_map(|p| p.player.map(|u| (p.pos, u))).collect();
-            if near.is_empty() { 0.0 } else { crate::game::soulscraft_power::power_here(game, core_centre(a.core), &near) }
-        }
+        None => group_power(game, a.core, &flow, &parts, &ov.stand_ins),
     };
     let mut plan = rev::plan(&ev, &data, &effects, power);
     if let Some(w) = ov.waves {
@@ -244,11 +259,14 @@ pub(super) fn start(game: &mut Game<'_>, dim: &str, a: &Altar, index: usize, now
     }
     if let Some(r) = ov.rest_ticks {
         plan.rest_ticks = r;
+        plan.rest_span_ticks = [r, r];
     }
     if let Some(h) = ov.altar_health {
         plan.altar_health = h;
     }
-    let (run, step) = Run::start(&plan, &flow, now);
+    let seed = now ^ (a.core[0] as u64).wrapping_mul(31) ^ (a.core[2] as u64).wrapping_mul(17);
+    // The rests' own stream, apart from the spawn points' (one roll a rest, 06-altar.md).
+    let (run, step) = Run::start(&plan, &flow, now, seed.rotate_left(17));
     let bar = {
         let mut n = BARS.lock().unwrap_or_else(PoisonError::into_inner);
         *n += 1;
@@ -259,6 +277,10 @@ pub(super) fn start(game: &mut Game<'_>, dim: &str, a: &Altar, index: usize, now
         dim: dim.to_owned(),
         core: a.core,
         event: ev.id.clone(),
+        name: plan.name.clone(),
+        started: now,
+        by_role: BTreeMap::new(),
+        sealed: false,
         hp: AltarHealth::new(plan.altar_health),
         plan,
         run,
@@ -273,7 +295,7 @@ pub(super) fn start(game: &mut Game<'_>, dim: &str, a: &Altar, index: usize, now
         joined: BTreeMap::new(),
         out: BTreeSet::new(),
         breaches: Breaches::default(),
-        rng: Rng::new(now ^ (a.core[0] as u64).wrapping_mul(31) ^ (a.core[2] as u64).wrapping_mul(17)),
+        rng: Rng::new(seed),
         reward_seed: ov.seed.unwrap_or(now.wrapping_mul(0x9E37_79B9) ^ (a.core[1] as u64)),
         stand_ins: ov.stand_ins,
         bar: bar.clone(),
@@ -308,6 +330,29 @@ pub(super) fn start(game: &mut Game<'_>, dim: &str, a: &Altar, index: usize, now
     events().insert((dim.to_owned(), a.core), r);
     Ok(())
 }
+
+/// The event's power P (06-altar.md): the mean P of everyone taking part at the start, the
+/// players in the zone and the self-test's stand-ins there that carry a P tag
+/// (`soulscraft.p=`, a player's stand-in); `/sc p` overrides it, as everywhere.
+fn group_power(game: &mut Game<'_>, core: [i32; 3], flow: &Flow, parts: &[Part], stand_ins: &[u32]) -> f64 {
+    let players: Vec<u128> = parts.iter().filter_map(|p| p.player).collect();
+    let mut tagged = Vec::new();
+    for id in stand_ins {
+        let Some(m) = game.mobs.iter().find(|m| m.id == *id && !m.removed && m.alive()) else { continue };
+        if !flow.in_zone(core, m.position.x, m.position.z) {
+            continue;
+        }
+        let tags = game.native_entity(*id).and_then(|e| game.native_entity_tags(e)).unwrap_or_default();
+        if let Some(p) = tags.iter().find_map(|t| t.strip_prefix(P_TAG)).and_then(|v| v.parse::<f64>().ok()) {
+            tagged.push(p);
+        }
+    }
+    crate::game::soulscraft_power::participants_power(game, &players, &tagged)
+}
+
+/// The P tag a stand-in carries for the group's power, and a vanilla-led wave mob for its own
+/// (the vanilla changes' tag, vanilla.rs).
+pub(super) const P_TAG: &str = "soulscraft.p=";
 
 /// Stops a run (an operator, the self-test): lost, walls back.
 pub(super) fn stop(game: &mut Game<'_>, dim: &str, core: [i32; 3], now: u64) -> bool {
@@ -427,7 +472,7 @@ fn take_spared(game: &mut Game<'_>, dim: &str, now: u64) {
 /// with two free cells above it: near the altar's height first (down from 24 above the core),
 /// then the rest of the column down to the world's floor and up to its roof (an altar on a cliff
 /// or a platform in the sky). No floor at all (an unloaded chunk reads as air): where they are.
-fn outside_zone(game: &Game<'_>, core: [i32; 3], flow: &Flow, from: V3) -> V3 {
+pub(super) fn outside_zone(game: &Game<'_>, core: [i32; 3], flow: &Flow, from: V3) -> V3 {
     let c = core_centre(core);
     let (dx, dz) = (from[0] - c[0], from[2] - c[2]);
     let len = (dx * dx + dz * dz).sqrt();
@@ -549,7 +594,7 @@ fn drive_mobs(game: &mut Game<'_>, r: &mut EventRun, parts: &[Part], now: u64) {
         let Some(mut w) = r.mobs.remove(&id) else { continue };
         w.pos = pos;
         if !w.adopted {
-            adopt_zombie(game, id, &w, r.plan.power);
+            adopt_zombie(game, id, &w, r.plan.power, r.plan.bearer_scale);
             w.adopted = true;
         }
         let eye = geom::add(pos, [0.0, 1.6, 0.0]);
@@ -579,6 +624,9 @@ fn drive_mobs(game: &mut Game<'_>, r: &mut EventRun, parts: &[Part], now: u64) {
                 w.mind.drain_start = None;
                 if w.soul {
                     STEER.lock().unwrap_or_else(PoisonError::into_inner).insert(id, Steering::Fight(e));
+                } else if w.led {
+                    // Its own goals and its vanilla group fight the participant (a skeleton shoots).
+                    let_go(game, &dim, id, &mut w);
                 } else if let Some(p) = parts.iter().find(|p| p.entity == e) {
                     chase(game, &dim, id, &mut w, p, r.plan.power, now);
                 }
@@ -597,15 +645,30 @@ fn drive_mobs(game: &mut Game<'_>, r: &mut EventRun, parts: &[Part], now: u64) {
 fn gone(r: &mut EventRun, id: u32) {
     r.mobs.remove(&id);
     WAVE_IDS.lock().unwrap_or_else(PoisonError::into_inner).remove(&id);
+    LED.lock().unwrap_or_else(PoisonError::into_inner).remove(&id);
     STEER.lock().unwrap_or_else(PoisonError::into_inner).remove(&id);
+}
+
+/// A vanilla-led mob after a participant: the event's walk stops, its own goals take over.
+fn let_go(game: &mut Game<'_>, dim: &str, id: u32, w: &mut WaveMob) {
+    w.steer = None;
+    if w.moving {
+        game.native_mob_stop(dim, id);
+        w.moving = false;
+        w.nav = None;
+    }
 }
 
 /// A vanilla zombie of the wave the first time it is seen: its own goals dropped (the event walks
 /// and swings it), no burning in daylight, its numbers from the event's P, and Path-of-craft-tree's
-/// experience tag (Г3).
-fn adopt_zombie(game: &mut Game<'_>, id: u32, w: &WaveMob, power: f64) {
-    if w.soul {
+/// experience tag (Г3). The banner-bearer grows to `bearer_scale`. A vanilla-led mob is its
+/// group's, not this.
+fn adopt_zombie(game: &mut Game<'_>, id: u32, w: &WaveMob, power: f64, bearer_scale: f64) {
+    if w.soul || w.led {
         return;
+    }
+    if w.banner && (bearer_scale - 1.0).abs() > 1e-6 {
+        set_scale(game, id, bearer_scale);
     }
     let sc = Scaled::at(&ZOMBIE, power);
     let max = sc.max_health * w.health_mult;
@@ -622,6 +685,30 @@ fn adopt_zombie(game: &mut Game<'_>, id: u32, w: &WaveMob, power: f64) {
         m.needs_sync = true;
     }
     server::set_xp_tag(game, id, ZOMBIE.health, max);
+}
+
+/// A mob's `minecraft:scale` base (the attribute is in 26.3's registry; horizon-world
+/// live_attribute_updates.rs:37), set as vanilla.rs sets a grown mob's armour: in its generic
+/// attribute map (created from its type's defaults if it has none), whose syncable instances the
+/// server sends its clients (game/lan_attributes.rs:303-306; the client sizes model and box by it,
+/// game/remote.rs:3579-3581), and in `extra.model_scale`, which sizes its box here
+/// (mobs/living.rs:442, `model_scale`).
+fn set_scale(game: &mut Game<'_>, id: u32, scale: f64) {
+    let Some(i) = crate::game::soulscraft_find::index_of(game, id) else { return };
+    let kind = game.mobs[i].kind.id.to_string();
+    if game.mobs[i].extra.armor_attributes.is_none() {
+        game.mobs[i].extra.armor_attributes = game.motion.attributes.create(&kind).map(Box::new);
+    }
+    let m = &mut game.mobs[i];
+    if let Some(map) = m.extra.armor_attributes.as_deref_mut()
+        && let Some(key) = map.catalog().id("minecraft:scale")
+    {
+        map.edit(key, |value, observer| {
+            let _ = value.set_base_value(scale, observer);
+        });
+    }
+    m.extra.model_scale = scale as f32;
+    m.needs_sync = true;
 }
 
 pub(super) fn nav_to(game: &mut Game<'_>, dim: &str, id: u32, w: &mut WaveMob, to: [i32; 3], now: u64) {
@@ -708,11 +795,13 @@ fn to_altar(game: &mut Game<'_>, r: &mut EventRun, id: u32, w: &mut WaveMob, alt
     if defense::track_path(&mut w.mind, has_path, &r.numbers, now) {
         if !w.cursed_logged {
             w.cursed_logged = true;
+            r.sealed = true;
             record(format!("curse mob={id} tick={now}"));
         }
         halt(game, &dim, id, w, core_c);
         w.beam = Some(BeamKind::Curse);
-        r.hp.hurt(r.numbers.curse_per_second / 20.0, Harm::Curse, r.numbers.cap_per_second, now);
+        let took = r.hp.hurt(r.numbers.curse_per_second / 20.0, Harm::Curse, r.numbers.cap_per_second, now);
+        *r.by_role.entry(w.role.name().to_owned()).or_default() += took;
         return;
     }
     match defense::drain(&mut w.mind, at_altar, &r.numbers, now) {
@@ -726,7 +815,8 @@ fn to_altar(game: &mut Game<'_>, r: &mut EventRun, id: u32, w: &mut WaveMob, alt
                 record(format!("drain mob={id} tick={now}"));
             }
             w.beam = Some(BeamKind::Drain);
-            r.hp.hurt(r.numbers.drain_per_second / 20.0, Harm::Drain, r.numbers.cap_per_second, now);
+            let took = r.hp.hurt(r.numbers.drain_per_second / 20.0, Harm::Drain, r.numbers.cap_per_second, now);
+            *r.by_role.entry(w.role.name().to_owned()).or_default() += took;
         }
         Drain::Away => {
             w.beam = None;
@@ -753,7 +843,7 @@ fn act(game: &mut Game<'_>, r: &mut EventRun, step: Step, now: u64) {
         Step::Telegraph(w) => telegraph(game, r, w, now),
         Step::Spawn(w) => spawn(game, r, w, now),
         Step::Rest(next) => {
-            record(format!("rest next={} ticks={} tick={now}", next + 1, r.plan.rest_ticks));
+            record(format!("rest next={} ticks={} tick={now}", next + 1, r.run.rest_before(next)));
             tell_zone(game, r, "Передышка", &format!("Волна {} из {} скоро", next + 1, r.plan.waves.len()));
         }
         Step::Won => finish(game, r, true, "won", now),
@@ -795,6 +885,7 @@ fn telegraph(game: &mut Game<'_>, r: &mut EventRun, w: usize, now: u64) {
 
 fn spawn(game: &mut Game<'_>, r: &mut EventRun, w: usize, now: u64) {
     let dim = r.dim.clone();
+    let data = server::state().data.clone();
     let wave = r.plan.waves.get(w).cloned().unwrap_or_default();
     let points = if r.spawns.is_empty() { vec![r.core] } else { r.spawns.clone() };
     let mut n = 0;
@@ -804,9 +895,13 @@ fn spawn(game: &mut Game<'_>, r: &mut EventRun, w: usize, now: u64) {
         let jitter = [0.5 + 0.3 * (k * 2.1).sin(), 0.0, 0.5 + 0.3 * (k * 2.1).cos()];
         let at = [f64::from(p[0]) + jitter[0], f64::from(p[1]), f64::from(p[2]) + jitter[2]];
         let soul = m.kind.starts_with("soulscraft:");
+        let led = !soul && m.led_by_vanilla(&data);
         let id = spawn_one(game, &dim, m, at, r.plan.power);
         let Some(id) = id else { continue };
         n += 1;
+        if led {
+            LED.lock().unwrap_or_else(PoisonError::into_inner).insert(id);
+        }
         WAVE_IDS.lock().unwrap_or_else(PoisonError::into_inner).insert(id);
         r.mobs.insert(
             id,
@@ -815,8 +910,10 @@ fn spawn(game: &mut Game<'_>, r: &mut EventRun, w: usize, now: u64) {
                 role: m.role,
                 soul,
                 health_mult: m.health_mult,
+                banner: m.banner,
+                led,
                 mind: Mind::default(),
-                adopted: soul,
+                adopted: soul || led,
                 nav: None,
                 moving: false,
                 swing: 0,
@@ -847,7 +944,31 @@ pub(super) fn spawn_one(game: &mut Game<'_>, dim: &str, m: &SpawnMob, at: V3, po
         log::info!("soulscraft: event spawn skipped kind={} at={:.1},{:.1},{:.1}: no room", m.kind, at[0], at[1], at[2]);
         return None;
     };
+    let led = m.led_by_vanilla(&server::state().data);
+    if led {
+        return summon_led(game, dim, m, spot, power);
+    }
     summon_zombie(game, dim, m, spot)
+}
+
+/// A vanilla mob its group leads (a skeleton): no wave tag, so soulscraft_vanilla adopts it, and
+/// the event's P as its tag, which it takes as its own (vanilla.rs `adopt`: a tagged mob is not
+/// fresh, no spawner check). The event knows it by id (`WAVE_IDS`, `LED`). A summon with a
+/// compound skips vanilla's finalizeSpawn, so it gets the weapon that would give it
+/// (soulscraft_rules::event::vanilla_weapon); like the event's zombies it does not burn by day.
+fn summon_led(game: &mut Game<'_>, dim: &str, m: &SpawnMob, at: V3, power: f64) -> Option<u32> {
+    let gear = rev::vanilla_weapon(&m.kind)
+        .map(|w| format!("equipment:{{mainhand:{{id:\"{w}\",count:1}}}},drop_chances:{{mainhand:0f}},"))
+        .unwrap_or_default();
+    let snbt = format!("{{{gear}Tags:[\"{P_TAG}{power:.2}\"],PersistenceRequired:1b,CanPickUpLoot:0b}}");
+    let Ok((crate::mod_api::Tag::Compound(nbt), _)) = crate::mod_api::parse_snbt(&snbt) else { return None };
+    let id = game.native_summon(dim, &m.kind, at, nbt)?;
+    if let Some(mob) = crate::game::soulscraft_find::mob_mut(game, id)
+        && mob.kind.flags.burns_in_day
+    {
+        std::sync::Arc::make_mut(&mut mob.kind).flags.burns_in_day = false;
+    }
+    Some(id)
 }
 
 fn summon_zombie(game: &mut Game<'_>, dim: &str, m: &SpawnMob, at: V3) -> Option<u32> {
@@ -868,7 +989,7 @@ fn summon_zombie(game: &mut Game<'_>, dim: &str, m: &SpawnMob, at: V3) -> Option
 fn finish(game: &mut Game<'_>, r: &mut EventRun, won: bool, how: &str, now: u64) {
     let dim = r.dim.clone();
     record(format!(
-        "{} core={},{},{} wave={} hp={:.2} drained={:.2} cursed={:.2} parts={} tick={now}",
+        "{} core={},{},{} wave={} hp={:.2} drained={:.2} cursed={:.2} parts={} {} tick={now}",
         if won { "won".to_owned() } else { format!("lost={how}") },
         r.core[0],
         r.core[1],
@@ -877,7 +998,8 @@ fn finish(game: &mut Game<'_>, r: &mut EventRun, won: bool, how: &str, now: u64)
         r.hp.hp,
         r.hp.by_drain,
         r.hp.by_curse,
-        r.joined.len() + r.stand_ins.len()
+        r.joined.len() + r.stand_ins.len(),
+        rev::end_telemetry(&r.by_role, r.sealed, &r.plan.effects)
     ));
     crate::game::soulscraft_book::event_ended(&r.event, r.joined.keys().copied().collect(), r.stand_ins.clone(), won);
     if won {

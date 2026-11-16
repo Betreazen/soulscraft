@@ -15,6 +15,8 @@
 // - `potential_spawns` (HEAD, catalog hook v1, API 388; native_hooks.rs:6335-6356): a monster
 //   position in a sector gets the other biomes' monsters and SoulsCraft's land mobs, the kin
 //   banners' kin weighted up (soulscraft_rules::boost::extend).
+//   The tier gate of natural spawns (soulscraft_natural, `tier_p` against the players' P) does
+//   not apply here: in a sector the altar calls its mobs, and an event's power is its group's.
 //
 // The sectors are worked out in the level's tick from the known altars (soulscraft_altar: level,
 // banners, the menu's switch, `since`) into a table the injections read; each takes only its own
