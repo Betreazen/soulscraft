@@ -23,7 +23,7 @@
 # frame from game/world_primitives.rs:43).
 [mod]
 id = "soulscraft"
-version = "0.6.1"
+version = "0.6.2"
 
 # The commit RustCraft and Path-of-craft-tree build on (the joint bench refuses any other).
 [compatibility]
