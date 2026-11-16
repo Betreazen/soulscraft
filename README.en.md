@@ -11,7 +11,7 @@ Every enemy blow shows itself first: a windup, the blow, then a window to answer
 ![Horizon](https://img.shields.io/badge/Horizon-native%20mod-7c4dff)
 ![Minecraft](https://img.shields.io/badge/Minecraft-26.3-3c8527)
 ![Rust](https://img.shields.io/badge/Rust-2024-b7410e?logo=rust)
-[Install](#install) · [Bestiary showcase](https://betreazen.github.io/soulscraft/showcase/) · [How to play](#how-to-play) · [For servers](#for-server-owners) · [Changelog](CHANGELOG.md)
+[Install](#install) · [Handbook](https://betreazen.github.io/soulscraft/showcase/) · [How to play](#how-to-play) · [For servers](#for-server-owners) · [Changelog](CHANGELOG.md)
 
 <img src="docs/images/altar_event_dusk.jpg" alt="A level-four summoning altar at dusk: banners, obelisks, a wave of the dead draining the altar with beams" width="860">
 
@@ -23,11 +23,11 @@ Every enemy blow shows itself first: a windup, the blow, then a window to answer
 
 SoulsCraft adds enemies you read rather than out-click. Every attack has a windup with a pose and a sound you learn to know, sometimes a held beat, the blow itself and a recovery that leaves the enemy open. Attack numbers live in one data file and count in ticks, so a windup is the same on every server.
 
-- **Seven new mobs.** A shielded revenant, a stalker with sickles, a bone marksman, a brute with a stone maul, a shrike, a deep lurker and a bog slime. Each has its own model, animations, held weapon and a hitbox that fits the model.
+- **Seven new mobs.** A shielded revenant, a stalker with sickles, a bone marksman, a brute with a stone maul, a shrike, a deep lurker and a bog slime. Each has its own model, animations, held weapon, hitbox that fits the model and sounds. Each behaves as the handbook says: the revenant follows you through its held beat and knocks your shield down, the stalker flanks, the marksman hides behind cover to reload, the brute's shockwave can be jumped, shrikes dive in turns, the lurker grabs and pulls you down.
 - **Vanilla mobs learn too.** The zombie lunges, the spider pounces, the vindicator brings an overhead down, the witch winds up a potion: 19 vanilla types get moves with the same honest windup. Their models and the rest of their behaviour stay vanilla.
 - **Enemies grow with you.** Enemy strength follows the players nearby: their armour, weapons and, with [Path-of-craft-tree](https://github.com/Betreazen/path-of-craft-tree) installed, their skill-tree levels.
-- **The mobs live in the world.** At night and in their biomes SoulsCraft's mobs come by themselves: the revenant wherever zombies spawn, the stalker in forests, the shrike high in the mountains, the lurker in the deep ocean. A mob you kill sometimes drops a **soul shard**, which the altar is built from.
-- **The summoning altar.** A build of up to 9 × 9 from a core, slabs, pillars, braziers and obelisks. Levels 1–4 come from its rings and an open sky. A horn on the pedestal starts an event: waves walk to the altar from spawn points shown in advance and drain its power. Hold the altar until the waves run out.
+- **The mobs live in the world.** At night and in their biomes SoulsCraft's mobs come by themselves: the revenant wherever zombies spawn, the stalker in forests, the shrike high in the mountains (in pairs or threes), the lurker in the deep ocean. A mob comes only when a player with strength at or above its tier is nearby: a weak player will not meet a brute. A mob you kill sometimes drops a **soul shard**, which the altar is built from.
+- **The summoning altar.** A build of up to 9 × 9 from a core, slabs, pillars, braziers and obelisks. Levels 1–4 come from its rings and an open sky. A horn on the pedestal starts an event: waves walk to the altar from spawn points shown in advance and drain its power. Hold the altar until the waves run out. The altar menu names the events and horns of all tiers, the event panel shows the wave and the event name, the zone border is drawn for the first seconds, rests between waves are random, 30 to 45 s. The enemies' strength is the mean strength of all participants.
 - **Four tiers of events.** The Rotten Horn calls zombies, the Grave Horn the Night of the Dead, the Storm Horn the Claw Storm, the Abyss Horn the Last Stand: eight waves with three brutes. A head from one tier's event goes into the next tier's horn.
 - **Horns are found, not only crafted.** Each tier has its structures: the Rotten Horn lies in dungeons and mineshafts, the Abyss Horn in ancient cities and bastion treasure rooms. Mobs drop a horn now and then too.
 - **Each tier has its reward.** A win gives soul shards and, by chance, the tier's own item: the Revenant's Blade, the Brute's Maul or the Abyss Heart. "Harder" banners raise the chance.
@@ -35,6 +35,7 @@ SoulsCraft adds enemies you read rather than out-click. Every attack has a windu
 - **Trophies.** A win brings mob heads (on the floor, on a wall or on your head), pieces of their armour and, on a level-three altar, a diorama: a piece of the mob's home on a plinth, the mob in its trophy pose, its own light and particles. The brass plaque shows the mob's name, the trophy's owner and how many of them they have killed.
 - **The hunter's book.** Entries open as you meet and kill: met, killed, studied, expert. The book plays the mob's live model through its attacks, and a phase strip shows when to strike.
 - **More spawns round the altar.** At night monsters of other biomes and SoulsCraft mobs come near an altar.
+- **A handbook in the browser.** The mobs' models and every attack, the four events, altar defence, vanilla mobs, items and 24 recipes, trophies and a mock-up of the book: the [handbook](https://betreazen.github.io/soulscraft/showcase/) (in Russian). It reads its numbers from the same data files as the mod.
 - **Plays well with other mods.** Enemy strength reads the Path-of-craft-tree tree, and kills by RustCraft turrets and guards count in their owner's book. The `soulscraft:bleeding` effect is shared by both mods.
 
 <table>
@@ -60,13 +61,13 @@ SoulsCraft adds enemies you read rather than out-click. Every attack has a windu
 
 | Mob | Role | Habitat | Attacks |
 | --- | --- | --- | --- |
-| **Revenant** | shielded duellist | the surface at night | thrust, slash, held overhead, shield bash |
-| **Stalker** | fast skirmisher | forests, taiga, jungle | double sickle slash with bleeding, dash lunge |
-| **Bone marksman** | archer | plains, badlands, mountains | aimed shot, stock strike |
-| **Brute** | heavy elite | mountain peaks, caves, events | wide swing, overhead slam with a shockwave, charge |
-| **Shrike** | diving hunter | mountains, windswept hills, at night | dive |
-| **Deep lurker** | ambush predator | deep ocean below Y 40 | ambush lunge, grab |
-| **Bog slime** | area damage, splits | swamps | high jump |
+| **Revenant** | shielded duellist | the surface at night | thrust, slash, held overhead, shield bash (knocks back, knocks the shield down) |
+| **Stalker** | fast skirmisher | forests, taiga, jungle | double sickle slash with bleeding, dash lunge; flanks from the side and behind |
+| **Bone marksman** | archer | plains, badlands, mountains | aimed shot, stock strike; hides behind cover to reload |
+| **Brute** | heavy elite | mountain peaks, caves, events | wide swing, overhead slam with a shockwave (can be jumped), charge, a roar in its rage |
+| **Shrike** | diving hunter | mountains, windswept hills, at night | dive, in turns; dodge when the wings fold |
+| **Deep lurker** | ambush predator | deep ocean below Y 40 | ambush lunge, a 40-tick grab (three blows free you) |
+| **Bog slime** | area damage, splits | swamps | high jump with a landing shadow, the wave slows |
 
 Vanilla moves: the zombie's lunge and the drowned's trident throw, the spider's pounce, the witch's potion throw, the pillager's shot, the vindicator's held overhead, the piglin brute's heavy strike, the hoglin's charge, the wither skeleton's two-blow series, the slime's big jump and the phantom's cry before its dive. The skeleton keeps its distance and backs off after a shot.
 
@@ -77,7 +78,7 @@ Vanilla moves: the zombie's lunge and the drowned's trident throw, the spider's 
 | Hunter's book | shapeless recipe: a book and rotten flesh; right-click opens it |
 | First altar | hunt soul shards at night, then craft a core, a pedestal and 8 slabs from deepslate bricks: a level-1 altar |
 | Start an event | a horn of its tier on the altar's pedestal, right-click; the altar's level must be at least the horn's tier |
-| Altar menu | right-click the core with an empty hand: level, banners, spawn boost |
+| Altar menu | right-click the core with an empty hand: level, banners, spawn boost, the events and horns of each tier |
 | Extend the altar | hold an altar block: a ghost shows where the next ring goes |
 | Survive an attack | the windup has a pose and a sound: step away or raise a shield, then strike in the recovery |
 | Dying in an event | never kills you, not even in hardcore: the altar carries you out of the zone at 1 health and heals you, and you keep your items |
@@ -109,10 +110,10 @@ The launcher takes the [latest release](https://github.com/Betreazen/soulscraft/
 ### Dedicated server
 
 ```powershell
-git clone --branch v0.6.2 https://github.com/Betreazen/soulscraft
+git clone --branch v0.7.0 https://github.com/Betreazen/soulscraft
 horizon-launcher native-build soulscraft/mod/soulscraft `
-    --server-output C:\horizon-engines\soulscraft-0.6.2 --version <Horizon version> --trust-native-code
-horizon-server --dir <server folder> config set engine.path=C:\horizon-engines\soulscraft-0.6.2\horizon-engine.exe
+    --server-output C:\horizon-engines\soulscraft-0.7.0 --version <Horizon version> --trust-native-code
+horizon-server --dir <server folder> config set engine.path=C:\horizon-engines\soulscraft-0.7.0\horizon-engine.exe
 horizon-server --dir <server folder> restart
 ```
 
@@ -138,7 +139,7 @@ The `/sc` commands are for operators of level 2 and up and for the console.
 | `/sc power` · `/sc p <strength>` | Show the strength of players nearby · set enemy strength by hand |
 | `/sc info` | How many of the mod's mobs and changed vanilla mobs are in the world |
 | `/sc reload` | Re-read `config/soulscraft/mobs.json` in the server folder without a restart |
-| `soulscraft_selftest run [filter]` | Console only: the in-world self-test, 87 scenarios of attacks, the altar, events, trophies and the book |
+| `soulscraft_selftest run [filter]` | Console only: the in-world self-test, 104 scenarios of attacks, the altar, events, trophies and the book |
 
 ### Numbers without a rebuild
 

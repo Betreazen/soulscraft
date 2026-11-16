@@ -78,21 +78,22 @@
 | `js/palette.js` | палитра команд (Ctrl+K) | руками |
 | `js/viewer.js` | модели из glb, предметы из JSON, актёры, сцена three.js, свет, кадр | руками |
 | `js/scene.js` | сценарии поведения, реквизит, среда сцены и шкала времени | руками |
-| `js/app.js` | страницы | руками |
+| `js/app.js` | страницы бестиария, мобов и ивентов; раздел меню «Правила» (оборона, ванильные мобы, рецепты); таблицы «Звуки» и «Поля данных» на странице моба: звуки берутся из `attacks[].cue`, `moves[].cue`, `passives[].cue` в `data/mobs.json`, поля — из шаблонов в `js/mobs/<id>.js` вида `{params.keep_distance_blocks}`, значения читаются из данных | руками |
 | `js/altar.js` | страницы алтаря, блоков и знамён, сцены достройки и призыва, макет меню | руками |
 | `js/trophies.js` | страница трофеев, блок «Трофей: диорама» на странице моба, сборка диорамы и головы из glb по файлу трофея, частицы | руками |
 | `js/book.js` | макет книги охотника | руками |
 | `js/defense.js`, `js/vanilla.js`, `js/recipes.js` | страницы «Оборона алтаря», «Ванильные мобы» и «Предметы и рецепты» | руками |
 | `js/extra.js` | `data/loot.json`, рецепты (`mod/content/data/soulscraft/recipe/*.json`), числа предметов, названия из `ru_ru.json`: `SC.extra({...})` | `node docs/showcase/tools/embed-extra.mjs` (Node, Python и Blender не нужны) |
 | `js/blocks.js` | реестр блоков: блоки, модели (glb, границы, свечение), постройки с местом каждого блока, свои типы частиц (`behaviour` и спрайт) | `assets/models/build_blocks.py` |
-| `js/mobs/<id>.js` | заметки и сцены одного моба | руками, по файлу на моба |
-| `js/glb.js`, `js/data.js`, `js/rigs.js`, `js/items.js`, `js/mobs/list.js` | модели (и блоки, и уровни алтаря), числа (`mobs.json`, `altar.json`, `trophies.json`, `book.json`), метки клипов и файлы трофеев, предметы и текстуры блоков, список скриптов мобов | `assets/models/build.py` (`embed.py`) |
+| `js/mobs/<id>.js` | заметки, сцены и поля данных (`fields`, шаблоны над `data/mobs.json`) одного моба | руками, по файлу на моба |
+| `js/data.js` | числа: `SC.data(mobs.json)`, `SC.altarData`, `SC.trophyData`, `SC.bookData` | `node docs/showcase/tools/embed-data.mjs` (Node, строка в строку как `embed.py`) или `assets/models/build.py` (`embed.py`) |
+| `js/glb.js`, `js/rigs.js`, `js/items.js`, `js/mobs/list.js` | модели (и блоки, и уровни алтаря), метки клипов и файлы трофеев, предметы и текстуры блоков, список скриптов мобов | `assets/models/build.py` (`embed.py`, нужны Python и Blender) |
 
 ## Как обновить
 
-Если поменялись `data/loot.json`, рецепты, предметы или `ru_ru.json`, перегенерировать `js/extra.js`: `node docs/showcase/tools/embed-extra.mjs`. Остальные данные (`mobs.json`, `altar.json`, `trophies.json`, `book.json`) идут в `js/data.js` сборкой ниже.
+Если поменялись `data/loot.json`, рецепты, предметы или `ru_ru.json`, перегенерировать `js/extra.js`: `node docs/showcase/tools/embed-extra.mjs`. Если поменялись `data/mobs.json`, `altar.json`, `trophies.json` или `book.json`, перегенерировать `js/data.js`: `node docs/showcase/tools/embed-data.mjs` (Python и Blender не нужны; числа вида `1.0` он пишет как Python). Модели и риги — сборкой ниже.
 
-Пересобрать модели (см. [assets/models/README.md](../../assets/models/README.md)). Сборка перепишет генерируемые скрипты. Если поменялись только числа в `data/mobs.json`, хватит `embed.py`:
+Пересобрать модели (см. [assets/models/README.md](../../assets/models/README.md)). Сборка перепишет генерируемые скрипты. Если поменялись только числа, хватит `embed-data.mjs` (выше); если нужен `embed.py` отдельно:
 
 ```text
 "C:\Program Files\Blender Foundation\Blender 5.2\blender.exe" --background --factory-startup --python assets/models/embed.py
