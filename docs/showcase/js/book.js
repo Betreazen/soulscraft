@@ -128,8 +128,9 @@
       if (m.stats) lines.push(['text', 'Здоровье ' + nm(m.stats.health) + ' · урон ' + nm(m.stats.damage) + ' · броня ' + nm(m.stats.armor)]);
       else {
         const rows = vanillaRows(e, false);
-        if (!rows.length) lines.push(['dim', 'Числа ванильные: книга берёт их у движка.']);
+        if (!rows.length) lines.push(['dim', 'Числа ванильные.']);
         for (const r of rows) lines.push(['text', r]);
+        if (rows.length && rows.length < e.keys.length) lines.push(['dim', 'Макет показывает числа только части типов, остальные книга берёт у движка.']);
       }
       if (m.attacks.length) lines.push(['text', 'Атаки: ' + m.attacks.map((a) => a.name).join(', ')]);
     }
@@ -148,9 +149,7 @@
       if (m.stats) lines.push(['head', 'Рост по силе P'], ['text', 'От P = 0 до P = 1: ' + growLine(scaled(m.stats, 0), scaled(m.stats, 1))]);
       else {
         const rows = vanillaRows(e, true);
-        lines.push(['head', 'Рост по силе P']);
-        if (rows.length) lines.push(['dim', 'От P = 0 до P = 1:'], ...rows.map((r) => ['text', r]));
-        else lines.push(['dim', 'Числа типов — из движка.']);
+        if (rows.length) lines.push(['head', 'Рост по силе P'], ['dim', 'От P = 0 до P = 1:'], ...rows.map((r) => ['text', r]));
       }
       const ev = eventLinks(e);
       if (ev.length) lines.push(['head', 'Ивенты'], ...ev.map((t) => ['text', t]));

@@ -157,7 +157,7 @@
     const rows = SC.ALTAR.levels.map((lv) => {
       sockets += lv.sockets.length;
       return el('tr', {}, el('td', {}, lv.level), el('td', {}, lv.size + '×' + lv.size), el('td', {}, ringNeeds(lv.level)),
-        el('td', {}, sockets), el('td', {}, lv.spawn_boost), el('td', {}, lv.unlocks));
+        el('td', {}, sockets), el('td', {}, '×' + (1 + SC.ALTAR.spawn_boost.extra_passes[lv.level - 1]) + ' попыток'), el('td', {}, lv.unlocks));
     });
     return el('div', { class: 'wide' }, el('table', { class: 'sc-moves' }, el('thead', {}, head), el('tbody', {}, rows)),
       el('p', { class: 'small sc-cap' }, 'Гнёзда стоят на клетках кольца вместо плит (предложение): уровень 2 — запад и восток, 3 — север и юг, 4 — четыре клетки «вертушкой». Число гнёзд — на весь алтарь этого уровня.'));
@@ -556,8 +556,8 @@
   // data/altar.json spawn_boost (hypotheses of iteration 3): passes by level, the sector, the drift.
   function boostSection() {
     const b = SC.ALTAR.spawn_boost, side = 2 * b.sector_radius_chunks + 1;
-    const head = el('tr', {}, ['Уровень', 'Сила', 'Попыток спавна', 'Доп. проходов'].map((h) => el('th', {}, h)));
-    const rows = SC.ALTAR.levels.map((lv, i) => el('tr', {}, el('td', {}, lv.level), el('td', {}, lv.spawn_boost), el('td', {}, '×' + (1 + b.extra_passes[i])), el('td', {}, b.extra_passes[i])));
+    const head = el('tr', {}, ['Уровень', 'Попыток спавна', 'Доп. проходов'].map((h) => el('th', {}, h)));
+    const rows = SC.ALTAR.levels.map((lv, i) => el('tr', {}, el('td', {}, lv.level), el('td', {}, '×' + (1 + b.extra_passes[i])), el('td', {}, b.extra_passes[i])));
     return [el('h2', {}, 'Учащённый спавн'),
       el('p', {}, 'Пока алтарь стоит под открытым небом и кнопка в меню включена, ванильный спавн пробует сектор вокруг алтаря чаще: каждый чанк сектора, где спавн и так возможен, проходится ещё несколько раз по ванильным правилам и лимитам. Кроме того, в списке спавна сектора появляются мобы других биомов и мобы SoulsCraft; знамёна рода поднимают вес своего рода.'),
       el('div', { class: 'wide' }, el('table', { class: 'sc-moves' }, el('thead', {}, head), el('tbody', {}, rows),
