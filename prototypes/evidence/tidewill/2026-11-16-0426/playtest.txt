@@ -1,0 +1,48 @@
+SoulsCraft playtest on tidewill, 2026-11-16T04:26:35
+== server before
+  {"crashes":0,"engine_pid":44095,"engine_uptime_seconds":3752,"last_crash":null,"phase":"running","pid":13978,"sample":{"cpu_percent":11.430693956030243,"game":{"chunks":841,"levels":[{"chunks":841,"dimension":"minecraft:overworld","entities":297}],"max_players":20,"mspt":{"average":4.980673,"p50":4.811545,"p95":6.909578,"p99":8.89351},"paused":false,"players":[{"address":"<address>","dimension":"minecraft:overworld","name":"rc_a","ping_ms":57,"position":[160.5,118.0,200.5],"uuid":"cf31688a-5fa8-35f0-9183-4fe2a33e08ec"}],"target_tps":20.0,"tps":19.996777832333184},"pid":44095,"rss_bytes":575275008},"update":null,"uptime_seconds":48185,"version":"0.1.0"}
+  There are 1 of a max of 20 players online: rc_a
+== landed on {"block":"minecraft:birch_leaves","loaded":true,"pos":[-621,77,380],"state":"minecraft:birch_leaves[distance=3,persisten at -620,5,78,380,5: moving on
+== landed on {"block":"minecraft:birch_leaves","loaded":true,"pos":[-614,75,380],"state":"minecraft:birch_leaves[distance=4,persisten at -613,5,76,380,5: moving on
+== landed on {"block":"minecraft:birch_leaves","loaded":true,"pos":[-607,69,380],"state":"minecraft:birch_leaves[distance=2,persisten at -606,5,70,380,5: moving on
+== bot on the ground at -599,5,64,380,5, altar core -600,64,388
+== event level 1 at -600,64,388
+  04:27:30 mspt avg 11,30 p95 17,04 p99 32,07, tps 20,0, entities 588, chunks 1682, players 2, cpu 24%
+  04:27:50 mspt avg 11,40 p95 18,31 p99 32,54, tps 20,0, entities 572, chunks 1682, players 2, cpu 22%
+  04:28:11 mspt avg 12,45 p95 24,66 p99 34,01, tps 20,0, entities 566, chunks 1682, players 2, cpu 23%
+  soulscraft: cost sampling on
+  soulscraft: event field cells=39168 seeds=37 ms=13.98 build=1 tick=126799
+  soulscraft: event start core=-600,64,388 event=test_zombies level=1 power=0.01 banners=[] waves=5 hp=200 tick=126799
+  soulscraft: event spawn wave=1 mobs=6 tick=126859
+  soulscraft: event field cells=39168 seeds=37 ms=18.66 build=2 tick=126884
+  soulscraft: event field cells=39168 seeds=37 ms=16.68 build=3 tick=126995
+  soulscraft: event field cells=39168 seeds=37 ms=15.37 build=4 tick=127017
+  soulscraft: event field cells=39168 seeds=37 ms=15.55 build=5 tick=127053
+  soulscraft: event field cells=39168 seeds=37 ms=15.02 build=6 tick=127079
+  soulscraft: event field cells=39168 seeds=37 ms=18.03 build=7 tick=127175
+  soulscraft: event field cells=39168 seeds=37 ms=14.83 build=8 tick=127195
+  soulscraft: event field cells=39168 seeds=37 ms=15.86 build=9 tick=127252
+  soulscraft: event field cells=39168 seeds=37 ms=16.75 build=10 tick=127349
+  soulscraft: event field cells=39168 seeds=37 ms=15.34 build=11 tick=127399
+  soulscraft: event field cells=39168 seeds=37 ms=15.03 build=12 tick=127584
+  soulscraft: event field cells=39168 seeds=37 ms=15.10 build=13 tick=127637
+  soulscraft: event field cells=39168 seeds=37 ms=15.75 build=14 tick=127677
+  soulscraft: event field cells=39168 seeds=37 ms=14.25 build=15 tick=127872
+  soulscraft: event field cells=39168 seeds=37 ms=15.95 build=16 tick=127934
+  soulscraft: event field cells=39168 seeds=37 ms=15.34 build=17 tick=127986
+  soulscraft: event field cells=39168 seeds=37 ms=20.58 build=18 tick=128006
+  soulscraft: event field cells=39168 seeds=37 ms=20.65 build=19 tick=128034
+  soulscraft: event lost=altar core=-600,64,388 wave=5 hp=0.00 drained=200.00 cursed=0.00 parts=1 tick=128054
+  soulscraft: cost over 65.6 s: tick rate 20, server tick average 12.05 ms
+  soulscraft: cost kind=minecraft:sheep mob_ticks=80032 total_ms=874.69 us_per_mob_tick=10.93 ms_per_server_tick=0.667
+  soulscraft: cost kind=minecraft:cow mob_ticks=60802 total_ms=663.30 us_per_mob_tick=10.91 ms_per_server_tick=0.506
+  soulscraft: cost kind=minecraft:pig mob_ticks=48364 total_ms=488.66 us_per_mob_tick=10.10 ms_per_server_tick=0.372
+  soulscraft: cost kind=minecraft:chicken mob_ticks=43476 total_ms=479.71 us_per_mob_tick=11.03 ms_per_server_tick=0.366
+  soulscraft: cost kind=minecraft:skeleton mob_ticks=34914 total_ms=358.27 us_per_mob_tick=10.26 ms_per_server_tick=0.273
+  soulscraft: cost kind=minecraft:zombie mob_ticks=24588 total_ms=266.17 us_per_mob_tick=10.83 ms_per_server_tick=0.203
+  soulscraft: cost kind=minecraft:creeper mob_ticks=23557 total_ms=234.99 us_per_mob_tick=9.98 ms_per_server_tick=0.179
+  soulscraft: cost kind=minecraft:villager mob_ticks=5248 total_ms=179.09 us_per_mob_tick=34.13 ms_per_server_tick=0.137
+  soulscraft: cost soulscraft_level_tick ticks=1312 ms_per_tick=0.654
+  client 
+== server after
+  {"crashes":0,"engine_pid":44095,"engine_uptime_seconds":3852,"last_crash":null,"phase":"running","pid":13978,"sample":{"cpu_percent":50.43367364047513,"game":{"chunks":1682,"levels":[{"chunks":1682,"dimension":"minecraft:overworld","entities":577}],"max_players":20,"mspt":{"average":10.61396,"p50":9.884257,"p95":15.068692,"p99":37.117533},"paused":false,"players":[{"address":"<address>","dimension":"minecraft:overworld","name":"rc_a","ping_ms":57,"position":[160.5,118.0,200.5],"uuid":"cf31688a-5fa8-35f0-9183-4fe2a33e08ec"},{"address":"<address>","dimension":"minecraft:overworld","name":"sc_a","ping_ms":40,"position":[-612.5,70.0,375.5],"uuid":"9ac0fc96-56ec-361e-b7b3-5581668bc9d3"}],"target_tps":20.0,"tps":19.98630405204327},"pid":44095,"rss_bytes":594231296},"update":null,"uptime_seconds":48285,"version":"0.1.0"}

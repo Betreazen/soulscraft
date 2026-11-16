@@ -12,6 +12,10 @@ $script:ServerTool = "$env:LOCALAPPDATA\Horizon\current\horizon-server.exe"
 $script:JointServer = "$env:LOCALAPPDATA\Horizon\joint-dev\server"
 $script:BenchPort = 25570
 $script:Instance = "$env:APPDATA\horizon\instances\joint-dev"
+$script:InstanceName = "joint-dev"
+# Set by lib\tidewill.ps1 (Use-Tidewill): bots go to the live server, the console over ssh.
+$script:ServerAddress = $null
+$script:Remote = $false
 # Bot homes, logs and full-size screenshots; set SOULSCRAFT_SCRATCH to keep them elsewhere.
 $script:Scratch = if ($env:SOULSCRAFT_SCRATCH) { $env:SOULSCRAFT_SCRATCH } else { Join-Path $env:TEMP 'soulscraft-bench' }
 
@@ -36,14 +40,15 @@ function Start-Bot([string]$Name, [switch]$Still) {
     [IO.File]::WriteAllLines($options, [string[]](@($lines) + 'soundCategory_master:0.0'), [Text.UTF8Encoding]::new($false))
     if ($Still) { $env:HORIZON_STILL = '1' } else { Remove-Item Env:HORIZON_STILL -ErrorAction SilentlyContinue }
     $reply = & $script:Ctl --socket $socket launch --game (Get-JointClient) --offscreen --home $script:Instance `
-        --game-dir $script:Instance --player-dir $dir --name $Name --server "127.0.0.1:$script:BenchPort" 2>&1
+        --game-dir $script:Instance --player-dir $dir --name $Name --server $(if ($script:ServerAddress) { $script:ServerAddress } else { "127.0.0.1:$script:BenchPort" }) 2>&1
     Remove-Item Env:HORIZON_STILL -ErrorAction SilentlyContinue
     if ($LASTEXITCODE -ne 0) { throw "launch of ${Name} failed: $reply" }
     $bot = [pscustomobject]@{ Name = $Name; Socket = $socket; Dir = $dir }
     Invoke-Bot $bot 'wait-ready 120' | Out-Null
     # The scripts read per-mob lines (adopt, phase, strike, boost, trophy particles) from the
     # server log: since 0.3.0 they are at `debug` unless `/sc log on`.
-    Invoke-Console 'sc log on' | Out-Null
+    # On the live server the playtest turns them on once and off at the end.
+    if (-not $script:Remote) { Invoke-Console 'sc log on' | Out-Null }
     $bot
 }
 
@@ -68,6 +73,7 @@ function Use-P5Server {
 
 # A console command on the joint server (`/sc …` included: the console runs as operator 4).
 function Invoke-Console([string]$Line) {
+    if ($script:Remote) { return (Invoke-Remote @("cmd $Line"))[0] }
     $out = & $script:ServerTool --dir $script:JointServer cmd $Line 2>&1
     if ($LASTEXITCODE -ne 0) { Write-Warning "console: $Line -> $out" }
     $out
