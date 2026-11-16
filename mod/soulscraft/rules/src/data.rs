@@ -230,6 +230,39 @@ pub struct AttackDef {
     pub follows: Option<String>,
     #[serde(default)]
     pub grab_max_ticks: Option<u32>,
+    /// What an own mob's attack sounds and shows like (a vanilla group's is `VanillaAttack.cue`).
+    #[serde(default)]
+    pub cue: Option<AttackCue>,
+}
+
+/// An own mob's cue: the vanilla groups' schema (`sound`, `pitch`, `particle`, `pose`, `hop`) and
+/// the phase it plays at, the windup's start unless `on` says `hit` or `recover`.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+pub struct AttackCue {
+    #[serde(flatten)]
+    pub cue: crate::vanilla::Cue,
+    #[serde(default)]
+    pub on: CueOn,
+}
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum CueOn {
+    #[default]
+    Windup,
+    Hit,
+    Recover,
+}
+
+impl CueOn {
+    /// The attack phase it plays at.
+    pub fn phase(self) -> crate::attack::Phase {
+        match self {
+            CueOn::Windup => crate::attack::Phase::Windup,
+            CueOn::Hit => crate::attack::Phase::Hit,
+            CueOn::Recover => crate::attack::Phase::Recover,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq)]
@@ -257,6 +290,9 @@ pub struct MoveDef {
     pub id: String,
     #[serde(default)]
     pub clip: Option<String>,
+    /// What the move sounds like when it starts (the marksman's reload behind cover).
+    #[serde(default)]
+    pub cue: Option<crate::vanilla::Cue>,
 }
 
 /// The kin groups of the kin banners (data/altar.json `kin_names`).
@@ -549,6 +585,28 @@ mod tests {
         assert!(MobsFile::parse(&rate).unwrap_err().contains("tick_rate"));
         let key = EMBEDDED.replacen("soulscraft:revenant", "soulscraft:knight", 1);
         assert!(MobsFile::parse(&key).unwrap_err().contains("key"));
+    }
+
+    #[test]
+    fn own_mobs_cue_their_attacks() {
+        let f = MobsFile::embedded();
+        let r = f.mob("revenant").unwrap();
+        let swing = r.attack("slash").unwrap().cue.as_ref().unwrap();
+        assert_eq!(swing.cue.sound.as_deref(), Some("minecraft:entity.zombie.attack_iron_door"));
+        assert_eq!(swing.on, CueOn::Windup);
+        let bash = r.attack("shield_bash").unwrap().cue.as_ref().unwrap();
+        assert_eq!(bash.cue.sound.as_deref(), Some("minecraft:item.shield.block"));
+        assert_eq!(bash.on, CueOn::Hit);
+        let lunge = f.mob("stalker").unwrap().attack("lunge").unwrap().cue.as_ref().unwrap();
+        assert_eq!(lunge.cue.sound.as_deref(), Some("minecraft:entity.fox.screech"));
+        let m = f.mob("marksman").unwrap();
+        let shot = m.attack("aimed_shot").unwrap().cue.as_ref().unwrap();
+        assert_eq!((shot.cue.sound.as_deref(), shot.on), (Some("minecraft:item.crossbow.shoot"), CueOn::Hit));
+        let hide = m.moves.iter().find(|x| x.id == "hide").and_then(|x| x.cue.as_ref()).unwrap();
+        assert_eq!(hide.sound.as_deref(), Some("minecraft:item.crossbow.loading_start"));
+        // A vanilla group's cue stays its own (`VanillaAttack.cue`), not its attack's.
+        assert!(f.vanilla.groups.iter().flat_map(|g| &g.attacks).all(|a| a.def.cue.is_none()));
+        assert!(f.vanilla.groups.iter().flat_map(|g| &g.attacks).any(|a| a.cue.sound.is_some()));
     }
 
     #[test]

@@ -29,10 +29,10 @@
       "stats": { "health": 30, "damage": 4, "armor": 6, "speed": 0.22, "knockback_resistance": 0.3 },
       "hitbox": { "width": 0.6, "height": 1.95, "eye": 1.8 },
       "attacks": [
-        { "id": "thrust", "name": "Укол", "clip": "attack_thrust", "windup": 6, "hold": 0, "hit": 2, "recover": 10, "damage": 0.7, "tell": "меч отводится назад" },
-        { "id": "slash", "name": "Рубящий удар", "clip": "attack_slash", "windup": 10, "hold": 0, "hit": 2, "recover": 12, "damage": 1.0, "tell": "меч над плечом" },
-        { "id": "overhead", "name": "Задержанный удар сверху", "clip": "attack_overhead", "windup": 10, "hold": 8, "hit": 2, "recover": 16, "damage": 1.3, "tell": "меч поднят над головой и замирает" },
-        { "id": "shield_bash", "name": "Удар щитом", "clip": "shield_bash", "windup": 8, "hold": 0, "hit": 2, "recover": 8, "damage": 0.5, "knockback": true, "tell": "щит отводится к груди" }
+        { "id": "thrust", "name": "Укол", "clip": "attack_thrust", "windup": 6, "hold": 0, "hit": 2, "recover": 10, "damage": 0.7, "tell": "меч отводится назад", "cue": { "sound": "minecraft:entity.zombie.attack_iron_door", "pitch": 1.2 } },
+        { "id": "slash", "name": "Рубящий удар", "clip": "attack_slash", "windup": 10, "hold": 0, "hit": 2, "recover": 12, "damage": 1.0, "tell": "меч над плечом", "cue": { "sound": "minecraft:entity.zombie.attack_iron_door" } },
+        { "id": "overhead", "name": "Задержанный удар сверху", "clip": "attack_overhead", "windup": 10, "hold": 8, "hit": 2, "recover": 16, "damage": 1.3, "tell": "меч поднят над головой и замирает", "cue": { "sound": "minecraft:entity.zombie.attack_iron_door", "pitch": 0.8 } },
+        { "id": "shield_bash", "name": "Удар щитом", "clip": "shield_bash", "windup": 8, "hold": 0, "hit": 2, "recover": 8, "damage": 0.5, "knockback": true, "tell": "щит отводится к груди", "cue": { "sound": "minecraft:item.shield.block", "on": "hit" } }
       ],
       "moves": [
         { "id": "block", "name": "Щит поднят", "clip": "block", "note": "подходит со щитом; удар спереди, пока щит поднят, снижен" },
@@ -45,8 +45,12 @@
         "circle_wait_max_ticks": 60,
         "attacks_before_backstep": 2,
         "backstep_blocks": 2,
-        "shield_down_while_attacking": true
+        "shield_down_while_attacking": true,
+        "hold_step_speed": 0.5,
+        "knockback_strength": 2.0,
+        "shield_disable_ticks": 100
       },
+      "note": "hold_step_speed — шаг к цели в паузе задержанного удара, доля скорости; knockback_strength — атрибут attack_knockback на ударе с knockback (сила отброса — его половина, как у ванильного Mob.doHurtTarget); shield_disable_ticks — перезарядка поднятого щита игрока от удара щитом, как от топора: движок даёт её только ударом моба с топором в руке (5 с = 100 тиков), другое число он не умеет; звуки cue — ванильные id; всё это гипотезы (Г6)",
       "behavior": [
         "Подходит со щитом. Удар спереди, пока щит поднят, снижен на 80%; спина и бок открыты.",
         "Если игрок держит щит, латник кружит на 2–3 блоках и ждёт, пока щит опустится, но не дольше 3 секунд. Потом бьёт щитом.",
@@ -57,7 +61,7 @@
         { "item": "soulscraft:rusty_helmet", "name": "Ржавый шлем", "chance": 0.04 },
         { "item": "soulscraft:rusty_chestplate", "name": "Ржавый нагрудник", "chance": 0.04 }
       ],
-      "assumed": ["params.shield_front_reduction", "loot", "attacks.*.hit"]
+      "assumed": ["params.shield_front_reduction", "loot", "attacks.*.hit", "params.hold_step_speed", "params.knockback_strength", "params.shield_disable_ticks", "attacks.*.cue"]
     },
     {
       "id": "stalker",
@@ -79,7 +83,7 @@
       "damage_note": "удар 2 за каждый серп",
       "attacks": [
         { "id": "double_slash", "name": "Двойной взмах", "clip": "attack_double", "windup": 6, "hold": 0, "hit": 4, "recover": 8, "damage": 0.6, "strikes_at": [0, 3], "effects": [{ "id": "bleed", "seconds": 3 }], "tell": "оба серпа расходятся в стороны" },
-        { "id": "lunge", "name": "Выпад-рывок", "clip": "attack_lunge", "windup": 12, "hold": 0, "hit": 6, "recover": 15, "damage": 1.2, "dash_blocks": 6, "tell": "приседает, серпы назад", "window_note": "после рывка 15 тиков: застрял и разворачивается" }
+        { "id": "lunge", "name": "Выпад-рывок", "clip": "attack_lunge", "windup": 12, "hold": 0, "hit": 6, "recover": 15, "damage": 1.2, "dash_blocks": 6, "tell": "приседает, серпы назад", "window_note": "после рывка 15 тиков: застрял и разворачивается", "cue": { "sound": "minecraft:entity.fox.screech", "pitch": 0.8 } }
       ],
       "moves": [
         { "id": "backstep", "name": "Отскок", "clip": "backstep", "note": "прыжок назад после удара" },
@@ -89,8 +93,11 @@
         "circle_radius_blocks": [4, 6],
         "flee_below_health": 0.25,
         "return_after_ticks": 200,
-        "lunge_more_often_if_player_at_wall": true
+        "lunge_more_often_if_player_at_wall": true,
+        "flank_max_ticks": 100,
+        "flank_angle_degrees": 135
       },
+      "note": "ловчий заходит на точку кольца в flank_angle_degrees от взгляда цели (больше 90°: сбоку и сзади) и бьёт, когда цель на него не смотрит (±60°), или через flank_max_ticks захода; звук выпада cue — ванильный id; всё это гипотезы (Г6)",
       "behavior": [
         "Кружит на 4–6 блоках, заходит сбоку и сзади.",
         "После удара отскакивает.",
@@ -98,7 +105,7 @@
         "Убегает при здоровье ниже 25% и возвращается через 10 секунд."
       ],
       "loot": [{ "item": "soulscraft:stalker_hood", "name": "Капюшон ловчего", "chance": 0.05 }],
-      "assumed": ["params.flee_below_health", "params.return_after_ticks", "attacks.*.hit", "attacks.double_slash.strikes_at"]
+      "assumed": ["params.flee_below_health", "params.return_after_ticks", "attacks.*.hit", "attacks.double_slash.strikes_at", "params.flank_max_ticks", "params.flank_angle_degrees", "attacks.*.cue"]
     },
     {
       "id": "marksman",
@@ -119,19 +126,23 @@
       "hitbox": { "width": 0.65, "height": 1.95, "eye": 1.8 },
       "damage_note": "болт 5",
       "attacks": [
-        { "id": "aimed_shot", "name": "Прицельный выстрел", "clip": "attack_shoot", "windup": 16, "hold": 0, "hit": 2, "recover": 30, "damage": 1.4, "projectile": "bolt", "tell": "арбалет поднят, на наконечнике блик", "window_note": "перезарядка 30 тиков" },
+        { "id": "aimed_shot", "name": "Прицельный выстрел", "clip": "attack_shoot", "windup": 16, "hold": 0, "hit": 2, "recover": 30, "damage": 1.4, "projectile": "bolt", "tell": "арбалет поднят, на наконечнике блик", "window_note": "перезарядка 30 тиков", "cue": { "sound": "minecraft:item.crossbow.shoot", "on": "hit" } },
         { "id": "butt_strike", "name": "Удар прикладом", "clip": "attack_butt", "windup": 8, "hold": 0, "hit": 2, "recover": 10, "damage": 0.6, "knockback": true, "tell": "арбалет отводится к плечу" }
       ],
       "moves": [
-        { "id": "hide", "name": "Укрытие", "clip": "reload", "note": "на время перезарядки уходит за укрытие выше двух блоков" },
+        { "id": "hide", "name": "Укрытие", "clip": "reload", "note": "на время перезарядки уходит за укрытие выше двух блоков", "cue": { "sound": "minecraft:item.crossbow.loading_start" } },
         { "id": "hop_back", "name": "Отпрыгивает", "clip": "backstep", "note": "после удара прикладом" }
       ],
       "params": {
         "keep_distance_blocks": [10, 16],
         "cover_min_height_blocks": 2,
         "melee_below_blocks": 4,
-        "prefers_high_ground": true
+        "prefers_high_ground": true,
+        "reload_cover_blocks": 8,
+        "high_ground_scan_blocks": 6,
+        "knockback_strength": 1.0
       },
+      "note": "reload_cover_blocks — радиус поиска укрытия на перезарядке: клетка, где от глаз цели не видно ни глаз моба, ни точки в cover_min_height_blocks над его ногами; high_ground_scan_blocks — на сколько блоков вверх и вниз ищется земля под кандидатом позиции; knockback_strength — атрибут attack_knockback удара прикладом; звуки cue — ванильные id; всё это гипотезы (Г6, Г8)",
       "behavior": [
         "Держит дистанцию 10–16 блоков, ищет точку выше игрока.",
         "На время перезарядки уходит за укрытие высотой больше двух блоков, чтобы скрыть модель целиком. От турелей RustCraft прячется так же.",
@@ -139,7 +150,7 @@
       ],
       "notes": ["Арбалет — своя часть модели, а не предмет: зарядка арбалета в руке моба мода не анимируется."],
       "loot": [{ "item": "soulscraft:marksman_hood", "name": "Рваный капюшон стрелка", "chance": 0.05 }],
-      "assumed": ["attacks.*.hit"]
+      "assumed": ["attacks.*.hit", "params.reload_cover_blocks", "params.high_ground_scan_blocks", "params.knockback_strength", "attacks.*.cue", "moves.hide.cue"]
     },
     {
       "id": "brute",

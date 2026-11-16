@@ -45,6 +45,8 @@ enum Kind {
     /// The vanilla changes (soulscraft_selftest_vanilla); `vslow_` ones only when the filter
     /// names them.
     Vanilla(String),
+    /// The revenant's, the stalker's and the marksman's fight ([`DUEL_CASES`]).
+    Duel(&'static str),
 }
 
 #[derive(Clone, Debug)]
@@ -108,6 +110,9 @@ fn scenarios(data: &MobsFile, filter: Option<&str>) -> Vec<Scenario> {
         Scenario { name: "bleeding_ticks".into(), kind: Kind::Bleed, timeout: 120 },
         Scenario { name: "wave_stub".into(), kind: Kind::Waves, timeout: 60 },
     ]);
+    for (name, timeout) in DUEL_CASES {
+        all.push(Scenario { name: (*name).to_owned(), kind: Kind::Duel(*name), timeout: *timeout });
+    }
     for (name, timeout) in crate::game::soulscraft_selftest_altar::CASES {
         all.push(Scenario { name: (*name).to_owned(), kind: Kind::Altar(*name), timeout: *timeout });
     }
@@ -239,6 +244,9 @@ pub(super) fn on_tick(game: &mut Game<'_>, dim: &str, now: u64) {
         }
         if matches!(sc.kind, Kind::Vanilla(_)) {
             crate::game::soulscraft_selftest_vanilla::cleanup(game);
+        }
+        if matches!(sc.kind, Kind::Duel(_)) {
+            duel_cleanup(game);
         }
         match v {
             Ok(()) => {
@@ -434,6 +442,7 @@ fn step(game: &mut Game<'_>, dim: &str, now: u64, sc: &Scenario, live: &mut Live
         Kind::Turret(name) => crate::game::soulscraft_selftest_turret::step(game, now, name, first),
         Kind::Undead(name) => crate::game::soulscraft_selftest_undead::step(game, now, name, first),
         Kind::Vanilla(name) => crate::game::soulscraft_selftest_vanilla::step(game, now, name, first),
+        Kind::Duel(name) => duel(game, dim, now, live, name, first),
     }
 }
 
@@ -719,4 +728,176 @@ fn waves(game: &mut Game<'_>, dim: &str, now: u64, live: &mut Live) -> Option<Re
         }
         _ => None,
     }
+}
+
+/// The revenant's, the stalker's and the marksman's fight (plan 2026-11-16, task 1):
+///   revenant_shield_bash_knocks  the shield bash (`knockback`) pushes a sheep that cannot walk a
+///                                block or more
+///   revenant_shield_front        a blow from in front of its raised shield does at most a fifth of
+///                                the same blow from behind (`shield_front_reduction`)
+///   marksman_reload_cover        after its shot it reloads behind a 3×3 wall off to its side, out
+///                                of the golem's sight (`reload_cover_blocks`)
+const DUEL_CASES: &[(&str, u64)] = &[("revenant_shield_bash_knocks", 80), ("revenant_shield_front", 60), ("marksman_reload_cover", 140)];
+
+/// The blow `revenant_shield_front` deals from each side.
+const SHIELD_TEST_BLOW: f32 = 10.0;
+/// Ticks after the bash before the push is measured: the sheep lands and stops.
+const KNOCK_SETTLE: u64 = 15;
+
+/// What a duel scenario keeps between its ticks: where the pushed sheep stood, the front blow's loss.
+#[derive(Default)]
+struct Duel {
+    from: Option<[f64; 3]>,
+    front: f32,
+}
+
+static DUEL: Mutex<Option<Duel>> = Mutex::new(None);
+
+fn duel(game: &mut Game<'_>, dim: &str, now: u64, live: &mut Live, name: &str, first: bool) -> Option<Result<(), String>> {
+    if first {
+        *DUEL.lock().unwrap_or_else(PoisonError::into_inner) = Some(Duel::default());
+    }
+    match name {
+        "revenant_shield_bash_knocks" => shield_bash_knocks(game, dim, now, live, first),
+        "revenant_shield_front" => shield_front(game, dim, live, first),
+        "marksman_reload_cover" => marksman_reload_cover(game, dim, now, live, first),
+        other => Some(Err(format!("no scenario {other}"))),
+    }
+}
+
+/// The wall and anything else a duel built on the platform; its state.
+fn duel_cleanup(game: &mut Game<'_>) {
+    *DUEL.lock().unwrap_or_else(PoisonError::into_inner) = None;
+    let (x, z) = (BASE[0] as i32, BASE[2] as i32);
+    // Refused when there is nothing to clear (vanilla's fill fails on no change): not logged.
+    game.native_run_command(&format!("fill {} 101 {} {} 106 {} air", x - 10, z - 10, x + 10, z + 10));
+}
+
+/// A revenant at P 0 facing south at `at`, still (NoAI: the server's brain runs, the body stays) or not.
+fn revenant(game: &mut Game<'_>, dim: &str, at: [f64; 3], still: bool) -> Option<u32> {
+    let still = if still { ",NoAI:1b" } else { "" };
+    let snbt = format!("{{Rotation:[0f,0f],Tags:[\"soulscraft.p=0.00\",\"{}\"],PersistenceRequired:1b{still}}}", server::TAG_FRESH);
+    summon(game, dim, "soulscraft:revenant", at, &snbt)
+}
+
+fn pos_of(game: &Game<'_>, id: u32) -> Option<[f64; 3]> {
+    game.mobs.iter().find(|m| m.id == id && !m.removed).map(|m| [m.position.x, m.position.y, m.position.z])
+}
+
+fn shield_bash_knocks(game: &mut Game<'_>, dim: &str, now: u64, live: &mut Live, first: bool) -> Option<Result<(), String>> {
+    if first {
+        live.mob = revenant(game, dim, BASE, false);
+        let at = [BASE[0], BASE[1], BASE[2] + GAP];
+        live.golem = summon(game, dim, "minecraft:sheep", at, "{Tags:[\"soulscraft.selftest_sheep\"],PersistenceRequired:1b}");
+        // It may not walk off (nor panic away when hurt): only the blow moves it.
+        run_cmd(game, "attribute @e[tag=soulscraft.selftest_sheep,limit=1] minecraft:movement_speed base set 0");
+        return (live.mob.is_none() || live.golem.is_none()).then(|| Err("revenant or sheep not spawned".into()));
+    }
+    let (mob, sheep) = (live.mob?, live.golem?);
+    if live.mark == 0 {
+        if !aim(live, false) {
+            return None;
+        }
+        if let Err(e) = force(live, "shield_bash") {
+            return Some(Err(e));
+        }
+        DUEL.lock().unwrap_or_else(PoisonError::into_inner).as_mut()?.from = pos_of(game, sheep);
+        live.mark = now;
+        return None;
+    }
+    let rec = server::state().strikes.iter().rev().find(|r| r.mob == mob && r.attack == "shield_bash" && r.tick > live.mark).cloned()?;
+    if now < rec.tick + KNOCK_SETTLE {
+        return None;
+    }
+    let from = DUEL.lock().unwrap_or_else(PoisonError::into_inner).as_ref()?.from?;
+    let moved = soulscraft_rules::geom::flat_dist(from, pos_of(game, sheep)?);
+    log::info!("soulscraft: selftest shield_bash hit={} moved={moved:.2}", rec.hit);
+    Some(if rec.hit && moved >= 1.0 { Ok(()) } else { Err(format!("bash hit={}, the sheep moved {moved:.2} blocks", rec.hit)) })
+}
+
+fn shield_front(game: &mut Game<'_>, dim: &str, live: &mut Live, first: bool) -> Option<Result<(), String>> {
+    if first {
+        live.mob = revenant(game, dim, BASE, true);
+        // Its target, out of its reach in front: it guards and never swings.
+        let at = [BASE[0], BASE[1], BASE[2] + 4.0];
+        live.golem = summon(game, dim, "minecraft:iron_golem", at, "{NoAI:1b,PersistenceRequired:1b}");
+        return (live.mob.is_none() || live.golem.is_none()).then(|| Err("revenant or golem not spawned".into()));
+    }
+    let id = live.mob?;
+    let hp = health(game, id)? as f32;
+    match live.note.as_str() {
+        "" => {
+            if !aim(live, false) || !server::state().mobs.get(&id).is_some_and(|t| t.guarding) {
+                return None;
+            }
+            live.golem_health = f64::from(hp);
+            live.note = "front".into();
+            (!shield_test_hit(game, dim, id, 3.0)).then(|| Err("the front blow was refused".into()))
+        }
+        "front" => {
+            DUEL.lock().unwrap_or_else(PoisonError::into_inner).as_mut()?.front = live.golem_health as f32 - hp;
+            live.golem_health = f64::from(hp);
+            live.note = "back".into();
+            (!shield_test_hit(game, dim, id, -3.0)).then(|| Err("the back blow was refused".into()))
+        }
+        _ => {
+            let front = DUEL.lock().unwrap_or_else(PoisonError::into_inner).as_ref()?.front;
+            let back = live.golem_health as f32 - hp;
+            // Armour takes at most armour/25 of a blow: from behind, the rest is lost whole.
+            let armor = server::state().data.mob("revenant").map_or(0.0, |m| m.stats.armor) as f32;
+            let full = SHIELD_TEST_BLOW * (1.0 - armor / 25.0);
+            log::info!("soulscraft: selftest shield_front front={front:.2} back={back:.2} full>={full:.2}");
+            Some(if front <= 0.2 * back + 0.01 && back >= full - 0.01 {
+                Ok(())
+            } else {
+                Err(format!("front lost {front:.2}, back {back:.2} (wanted front at most a fifth, back at least {full:.2})"))
+            })
+        }
+    }
+}
+
+/// A player's blow on the revenant `id` from `dz` blocks south of the platform's centre (in front
+/// of it for `dz` > 0): a stand-in player there for the damage hook, and the hurt cooldown cleared.
+fn shield_test_hit(game: &mut Game<'_>, dim: &str, id: u32, dz: f64) -> bool {
+    if let Some(m) = crate::game::soulscraft_find::mob_mut(game, id) {
+        m.invulnerable = 0;
+    }
+    server::stand_in_player([BASE[0], BASE[1], BASE[2] + dz]);
+    game.native_hurt_entity(dim, id, SHIELD_TEST_BLOW, "minecraft:mob_attack", None)
+}
+
+fn marksman_reload_cover(game: &mut Game<'_>, dim: &str, now: u64, live: &mut Live, first: bool) -> Option<Result<(), String>> {
+    if first {
+        // The wall: x +4..+6, z +3, y 101..103 from the marksman's block; its shot south stays clear.
+        let (x, z) = (BASE[0].floor() as i32, BASE[2].floor() as i32);
+        run_cmd(game, &format!("fill {} 101 {} {} 103 {} stone", x + 4, z + 3, x + 6, z + 3));
+        live.note = "aimed_shot".into();
+        return arrange(game, dim, "marksman", BASE, 0.0, live).err().map(Err);
+    }
+    let (mob, golem) = (live.mob?, live.golem?);
+    if live.mark == 0 {
+        if !aim(live, false) {
+            return None;
+        }
+        if let Err(e) = force(live, "aimed_shot") {
+            return Some(Err(e));
+        }
+        live.mark = now;
+        return None;
+    }
+    let shot = server::state().strikes.iter().any(|r| r.mob == mob && r.attack == "aimed_shot" && r.tick > live.mark);
+    if !shot {
+        return None;
+    }
+    let (eye, top) = {
+        let s = server::state();
+        let m = s.data.mob("marksman")?;
+        (m.hitbox_at(0).eye, m.param("cover_min_height_blocks").unwrap_or(2.0))
+    };
+    let at = pos_of(game, mob)?;
+    let g = game.mobs.iter().find(|m| m.id == golem)?;
+    let seer = [g.position.x, g.position.y + g.eye_height(), g.position.z];
+    let seen = [eye, top].iter().any(|h| crate::game::soulscraft_cover::sees(game, seer, [at[0], at[1] + h, at[2]]));
+    live.note = format!("shot, still seen at {:.1},{:.1},{:.1}", at[0], at[1], at[2]);
+    (!seen).then_some(Ok(()))
 }

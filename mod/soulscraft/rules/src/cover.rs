@@ -4,8 +4,9 @@
 //! threat sees a mob standing there. The server half reads the turrets and the blocks, this
 //! decides.
 //!
-//! The marksman's own cover search (keep shooting from behind cover, 04-bestiary.md) builds on
-//! this later: it needs a spot that is cover from the turrets but still sees its target.
+//! The marksman reloads behind cover from its target the same way ([`reload_cover`]): the target
+//! is the threat. Shooting from behind cover (a spot hidden from turrets that still sees its
+//! target) is not done.
 
 use crate::geom::{self, V3};
 
@@ -60,9 +61,24 @@ pub fn exposed(eye: V3, threats: &[Threat], sight: &impl Fn(V3, V3) -> bool) -> 
 /// The nearest of `spots` (where the mob's feet would stand) that no threat sees, the mob's eyes
 /// `eye_height` over its feet. None when every spot is seen.
 pub fn nearest_cover(from: V3, spots: &[V3], eye_height: f64, threats: &[Threat], sight: &impl Fn(V3, V3) -> bool) -> Option<V3> {
+    nearest_cover_at(from, spots, &[eye_height], threats, sight)
+}
+
+/// [`nearest_cover`] that hides every one of `heights` over the mob's feet, not only its eyes.
+pub fn nearest_cover_at(from: V3, spots: &[V3], heights: &[f64], threats: &[Threat], sight: &impl Fn(V3, V3) -> bool) -> Option<V3> {
     let mut sorted: Vec<V3> = spots.to_vec();
     sorted.sort_by(|a, b| geom::dist(*a, from).total_cmp(&geom::dist(*b, from)));
-    sorted.into_iter().find(|s| !exposed(geom::add(*s, [0.0, eye_height, 0.0]), threats, sight))
+    sorted
+        .into_iter()
+        .find(|s| heights.iter().all(|h| !exposed(geom::add(*s, [0.0, *h, 0.0]), threats, sight)))
+}
+
+/// The marksman's reload (04-bestiary.md): the nearest of `spots` its target, whose eyes are at
+/// `target_eye`, cannot see, at every one of `heights` (its eyes, `cover_min_height_blocks`). The
+/// target is the threat here, at any range. None: no cover, it steps back instead.
+pub fn reload_cover(from: V3, spots: &[V3], heights: &[f64], target_eye: V3, sight: &impl Fn(V3, V3) -> bool) -> Option<V3> {
+    let threat = [Threat { pos: target_eye, range: f64::INFINITY }];
+    nearest_cover_at(from, spots, heights, &threat, sight)
 }
 
 /// A straight look from `from` to `to` that no solid cell cuts, sampled every quarter block and

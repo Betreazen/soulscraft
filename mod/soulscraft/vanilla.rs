@@ -25,7 +25,6 @@ use crate::mod_api::NativeServerPlayer;
 use horizon_client::mobs::finalize::{self, Attr, Op};
 use horizon_client::mobs::goals::{Cx, Goal, JUMP, LOOK, MOVE};
 use horizon_client::mobs::{Mob, Who};
-use horizon_client::particles::ParticleOptions;
 use soulscraft_rules::{
     attack::Phase,
     brain::{Event, Order, Strike},
@@ -52,8 +51,6 @@ const REPATH_EVERY: u64 = 10;
 /// A tracked mob not seen for this long left: forgotten.
 const FORGET_AFTER: u64 = 40;
 const LOG_KEEP: usize = 512;
-/// Sound source `hostile` (`SoundSource` index).
-const HOSTILE: usize = 5;
 /// A thrown trident's speed (vanilla `Drowned.performRangedAttack`: 1.6).
 const TRIDENT_SPEED: f64 = 1.6;
 /// A thrown potion's speed (vanilla `Witch.performRangedAttack`: 0.75).
@@ -636,26 +633,13 @@ fn set_velocity(game: &mut Game<'_>, id: u32, v: V3, with_y: bool) {
     }
 }
 
-/// The windup's cue: its sound, particles round the mob and a cube's hop.
+/// The windup's cue: its sound, particles round the mob and a cube's hop
+/// (soulscraft_server::play_cue, shared with SoulsCraft's own mobs).
 fn cue(game: &mut Game<'_>, dim: &str, now: u64, m: &Seen, g: &VanillaDef, idx: usize) {
     let Some(a) = g.attacks.get(idx) else { return };
     let c = a.cue.for_type(&m.kind);
     let at = geom::add(m.pos, [0.0, m.height * 0.6, 0.0]);
-    if let Some(sound) = &c.sound {
-        let pitch = c.pitch.unwrap_or(1.0);
-        game.with_level(|_, level, _| level.native_play_sound(sound, at, HOSTILE, 1.0, pitch));
-    }
-    if let Some(kind) = &c.particle {
-        let options = ParticleOptions::named(kind.clone());
-        let spread = [m.width * 0.6, m.height * 0.3, m.width * 0.6];
-        let feet = geom::add(m.pos, [0.0, 0.2, 0.0]);
-        game.with_level(|_, level, _| level.native_send_particles(&options, None, feet, spread, 0.02, 12));
-    }
-    if let Some(up) = c.hop
-        && m.on_ground
-    {
-        set_velocity(game, m.id, [0.0, up, 0.0], true);
-    }
+    crate::game::soulscraft_server::play_cue(game, m.id, at, &c);
     let _ = dim;
     state().cues.push((m.id, a.def.id.clone(), now));
 }
