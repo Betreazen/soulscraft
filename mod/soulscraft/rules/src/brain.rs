@@ -74,6 +74,9 @@ pub struct TargetSense {
     pub shield_up: bool,
     /// The target's view points at the mob (within 60°).
     pub looking_at_me: bool,
+    /// The target looks at the mob: its view within 60° of it on the ground (the lurker's check,
+    /// server.rs); the stalker and the lurker move when it is false.
+    pub sees_me: bool,
     /// A solid block right behind the target, away from the mob.
     pub at_wall: bool,
     /// A roof over the target (the shrike waits).
@@ -90,6 +93,8 @@ pub struct Senses {
     pub in_water: bool,
     /// The mob ran into a wall this tick (`horizontalCollision`).
     pub wall_hit: bool,
+    /// Another shrike holds the dive turn on this target ([`DiveTurns`]): this one circles.
+    pub wait_turn: bool,
     pub target: Option<TargetSense>,
 }
 
@@ -152,6 +157,10 @@ pub struct Tick {
     pub speed_mult: f64,
     /// A label for the debug view: `overhead:hold 12`, `circle`.
     pub label: String,
+    /// The grab: where its target is held this tick (the mouth).
+    pub hold: Option<V3>,
+    /// The slime in the air: its shadow shows at the landing point this tick.
+    pub shadow: Option<V3>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -161,6 +170,11 @@ enum Mode {
     BackOff { until: u64, from: V3 },
     Pause { until: u64 },
     Flee { until: u64 },
+    /// The brute's roar as its rage starts (`passives.rage.clip_ticks`): it stands and roars.
+    Roar { until: u64 },
+    /// The lurker holds its target (the attack `grab`, after `ambush` landed): since when, until
+    /// when at most, the blows taken meanwhile.
+    Grab { attack: usize, since: u64, until: u64, hits: u32 },
 }
 
 impl Mode {
@@ -171,9 +185,14 @@ impl Mode {
             Mode::BackOff { .. } => "backoff",
             Mode::Pause { .. } => "pause",
             Mode::Flee { .. } => "flee",
+            Mode::Roar { .. } => "rage",
+            Mode::Grab { .. } => "grab",
         }
     }
 }
+
+/// After its attack the lurker backs off into the dark this long, and after a grab too.
+const AMBUSH_BACKOFF: u64 = 30;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct Run {
@@ -188,6 +207,11 @@ struct Run {
     ends_at: Option<u32>,
     airborne_since: Option<u64>,
     landed_jump: bool,
+    /// Where it falls on: the shrike's dive point, fixed as its wings fold (the windup's last
+    /// tick); the slime's landing.
+    point: Option<V3>,
+    /// The jump's tick of landing: its window (the recovery) runs from there.
+    landed_at: Option<u32>,
 }
 
 /// One mob's mind; its fields live as long as the mob does in memory.
@@ -206,6 +230,11 @@ pub struct Brain {
     bash_due: bool,
     fled: bool,
     last_stick: u64,
+    /// The brute roared once its rage started.
+    raged: bool,
+    /// Its health share last tick, and whether it fell since (a blow taken).
+    last_health: Option<f64>,
+    hurt: bool,
 }
 
 impl Brain {
@@ -224,6 +253,9 @@ impl Brain {
             bash_due: false,
             fled: false,
             last_stick: 0,
+            raged: false,
+            last_health: None,
+            hurt: false,
         }
     }
 
@@ -279,7 +311,11 @@ impl Brain {
             rage,
             speed_mult: if rage { rage_mult(mob) } else { 1.0 },
             label: String::new(),
+            hold: None,
+            shadow: None,
         };
+        self.hurt = self.last_health.is_some_and(|h| s.health_frac < h - 1e-9);
+        self.last_health = Some(s.health_frac);
         let decide = s.now >= self.next_decision;
         if decide {
             self.next_decision = s.now + u64::from(sc.decide_every.max(1));
@@ -312,6 +348,8 @@ impl Brain {
             ends_at: None,
             airborne_since: None,
             landed_jump: false,
+            point: None,
+            landed_at: None,
         });
         events.push(Event::AttackStart { attack: idx });
         events.push(Event::Phase { attack: idx, phase: Phase::Windup, t: 0 });
@@ -330,6 +368,9 @@ impl Brain {
         if run.ends_at.is_some_and(|end| t >= end) {
             phase = Phase::Done;
         }
+        if let Some(p) = jump_phase(&run, &line, t) {
+            phase = p;
+        }
         if phase != run.phase {
             run.phase = phase;
             out.events.push(Event::Phase { attack: run.idx, phase, t });
@@ -339,7 +380,12 @@ impl Brain {
         }
         let reach = reach_of(mob, a, self.style);
         match phase {
-            Phase::Windup => {}
+            Phase::Windup => {
+                if self.style == Style::Diver && t + 1 == line.windup {
+                    // The wings fold: the dive's point is fixed here and does not follow after.
+                    run.point = s.target.map(|tg| geom::add(tg.pos, [0.0, 0.5, 0.0]));
+                }
+            }
             Phase::Hold => {
                 // A delayed blow commits: it stops tracking the target while it holds.
                 out.look_at = None;
@@ -372,9 +418,32 @@ impl Brain {
             self.strike(&mut run, a, reach, t, s, out);
         }
         if self.style == Style::Jumper {
-            self.track_landing(&mut run, a, s, out);
+            self.track_landing(&mut run, mob, a, s, out);
+            if run.landed_at == Some(t) && phase == Phase::Hit {
+                // Down: the window opens now.
+                phase = Phase::Recover;
+                run.phase = phase;
+                out.events.push(Event::Phase { attack: run.idx, phase, t });
+            }
+        }
+        // The dive's clip holds until it touches the target or the ground, or its window ends.
+        if self.style == Style::Diver
+            && self.clip.name == "dive"
+            && let Strikes::Dash { to, .. } = strike_window(self.style, a)
+            && (run.landed > 0 || (s.on_ground && t > line.hit_start()) || t >= to)
+        {
+            self.set_clip("climb", s.now);
         }
         out.label = format!("{}:{} {}", a.id, phase.label(), t);
+        if let Some(grab) = self.grab_after(mob, a, &run, out) {
+            // The ambush bit: it ends on its blow and the grab holds the target from this tick.
+            out.events.push(Event::Phase { attack: run.idx, phase: Phase::Done, t });
+            out.events.push(Event::AttackEnd { attack: run.idx, t });
+            self.run = None;
+            self.series += 1;
+            self.begin_grab(mob, grab, s, out);
+            return;
+        }
         if phase == Phase::Done {
             out.events.push(Event::AttackEnd { attack: run.idx, t });
             self.run = None;
@@ -416,8 +485,10 @@ impl Brain {
     fn start_hit(&mut self, run: &mut Run, a: &AttackDef, line: &Timeline, s: &Senses, out: &mut Tick) {
         let Some(tg) = s.target else { return };
         if self.style == Style::Diver {
-            // The dive falls on where the target stands now, in the hit phase's ticks.
-            let to = geom::add(tg.pos, [0.0, 0.5, 0.0]);
+            // The dive falls on the point fixed as the wings folded (where the target stands now
+            // for a windup too short to fold), in the hit phase's ticks.
+            let to = run.point.unwrap_or_else(|| geom::add(tg.pos, [0.0, 0.5, 0.0]));
+            self.set_clip("dive", s.now);
             let d = geom::sub(to, s.pos);
             let l = geom::len(d).max(1e-6);
             run.dir = geom::scale(d, 1.0 / l);
@@ -430,11 +501,14 @@ impl Brain {
         } else if self.style == Style::Jumper {
             out.order = Order::Leap { to: tg.pos };
             run.airborne_since = Some(s.now);
+            run.point = Some(tg.pos);
+            self.set_clip("jump_air", s.now);
         }
     }
 
-    /// The slime's blow is its landing, an area, when it is down again after the jump.
-    fn track_landing(&mut self, run: &mut Run, a: &AttackDef, s: &Senses, out: &mut Tick) {
+    /// The slime's blow is its landing, an area, when it is down again after the jump. In the air
+    /// it shows `jump_air` and, every `params.shadow_every_ticks`, its shadow where it lands.
+    fn track_landing(&mut self, run: &mut Run, mob: &MobDef, a: &AttackDef, s: &Senses, out: &mut Tick) {
         let Some(since) = run.airborne_since else { return };
         if run.landed_jump {
             return;
@@ -442,6 +516,7 @@ impl Brain {
         let up = s.now.saturating_sub(since);
         if (up >= 3 && s.on_ground) || up >= LANDING_TIMEOUT {
             run.landed_jump = true;
+            run.landed_at = Some((s.now - run.start) as u32);
             run.landed += 1;
             let hit = s
                 .target
@@ -452,7 +527,63 @@ impl Brain {
                 area: a.wave.as_ref().map(|w| w.radius_blocks),
                 ranged: false,
             });
+            // Down again: the attack's own clip from its recovery, which starts now.
+            let recover = u64::from(Timeline::of(a).recover_start());
+            self.clip = Clip { name: a.clip.clone(), start: s.now.saturating_sub(recover) };
+            return;
         }
+        let every = mob.param("shadow_every_ticks").map_or(0, |e| e as u64);
+        if every > 0 && up.is_multiple_of(every) {
+            out.shadow = run.point;
+        }
+    }
+
+    /// The grab that follows attack `a` when its blow just landed on the target this tick.
+    fn grab_after(&self, mob: &MobDef, a: &AttackDef, run: &Run, out: &Tick) -> Option<usize> {
+        if self.style != Style::Ambusher || !out.strikes.iter().any(|st| st.attack == run.idx && st.hits_target) {
+            return None;
+        }
+        mob.attacks.iter().position(|g| g.follows.as_deref() == Some(a.id.as_str()))
+    }
+
+    fn begin_grab(&mut self, mob: &MobDef, attack: usize, s: &Senses, out: &mut Tick) {
+        let g = &mob.attacks[attack];
+        let until = s.now + u64::from(g.grab_max_ticks.unwrap_or(0));
+        self.set_mode(Mode::Grab { attack, since: s.now, until, hits: 0 }, s.now, &mut out.events);
+        self.set_clip(&g.clip, s.now);
+    }
+
+    /// One tick of the grab: the target held at the mouth (drawn down with `pulls_down`), a bite
+    /// every `grab_hit_every_ticks`. `break_hits` blows taken, the end of `grab_max_ticks` or a
+    /// lost target free it and the mob backs off: false then.
+    fn grab(&mut self, mob: &MobDef, s: &Senses, out: &mut Tick) -> bool {
+        let Mode::Grab { attack, since, until, mut hits } = self.mode else { return false };
+        let Some(g) = mob.attacks.get(attack) else {
+            self.set_mode(Mode::Engage, s.now, &mut out.events);
+            return false;
+        };
+        if self.hurt {
+            hits += 1;
+        }
+        let broken = g.break_hits.is_some_and(|n| hits >= n);
+        if broken || s.now >= until || s.target.is_none() {
+            let from = s.target.map_or(s.pos, |t| t.pos);
+            self.set_mode(Mode::BackOff { until: s.now + AMBUSH_BACKOFF, from }, s.now, &mut out.events);
+            return false;
+        }
+        self.mode = Mode::Grab { attack, since, until, hits };
+        out.look_at = None;
+        out.hold = Some(geom::add(s.pos, geom::scale(geom::yaw_dir(s.yaw), g.mouth_ahead_blocks.unwrap_or(0.0))));
+        out.order = match g.pull_down_per_tick {
+            Some(per_tick) if g.pulls_down => Order::Dash { dir: [0.0, -1.0, 0.0], per_tick },
+            _ => Order::Stay,
+        };
+        let held = s.now - since;
+        if g.grab_hit_every_ticks.is_some_and(|every| every > 0 && held > 0 && held.is_multiple_of(u64::from(every))) {
+            out.strikes.push(Strike { attack, hits_target: true, area: None, ranged: false });
+        }
+        out.label = format!("{}:hold {held}", g.id);
+        true
     }
 
     fn recover_order(&self, mob: &MobDef, s: &Senses) -> Order {
@@ -489,7 +620,7 @@ impl Brain {
                 }
             }
             Style::Skirmisher | Style::Ambusher => {
-                let until = s.now + if self.style == Style::Ambusher { 30 } else { 10 };
+                let until = s.now + if self.style == Style::Ambusher { AMBUSH_BACKOFF } else { 10 };
                 self.set_mode(Mode::BackOff { until, from }, s.now, events);
             }
             Style::Shooter if a.projectile.is_none() => {
@@ -507,6 +638,7 @@ impl Brain {
             (_, Mode::BackOff { .. }) if has("backstep") || has("hop_back") => "backstep",
             (Style::Ambusher, Mode::BackOff { .. }) => "retreat",
             (Style::Skirmisher, Mode::Flee { .. }) => "run",
+            (_, Mode::Roar { .. }) => "rage",
             _ => "",
         }
     }
@@ -515,16 +647,28 @@ impl Brain {
     fn mind(&mut self, mob: &MobDef, s: &Senses, decide: bool, out: &mut Tick) {
         let before = self.mode;
         match self.mode {
-            Mode::BackOff { until, .. } | Mode::Pause { until } | Mode::Flee { until } if s.now >= until => {
+            Mode::BackOff { until, .. } | Mode::Pause { until } | Mode::Flee { until } | Mode::Roar { until }
+                if s.now >= until =>
+            {
                 self.set_mode(Mode::Engage, s.now, &mut out.events);
             }
             _ => {}
+        }
+        if matches!(self.mode, Mode::Grab { .. }) && self.grab(mob, s, out) {
+            return;
         }
         let Some(tg) = s.target else {
             self.set_clip("", s.now);
             out.label = "idle".into();
             return;
         };
+        if out.rage && !self.raged {
+            // The rage starts: once, the brute stands and roars (`passives.rage.clip_ticks`).
+            self.raged = true;
+            if let Some(ticks) = mob.passive("rage").and_then(|r| r.get("clip_ticks")?.as_u64()) {
+                self.set_mode(Mode::Roar { until: s.now + ticks }, s.now, &mut out.events);
+            }
+        }
         let d = geom::flat_dist(s.pos, tg.pos);
         if decide && matches!(self.mode, Mode::Engage | Mode::Circle) {
             self.decide(mob, s, &tg, d, &mut out.events);
@@ -570,7 +714,8 @@ impl Brain {
                 let hovering = s.now.saturating_sub(self.mode_since) >= 40;
                 let (lo, hi) = mob.param_range("circle_height_blocks").unwrap_or((8.0, 12.0));
                 let above = s.pos[1] - tg.pos[1];
-                if hovering && !tg.under_roof && above >= lo - 2.0 && above <= hi + 2.0 && d < 8.0 {
+                // Another shrike's dive at this target: this one keeps circling (DiveTurns).
+                if hovering && !s.wait_turn && !tg.under_roof && above >= lo - 2.0 && above <= hi + 2.0 && d < 8.0 {
                     pick("dive")
                 } else {
                     None
@@ -678,7 +823,7 @@ impl Brain {
                 }
             }
             Mode::Flee { .. } => Order::Walk { to: away(s.pos, tg.pos, 12.0), speed: 1.4 },
-            Mode::Pause { .. } => Order::Stay,
+            Mode::Pause { .. } | Mode::Roar { .. } | Mode::Grab { .. } => Order::Stay,
             Mode::Circle => {
                 let (lo, hi) = mob
                     .param_range("circle_radius_blocks")
@@ -714,7 +859,7 @@ impl Brain {
                 Order::Steer { to: geom::add(ring, [0.0, (lo + hi) / 2.0, 0.0]), speed: 0.35 }
             }
             Style::Ambusher => {
-                if !s.in_water || tg.looking_at_me {
+                if !s.in_water || tg.sees_me {
                     Order::Stay
                 } else {
                     Order::Steer { to: tg.pos, speed: 0.12 }
@@ -758,6 +903,18 @@ pub fn strike_window(style: Style, a: &AttackDef) -> Strikes {
     Strikes::of(a)
 }
 
+/// The phase of a jump once the slime is off the ground: its hit phase lasts the flight, its
+/// recovery is the `recover` ticks after the landing (`window_note`: «15 тиков после приземления»),
+/// so a big slime's higher jump keeps its blow and its window. None before the jump.
+fn jump_phase(run: &Run, line: &Timeline, t: u32) -> Option<Phase> {
+    run.airborne_since?;
+    Some(match run.landed_at {
+        None => Phase::Hit,
+        Some(at) if t < at + line.recover => Phase::Recover,
+        Some(_) => Phase::Done,
+    })
+}
+
 /// The brute's rage speed multiplier (`passives.rage.speed_mult`).
 pub fn rage_mult(mob: &MobDef) -> f64 {
     mob.passive("rage")
@@ -775,6 +932,41 @@ pub fn reach_of(mob: &MobDef, a: &AttackDef, style: Style) -> f64 {
         return DASH_CONTACT;
     }
     if style == Style::Heavy { HEAVY_REACH } else { DEFAULT_REACH }
+}
+
+/// The shrikes' dive turns: one shrike at a time dives at a target. The first to start its
+/// windup takes the target's turn and gives it back when its dive ends; the others circle
+/// ([`Senses::wait_turn`]). The server keeps one for all its shrikes.
+#[derive(Clone, Debug, Default)]
+pub struct DiveTurns {
+    /// Target entity to (holder, the tick the turn lapses at).
+    held: std::collections::HashMap<u32, (u32, u64)>,
+}
+
+impl DiveTurns {
+    /// Whether `mob` must wait: another shrike holds `target`'s turn.
+    pub fn waits(&self, target: u32, mob: u32, now: u64) -> bool {
+        self.held.get(&target).is_some_and(|&(holder, until)| holder != mob && now < until)
+    }
+
+    /// After `mob`'s tick: a dive started takes the turn (for at most `dive_ticks`, should its end
+    /// never come), a dive ended gives it back.
+    pub fn note(&mut self, target: u32, mob: u32, now: u64, tick: &Tick, dive_ticks: u64) {
+        for e in &tick.events {
+            match e {
+                Event::AttackStart { .. } if !self.waits(target, mob, now) => {
+                    self.held.insert(target, (mob, now + dive_ticks));
+                }
+                Event::AttackEnd { .. } => self.release(mob),
+                _ => {}
+            }
+        }
+    }
+
+    /// `mob` died or left, or its dive ended: its turn is free.
+    pub fn release(&mut self, mob: u32) {
+        self.held.retain(|_, (holder, _)| *holder != mob);
+    }
 }
 
 #[cfg(test)]

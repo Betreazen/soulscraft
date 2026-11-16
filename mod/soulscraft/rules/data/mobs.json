@@ -161,11 +161,11 @@
       "hitbox": { "width": 1.6, "height": 3.2, "eye": 2.65 },
       "attacks": [
         { "id": "wide_swing", "name": "Широкий размах", "clip": "attack_swing", "windup": 12, "hold": 0, "hit": 2, "recover": 14, "damage": 1.0, "arc_degrees": 120, "tell": "молот отведён в сторону" },
-        { "id": "overhead_wave", "name": "Удар сверху с волной", "clip": "attack_slam", "windup": 16, "hold": 0, "hit": 2, "recover": 20, "damage": 1.6, "wave": { "radius_blocks": 3, "damage": 0.5, "jumpable": true }, "tell": "молот над головой, рык", "window_note": "20 тиков, молот застрял в земле" },
+        { "id": "overhead_wave", "name": "Удар сверху с волной", "clip": "attack_slam", "windup": 16, "hold": 0, "hit": 2, "recover": 20, "damage": 1.6, "wave": { "radius_blocks": 3, "damage": 0.5, "jumpable": true, "impact_ahead_blocks": 2 }, "cue": { "sound": "minecraft:entity.ravager.attack" }, "tell": "молот над головой, рык", "window_note": "20 тиков, молот застрял в земле" },
         { "id": "charge", "name": "Таран", "clip": "attack_charge", "windup": 14, "hold": 0, "hit": 8, "recover": 40, "recover_if": "wall", "damage": 1.4, "dash_blocks": 8, "tell": "роет землю ногой, наклоняет рога", "window_note": "врезался в стену — оглушён 40 тиков" }
       ],
       "passives": [
-        { "id": "rage", "name": "Ярость", "below_health": 0.3, "speed_mult": 1.2, "tell": "красные глаза" }
+        { "id": "rage", "name": "Ярость", "below_health": 0.3, "speed_mult": 1.2, "clip_ticks": 20, "cue": { "sound": "minecraft:entity.ravager.roar" }, "tell": "красные глаза" }
       ],
       "moves": [],
       "params": {
@@ -177,8 +177,9 @@
         "Волну можно перепрыгнуть.",
         "Таран используется, если игрок дальше 6 блоков."
       ],
+      "notes": ["Волна идёт от точки удара молота: impact_ahead_blocks перед громилой. Её перепрыгивает тот, чьи ноги выше земли больше чем на 0,5 блока (гипотеза; attack.rs, JUMP_CLEAR)."],
       "loot": [{ "item": "soulscraft:brute_helmet", "name": "Рогатый шлем громилы", "chance": 0.06 }],
-      "assumed": ["attacks.*.hit"]
+      "assumed": ["attacks.*.hit", "attacks.overhead_wave.wave.impact_ahead_blocks", "attacks.overhead_wave.cue", "passives.rage.clip_ticks", "passives.rage.cue"]
     },
     {
       "id": "shrike",
@@ -199,7 +200,7 @@
       "stats": { "health": 14, "damage": 4, "armor": 0, "flying": true },
       "hitbox": { "width": 0.5, "height": 0.9, "eye": 0.7 },
       "attacks": [
-        { "id": "dive", "name": "Пике", "clip": "attack_dive", "windup": 14, "hold": 0, "hit": 2, "recover": 30, "damage": 1.2, "effects": [{ "id": "slowness", "seconds": 3 }], "tell": "резкий крик, птица замирает в воздухе, крылья сложены", "window_note": "после пике 30 тиков набирает высоту низко над землёй" }
+        { "id": "dive", "name": "Пике", "clip": "attack_dive", "windup": 14, "hold": 0, "hit": 2, "recover": 30, "damage": 1.2, "effects": [{ "id": "slowness", "seconds": 3 }], "cue": { "sound": "minecraft:entity.phantom.swoop" }, "tell": "резкий крик, птица замирает в воздухе, крылья сложены", "window_note": "после пике 30 тиков набирает высоту низко над землёй" }
       ],
       "moves": [],
       "params": {
@@ -213,7 +214,7 @@
         "Игрок в укрытии под крышей сорокопут не атакует, ждёт."
       ],
       "loot": [],
-      "assumed": ["params.waits_if_player_under_roof", "attacks.*.hit", "height_px"]
+      "assumed": ["params.waits_if_player_under_roof", "attacks.*.hit", "height_px", "attacks.dive.cue"]
     },
     {
       "id": "lurker",
@@ -233,8 +234,8 @@
       "stats": { "health": 30, "damage": 5, "armor": 2, "water_only": true },
       "hitbox": { "width": 0.75, "height": 1.0, "eye": 0.6 },
       "attacks": [
-        { "id": "ambush", "name": "Бросок из засады", "clip": "attack_lunge", "windup": 10, "hold": 0, "hit": 6, "recover": 20, "damage": 1.3, "dash_blocks": 6, "tell": "пасть раскрывается, приманка гаснет" },
-        { "id": "grab", "name": "Хватка", "clip": "grab", "follows": "ambush", "windup": 0, "hold": 0, "hit": 0, "recover": 0, "damage": 0, "grab_max_ticks": 40, "pulls_down": true, "break_hits": 3, "tell": "игрок в пасти" }
+        { "id": "ambush", "name": "Бросок из засады", "clip": "attack_lunge", "windup": 10, "hold": 0, "hit": 6, "recover": 20, "damage": 1.3, "dash_blocks": 6, "cue": { "sound": "minecraft:entity.guardian.attack" }, "tell": "пасть раскрывается, приманка гаснет" },
+        { "id": "grab", "name": "Хватка", "clip": "grab", "follows": "ambush", "windup": 0, "hold": 0, "hit": 0, "recover": 0, "damage": 0.25, "grab_max_ticks": 40, "pulls_down": true, "break_hits": 3, "grab_hit_every_ticks": 10, "pull_down_per_tick": 0.05, "mouth_ahead_blocks": 0.8, "tell": "игрок в пасти", "note": "после попадания броска цель держится у пасти до grab_max_ticks, при pulls_down опускаясь на pull_down_per_tick за тик; урон damage раз в grab_hit_every_ticks; break_hits ударов по удильщику освобождают, и он уходит" }
       ],
       "moves": [],
       "params": {
@@ -247,7 +248,7 @@
         "После атаки уходит в темноту."
       ],
       "loot": [],
-      "assumed": ["attacks.*.hit"]
+      "assumed": ["attacks.*.hit", "attacks.ambush.cue", "attacks.grab.damage", "attacks.grab.grab_hit_every_ticks", "attacks.grab.pull_down_per_tick", "attacks.grab.mouth_ahead_blocks"]
     },
     {
       "id": "bog_slime",
@@ -266,25 +267,26 @@
       "stats": { "health": 16, "damage": 4, "armor": 0 },
       "hitbox": { "width": 0.55, "height": 0.75, "eye": 0.5 },
       "sizes": [
-        { "size": 4, "health": 16, "damage": 4 },
-        { "size": 2, "health": 4, "damage": 2 },
-        { "size": 1, "health": 1, "damage": 1 }
+        { "size": 4, "health": 16, "damage": 4, "jump_velocity": 0.8, "decide_mult": 1.5 },
+        { "size": 2, "health": 4, "damage": 2, "jump_velocity": 0.62 },
+        { "size": 1, "health": 1, "damage": 1, "jump_velocity": 0.45 }
       ],
       "attacks": [
-        { "id": "high_jump", "name": "Высокий прыжок", "clip": "attack_jump", "windup": 12, "hold": 0, "hit": 2, "recover": 15, "damage": 1.4, "wave": { "radius_blocks": 2, "effects": [{ "id": "slowness", "seconds": 3 }] }, "tell": "сжимается; тень на месте приземления", "window_note": "15 тиков после приземления" }
+        { "id": "high_jump", "name": "Высокий прыжок", "clip": "attack_jump", "windup": 12, "hold": 0, "hit": 2, "recover": 15, "damage": 1.4, "wave": { "radius_blocks": 2, "effects": [{ "id": "slowness", "seconds": 3 }] }, "cue": { "sound": "minecraft:entity.slime.jump" }, "tell": "сжимается; тень на месте приземления", "window_note": "15 тиков после приземления" }
       ],
       "passives": [
         { "id": "stick", "name": "Прилипание", "on": "contact", "effects": [{ "id": "slowness", "level": 2, "seconds": 2 }] },
         { "id": "split", "name": "Деление", "on": "death", "spawn_count": [2, 3], "spawn": "меньший размер" }
       ],
       "moves": [],
-      "params": { "base": "minecraft:slime", "swims": true },
+      "params": { "base": "minecraft:slime", "swims": true, "shadow_every_ticks": 4, "shadow_particle": "minecraft:smoke" },
       "behavior": [
         "Прыгает к игроку, большие прыгают выше и реже.",
         "В воде плавает."
       ],
+      "notes": ["Скорость прыжка вверх по размеру — sizes.*.jump_velocity, интервал решений размера умножается на sizes.*.decide_mult. Пока слизь в воздухе, в точке приземления раз в shadow_every_ticks идут частицы shadow_particle (тень)."],
       "loot": [],
-      "assumed": ["attacks.*.hit"]
+      "assumed": ["attacks.*.hit", "attacks.high_jump.cue", "sizes.*.jump_velocity", "sizes.*.decide_mult", "params.shadow_every_ticks", "params.shadow_particle"]
     }
   ],
   "vanilla": {

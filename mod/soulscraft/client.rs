@@ -37,6 +37,9 @@ const FULL_LIGHT: u32 = 0xF0F0;
 const HURT_TINT: u32 = 0xFF8080;
 /// A clip that ended more than this long ago gives way to walking and idling.
 const AFTER_CLIP: f32 = 2.0;
+/// Clips that hold their last frame for as long as the server names them: the slime's `jump_air`
+/// lasts until it lands, however long the jump.
+const HELD: [&str; 1] = ["jump_air"];
 
 struct Model {
     rig: Rig,
@@ -332,7 +335,8 @@ pub(super) fn draw_mob(game: &Game<'_>, mob: &NativeMobRender<'_>, draw: &mut Bl
         ("death".to_owned(), mob.death_time as f32 + mob.partial)
     } else {
         let t = now - shown.start as f32;
-        let fresh = model.rig.clips.get(&shown.clip).is_some_and(|c| c.looped || t <= c.ticks as f32 + AFTER_CLIP);
+        let held = HELD.contains(&shown.clip.as_str());
+        let fresh = model.rig.clips.get(&shown.clip).is_some_and(|c| c.looped || held || t <= c.ticks as f32 + AFTER_CLIP);
         if !shown.clip.is_empty() && fresh {
             if c_logged(mob.id) {
                 log::info!("soulscraft: mob {} draws {} at t {t:.1}", mob.id, shown.clip);

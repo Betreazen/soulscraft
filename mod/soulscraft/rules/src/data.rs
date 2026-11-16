@@ -230,6 +230,24 @@ pub struct AttackDef {
     pub follows: Option<String>,
     #[serde(default)]
     pub grab_max_ticks: Option<u32>,
+    /// The grab draws its target down while it holds (`pull_down_per_tick` a tick).
+    #[serde(default)]
+    pub pulls_down: bool,
+    #[serde(default)]
+    pub pull_down_per_tick: Option<f64>,
+    /// Blows on the grabbing mob that free its target.
+    #[serde(default)]
+    pub break_hits: Option<u32>,
+    /// The grab bites (`damage`) this often while it holds.
+    #[serde(default)]
+    pub grab_hit_every_ticks: Option<u32>,
+    /// The grabbed target is held this far in front of the mob (its mouth).
+    #[serde(default)]
+    pub mouth_ahead_blocks: Option<f64>,
+    /// What the windup sounds and shows like (the vanilla cue's schema; the server plays it when
+    /// the attack starts). A vanilla move keeps its own `VanillaAttack::cue` instead.
+    #[serde(default)]
+    pub cue: Option<crate::vanilla::Cue>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq)]
@@ -250,6 +268,10 @@ pub struct WaveDef {
     pub effects: Vec<EffectDef>,
     #[serde(default)]
     pub jumpable: bool,
+    /// The wave starts this far in front of the mob (where the brute's hammer lands); 0 is the
+    /// mob's own feet (the slime's landing).
+    #[serde(default)]
+    pub impact_ahead_blocks: f64,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq)]
@@ -276,6 +298,12 @@ pub struct SizeDef {
     pub size: u32,
     pub health: f64,
     pub damage: f64,
+    /// The upward speed of its high jump, blocks a tick.
+    #[serde(default)]
+    pub jump_velocity: Option<f64>,
+    /// Its decision interval is the P one (Г8) times this.
+    #[serde(default)]
+    pub decide_mult: Option<f64>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -450,6 +478,23 @@ impl MobDef {
     pub fn hitbox_at(&self, size: u8) -> Hitbox {
         self.hitbox.unwrap_or(Hitbox::ZOMBIE).at_size(size, self.full_size())
     }
+
+    fn size_def(&self, size: u8) -> Option<&SizeDef> {
+        self.sizes.iter().find(|s| s.size == u32::from(size))
+    }
+
+    /// The upward speed of the high jump at `size` (`sizes.*.jump_velocity`).
+    pub fn jump_velocity_at(&self, size: u8) -> Option<f64> {
+        self.size_def(size)?.jump_velocity
+    }
+
+    /// The decision interval at `size`: `base` (Г8's) times `sizes.*.decide_mult`, rounded.
+    pub fn decide_every_at(&self, size: u8, base: u32) -> u32 {
+        match self.size_def(size).and_then(|s| s.decide_mult) {
+            Some(k) => (f64::from(base) * k).round() as u32,
+            None => base,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -549,6 +594,46 @@ mod tests {
         assert!(MobsFile::parse(&rate).unwrap_err().contains("tick_rate"));
         let key = EMBEDDED.replacen("soulscraft:revenant", "soulscraft:knight", 1);
         assert!(MobsFile::parse(&key).unwrap_err().contains("key"));
+    }
+
+    #[test]
+    fn slime_sizes_jump_higher_and_decide_slower() {
+        let f = MobsFile::embedded();
+        let slime = f.mob("bog_slime").unwrap();
+        assert_eq!(slime.jump_velocity_at(4), Some(0.8));
+        assert_eq!(slime.jump_velocity_at(2), Some(0.62));
+        assert_eq!(slime.jump_velocity_at(1), Some(0.45));
+        assert_eq!(slime.decide_every_at(4, 20), 30);
+        assert_eq!(slime.decide_every_at(2, 20), 20);
+        assert_eq!(slime.decide_every_at(4, 10), 15);
+        let brute = f.mob("brute").unwrap();
+        assert_eq!(brute.jump_velocity_at(0), None);
+        assert_eq!(brute.decide_every_at(0, 20), 20);
+    }
+
+    #[test]
+    fn own_attacks_read_their_cue_and_the_grab_its_numbers() {
+        let f = MobsFile::embedded();
+        let sound = |mob: &str, attack: &str| f.mob(mob).unwrap().attack(attack).unwrap().cue.as_ref().and_then(|c| c.sound.clone());
+        assert_eq!(sound("brute", "overhead_wave").as_deref(), Some("minecraft:entity.ravager.attack"));
+        assert_eq!(sound("shrike", "dive").as_deref(), Some("minecraft:entity.phantom.swoop"));
+        assert_eq!(sound("lurker", "ambush").as_deref(), Some("minecraft:entity.guardian.attack"));
+        assert_eq!(sound("bog_slime", "high_jump").as_deref(), Some("minecraft:entity.slime.jump"));
+        assert_eq!(sound("brute", "wide_swing"), None);
+        let roar = f.mob("brute").unwrap().passive("rage").unwrap();
+        assert_eq!(roar["clip_ticks"], 20);
+        assert_eq!(roar["cue"]["sound"], "minecraft:entity.ravager.roar");
+        let grab = f.mob("lurker").unwrap().attack("grab").unwrap();
+        assert_eq!(grab.grab_max_ticks, Some(40));
+        assert_eq!(grab.break_hits, Some(3));
+        assert!(grab.pulls_down);
+        assert_eq!(grab.grab_hit_every_ticks, Some(10));
+        assert_eq!(grab.pull_down_per_tick, Some(0.05));
+        assert_eq!(grab.mouth_ahead_blocks, Some(0.8));
+        assert_eq!(grab.damage, 0.25);
+        assert_eq!(f.mob("brute").unwrap().attack("overhead_wave").unwrap().wave.as_ref().unwrap().impact_ahead_blocks, 2.0);
+        // A vanilla move keeps its own cue (VanillaAttack.cue), not the flattened AttackDef's.
+        assert!(f.vanilla.groups.iter().flat_map(|g| &g.attacks).all(|a| a.def.cue.is_none()));
     }
 
     #[test]

@@ -15,6 +15,7 @@ fn senses(now: u64, d: f64) -> Senses {
         on_ground: true,
         in_water: false,
         wall_hit: false,
+        wait_turn: false,
         target: Some(TargetSense { pos: [0.0, 0.0, d], ..TargetSense::default() }),
     }
 }
@@ -294,7 +295,15 @@ fn brute_swings_in_reach_and_rages_when_low() {
         s.health_frac = 0.2;
         s
     });
-    let a = starts(&out)[0].1;
+    assert!(starts(&out).is_empty(), "it roars first");
+    let mut b = Brain::new(Style::Heavy, 9, 0);
+    let out = run(&mut b, &m, 0.0, 0, 25, |n| {
+        let mut s = senses(n, 3.0);
+        s.health_frac = 0.2;
+        s
+    });
+    let (when, a) = starts(&out)[0];
+    assert_eq!(when, 20, "after the roar's clip_ticks");
     assert!(a == m.attack_index("wide_swing").unwrap() || a == m.attack_index("overhead_wave").unwrap());
     assert!(out[0].rage);
     assert!((out[0].speed_mult - 1.2).abs() < 1e-9);
@@ -365,7 +374,7 @@ fn lurker_creeps_when_unseen_and_strikes_only_from_water() {
         move |n| {
             let mut s = senses(n, 10.0);
             s.in_water = true;
-            s.target.as_mut().unwrap().looking_at_me = seen;
+            s.target.as_mut().unwrap().sees_me = seen;
             s
         }
     };
@@ -451,4 +460,284 @@ fn every_mob_runs_every_attack_to_its_end() {
             assert!(ended, "{} {} ends", m.id, a.id);
         }
     }
+}
+
+#[test]
+fn brute_roars_once_when_rage_starts() {
+    let m = mob("brute");
+    let mut b = Brain::new(Style::Heavy, 9, 0);
+    let sc = Scaled::at(&m.stats, 0.0);
+    let low = |n: u64| {
+        let mut s = senses(n, 3.0);
+        s.health_frac = 0.2;
+        s
+    };
+    let first = b.tick(&m, &sc, &low(0));
+    assert!(first.events.contains(&Event::Mode("rage")));
+    assert_eq!(first.order, Order::Stay);
+    assert_eq!(b.clip().name, "rage");
+    for n in 1..20 {
+        let t = b.tick(&m, &sc, &low(n));
+        assert_eq!(b.clip().name, "rage", "tick {n}");
+        assert!(t.strikes.is_empty() && !t.events.iter().any(|e| matches!(e, Event::AttackStart { .. })));
+    }
+    let rest = run(&mut b, &m, 0.0, 20, 200, low);
+    assert!(!rest.iter().flat_map(|t| &t.events).any(|e| *e == Event::Mode("rage")), "the roar is once");
+}
+
+/// A shrike 10 blocks over its target, in the air.
+fn above(n: u64) -> Senses {
+    let mut s = senses(n, 3.0);
+    s.pos = [0.0, 10.0, 0.0];
+    s.on_ground = false;
+    s
+}
+
+#[test]
+fn shrike_dive_locks_at_fold() {
+    let m = mob("shrike");
+    let dive = m.attack("dive").unwrap();
+    let fold = u64::from(dive.windup) - 1;
+    let hit = Timeline::of(dive).hit_start() as usize;
+    let mut b = Brain::new(Style::Diver, 6, 0);
+    b.force(0);
+    let sc = Scaled::at(&m.stats, 0.0);
+    // The target steps aside the tick after the wings fold.
+    let moved = |n: u64| {
+        let mut s = above(n);
+        if n > fold {
+            s.target.as_mut().unwrap().pos = [6.0, 0.0, 3.0];
+        }
+        s
+    };
+    let mut out = Vec::new();
+    let mut clips = Vec::new();
+    for n in 0..30 {
+        out.push(b.tick(&m, &sc, &moved(n)));
+        clips.push(b.clip().name.clone());
+    }
+    let dir = match out[hit].order {
+        Order::Dash { dir, .. } => dir,
+        o => panic!("{o:?}"),
+    };
+    // Aimed at where the target stood at the fold, (0, 0.5, 3), not at (6, 0.5, 3).
+    let line = geom::sub([0.0, 0.5, 3.0], [0.0, 10.0, 0.0]);
+    let want = geom::scale(line, 1.0 / geom::len(line));
+    assert!(geom::dist(dir, want) < 1e-9, "{dir:?} not {want:?}");
+    assert_eq!(out[hit + 1].order, out[hit].order, "the dive keeps its line");
+    assert_eq!(clips[hit - 1], "attack_dive");
+    let window_end = Timeline::of(dive).recover_start() as usize + 3;
+    for (n, c) in clips.iter().enumerate().take(window_end).skip(hit) {
+        assert_eq!(c, "dive", "no contact, no ground: still diving at {n}");
+    }
+    assert_eq!(clips[window_end], "climb");
+}
+
+#[test]
+fn shrike_dive_clip_ends_on_contact() {
+    let m = mob("shrike");
+    let mut b = Brain::new(Style::Diver, 6, 0);
+    b.force(0);
+    let sc = Scaled::at(&m.stats, 0.0);
+    let mut clips = Vec::new();
+    for n in 0..20 {
+        let mut s = above(n);
+        if n >= 15 {
+            s.pos = [0.0, 0.5, 2.5];
+        }
+        b.tick(&m, &sc, &s);
+        clips.push(b.clip().name.clone());
+    }
+    assert_eq!(clips[14], "dive");
+    assert_eq!(clips[15], "climb", "it touched the target");
+}
+
+#[test]
+fn shrikes_take_turns() {
+    let m = mob("shrike");
+    let sc = Scaled::at(&m.stats, 0.0);
+    let dive_len = u64::from(Timeline::of(m.attack("dive").unwrap()).end());
+    const TARGET: u32 = 77;
+    let mut brains = [Brain::new(Style::Diver, 6, 0), Brain::new(Style::Diver, 7, 0)];
+    let mut turns = DiveTurns::default();
+    // (mob, start, end) of every dive.
+    let mut dives: Vec<(u32, u64, Option<u64>)> = Vec::new();
+    for now in 0..400 {
+        for (i, b) in brains.iter_mut().enumerate() {
+            let id = i as u32 + 1;
+            let mut s = above(now);
+            s.wait_turn = turns.waits(TARGET, id, now);
+            let t = b.tick(&m, &sc, &s);
+            turns.note(TARGET, id, now, &t, dive_len);
+            for e in &t.events {
+                match e {
+                    Event::AttackStart { .. } => dives.push((id, now, None)),
+                    Event::AttackEnd { .. } => {
+                        if let Some(d) = dives.iter_mut().rev().find(|d| d.0 == id && d.2.is_none()) {
+                            d.2 = Some(now);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+    assert!(dives.iter().any(|d| d.0 == 1) && dives.iter().any(|d| d.0 == 2), "both dive: {dives:?}");
+    for a in &dives {
+        for b in dives.iter().filter(|b| b.0 != a.0 && b.1 >= a.1) {
+            let end = a.2.unwrap_or(u64::MAX);
+            assert!(b.1 >= end, "{} started at {} while {} held the turn ({}..{end})", b.0, b.1, a.0, a.1);
+        }
+    }
+}
+
+#[test]
+fn a_turn_held_too_long_lapses_and_a_dead_holder_lets_go() {
+    let mut turns = DiveTurns::default();
+    let t = Tick {
+        order: Order::Stay,
+        repath: false,
+        look_at: None,
+        events: vec![Event::AttackStart { attack: 0 }],
+        strikes: Vec::new(),
+        guarding: false,
+        rage: false,
+        speed_mult: 1.0,
+        label: String::new(),
+        hold: None,
+        shadow: None,
+    };
+    turns.note(5, 1, 100, &t, 46);
+    assert!(turns.waits(5, 2, 120));
+    assert!(!turns.waits(5, 1, 120), "the holder itself may go on");
+    assert!(!turns.waits(6, 2, 120), "another target is free");
+    assert!(!turns.waits(5, 2, 146), "lapsed after the dive's length");
+    turns.release(1);
+    assert!(!turns.waits(5, 2, 120));
+}
+
+#[test]
+fn slime_shows_jump_air_and_casts_a_shadow() {
+    let m = mob("bog_slime");
+    let mut b = Brain::new(Style::Jumper, 1, 0);
+    b.force(0);
+    let sc = Scaled::at(&m.stats, 0.0);
+    let mut shadows = Vec::new();
+    let mut clips = Vec::new();
+    for n in 0..30 {
+        let mut s = senses(n, 1.5);
+        s.on_ground = !(13..20).contains(&n);
+        let t = b.tick(&m, &sc, &s);
+        if let Some(at) = t.shadow {
+            shadows.push((n, at));
+        }
+        clips.push(b.clip().clone());
+    }
+    assert_eq!(shadows, vec![(12, [0.0, 0.0, 1.5]), (16, [0.0, 0.0, 1.5])], "every shadow_every_ticks at the landing");
+    assert_eq!(clips[11].name, "attack_jump");
+    for (n, c) in clips.iter().enumerate().take(20).skip(12) {
+        assert_eq!(c.name, "jump_air", "in the air at {n}");
+    }
+    // Landed: the attack's clip again, at its recovery (tick 14 of it now).
+    assert_eq!(clips[20], Clip { name: "attack_jump".into(), start: 6 });
+}
+
+#[test]
+fn a_long_jump_recovers_after_it_lands() {
+    // The big slime's jump (0.8 up) is in the air past the attack's 29 ticks: its window is the
+    // 15 ticks after the landing (window_note), and its blow is the landing.
+    let m = mob("bog_slime");
+    let jump = m.attack("high_jump").unwrap();
+    let mut b = Brain::new(Style::Jumper, 1, 0);
+    b.force(0);
+    // To the tick it ends at, not into the next jump.
+    let out = run(&mut b, &m, 0.0, 0, 49, |n| {
+        let mut s = senses(n, 1.5);
+        s.on_ground = !(13..33).contains(&n);
+        s
+    });
+    let phases: Vec<(usize, Phase)> = out
+        .iter()
+        .enumerate()
+        .flat_map(|(i, t)| {
+            t.events.iter().filter_map(move |e| match e {
+                Event::Phase { phase, .. } => Some((i, *phase)),
+                _ => None,
+            })
+        })
+        .collect();
+    let land = 33;
+    assert_eq!(
+        phases,
+        vec![(0, Phase::Windup), (12, Phase::Hit), (land, Phase::Recover), (land + jump.recover as usize, Phase::Done)]
+    );
+    assert_eq!(strikes(&out).iter().map(|(i, _)| *i).collect::<Vec<_>>(), vec![land]);
+}
+
+/// A lurker in water, its target 1.5 blocks south: the forced ambush lands on the hit phase's
+/// first tick (10). `hurt` gives the ticks the lurker loses health on.
+fn grab_run(hurt: &[u64], ticks: u64) -> Vec<Tick> {
+    let m = mob("lurker");
+    let mut b = Brain::new(Style::Ambusher, 8, 0);
+    b.force(m.attack_index("ambush").unwrap());
+    let sc = Scaled::at(&m.stats, 0.0);
+    let mut health = 1.0;
+    (0..ticks)
+        .map(|n| {
+            if hurt.contains(&n) {
+                health -= 0.05;
+            }
+            let mut s = senses(n, 1.5);
+            s.in_water = true;
+            s.health_frac = health;
+            b.tick(&m, &sc, &s)
+        })
+        .collect()
+}
+
+fn mode_at(out: &[Tick], mode: &str) -> Option<usize> {
+    out.iter().position(|t| t.events.iter().any(|e| matches!(e, Event::Mode(m) if *m == mode)))
+}
+
+fn bites(out: &[Tick]) -> Vec<usize> {
+    let grab = mob("lurker").attack_index("grab").unwrap();
+    strikes(out).iter().filter(|(_, s)| s.attack == grab).map(|(i, _)| *i).collect()
+}
+
+#[test]
+fn grab_ends_after_hits() {
+    let out = grab_run(&[15, 17, 19], 60);
+    assert_eq!(mode_at(&out, "grab"), Some(10), "the ambush landed, the grab follows");
+    assert!(out[10].events.iter().any(|e| matches!(e, Event::AttackEnd { .. })), "the ambush ends on its blow");
+    for (n, t) in out.iter().enumerate().take(19).skip(10) {
+        assert_eq!(t.hold, Some([0.0, 0.0, 0.8]), "held at the mouth on {n}");
+        assert!(matches!(t.order, Order::Dash { dir, per_tick } if dir == [0.0, -1.0, 0.0] && (per_tick - 0.05).abs() < 1e-9));
+    }
+    assert_eq!(mode_at(&out, "backoff"), Some(19), "the third blow frees the target");
+    assert!(out[19..].iter().all(|t| t.hold.is_none()));
+    assert!(bites(&out).is_empty(), "freed before the first bite");
+}
+
+#[test]
+fn grab_lasts_its_max_ticks_and_bites() {
+    let out = grab_run(&[], 70);
+    assert_eq!(mode_at(&out, "grab"), Some(10));
+    assert_eq!(mode_at(&out, "backoff"), Some(50), "grab_max_ticks 40 after it began");
+    assert_eq!(bites(&out), vec![20, 30, 40], "grab.damage every grab_hit_every_ticks");
+    let grab = mob("lurker").attack_index("grab").unwrap();
+    assert!(strikes(&out).iter().filter(|(_, s)| s.attack == grab).all(|(_, s)| s.hits_target && s.area.is_none()));
+}
+
+#[test]
+fn an_ambush_that_misses_grabs_nothing() {
+    let m = mob("lurker");
+    let mut b = Brain::new(Style::Ambusher, 8, 0);
+    b.force(m.attack_index("ambush").unwrap());
+    let out = run(&mut b, &m, 0.0, 0, 40, |n| {
+        let mut s = senses(n, 12.0);
+        s.in_water = true;
+        s
+    });
+    assert_eq!(mode_at(&out, "grab"), None);
+    assert!(out.iter().all(|t| t.hold.is_none()));
 }

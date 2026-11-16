@@ -606,14 +606,15 @@ bindings = [
 # A mob's health ran out (LivingEntity.die): the killer from its last damage and
 # `last_hurt_by_player`, before `mob_died` clears it (game/creatures.rs:1585, :1626). The named hook
 # `living_death` is behind `mods().is_empty()` there (:1586): at the function, pinned by
-# horizon_revision.
+# horizon_revision. The game is the function's own `&mut self` (a dead shrike gets its gravity
+# back: soulscraft_server::on_mob_death).
 [[injection]]
 id = "mob_death"
 target = "horizon_client::game::creatures::Game<'_>::mob_death_canceled"
 kind = "HEAD"
 helper = "hook_mob_death.rs"
 bindings = [
-  { name = "game", ty = "&crate::game::Game<'_>", value = "&*self" },
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
   { name = "mob", ty = "&horizon_client::mobs::Mob", value = "m" },
 ]
 

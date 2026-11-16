@@ -8,7 +8,8 @@
 //! The clip's markers are the same ticks (assets/models/build.py fails when they differ), so the
 //! server and the client agree on the pose by counting ticks from the attack's start.
 
-use crate::data::AttackDef;
+use crate::data::{AttackDef, WaveDef};
+use crate::geom::{self, V3};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Phase {
@@ -132,6 +133,25 @@ impl Strikes {
     }
 }
 
+/// A jumpable wave passes under feet this high over the ground under them, in blocks (the
+/// brief's 0,5; hypothesis, 03-hypotheses.md Г6).
+pub const JUMP_CLEAR: f64 = 0.5;
+
+/// Where a wave starts: `impact_ahead_blocks` in front of a mob at `pos` facing `yaw`.
+pub fn wave_center(pos: V3, yaw: f64, wave: &WaveDef) -> V3 {
+    geom::add(pos, geom::scale(geom::yaw_dir(yaw), wave.impact_ahead_blocks))
+}
+
+/// Whether a wave from `center` catches a target whose feet are at `target_feet`, the ground
+/// under them at `ground_y`: within `radius`, and for a `jumpable` wave not over it (feet more
+/// than [`JUMP_CLEAR`] over the ground).
+pub fn wave_hits(center: V3, radius: f64, jumpable: bool, target_feet: V3, ground_y: f64) -> bool {
+    if jumpable && target_feet[1] - ground_y > JUMP_CLEAR {
+        return false;
+    }
+    geom::dist(center, target_feet) <= radius
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -207,6 +227,44 @@ mod tests {
                 assert_eq!(last, Phase::Done);
             }
         }
+    }
+
+    fn slam_wave() -> crate::data::WaveDef {
+        MobsFile::embedded().mob("brute").unwrap().attack("overhead_wave").unwrap().wave.clone().unwrap()
+    }
+
+    #[test]
+    fn wave_from_impact_point() {
+        let w = slam_wave();
+        // The brute at the origin facing south (+z): the hammer lands impact_ahead_blocks (2) ahead.
+        let center = wave_center([0.0; 3], 0.0, &w);
+        assert!(crate::geom::dist(center, [0.0, 0.0, 2.0]) < 1e-9, "{center:?}");
+        let r = w.radius_blocks;
+        // 4.9 blocks in front of the brute is 2.9 from the impact: hit.
+        assert!(wave_hits(center, r, w.jumpable, [0.0, 0.0, 4.9], 0.0));
+        // 2 blocks behind the brute is 4 from the impact: missed.
+        assert!(!wave_hits(center, r, w.jumpable, [0.0, 0.0, -2.0], 0.0));
+        // Facing east (yaw −90): the impact is at +x.
+        let east = wave_center([10.0, 64.0, 0.0], -90.0, &w);
+        assert!(crate::geom::dist(east, [12.0, 64.0, 0.0]) < 1e-9, "{east:?}");
+        // A wave without impact_ahead_blocks (the slime's landing) is centred on the mob.
+        let slime = MobsFile::embedded().mob("bog_slime").unwrap().attack("high_jump").unwrap().wave.clone().unwrap();
+        assert_eq!(wave_center([1.0, 2.0, 3.0], 45.0, &slime), [1.0, 2.0, 3.0]);
+    }
+
+    #[test]
+    fn wave_misses_jumping_player() {
+        let w = slam_wave();
+        let center = wave_center([0.0; 3], 0.0, &w);
+        assert!(w.jumpable);
+        // Feet 0.6 over the ground under them: over the wave.
+        assert!(!wave_hits(center, w.radius_blocks, true, [0.0, 0.6, 2.0], 0.0));
+        // Feet 0.4 over it: still caught.
+        assert!(wave_hits(center, w.radius_blocks, true, [0.0, 0.4, 2.0], 0.0));
+        // On a step a block up the player stands on the ground there: caught.
+        assert!(wave_hits(center, w.radius_blocks, true, [0.0, 1.0, 2.0], 1.0));
+        // A wave that cannot be jumped catches the jumper.
+        assert!(wave_hits(center, w.radius_blocks, false, [0.0, 0.6, 2.0], 0.0));
     }
 
     #[test]

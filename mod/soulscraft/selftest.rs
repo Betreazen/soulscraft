@@ -33,6 +33,12 @@ enum Kind {
     Survive,
     Bleed,
     Waves,
+    /// A dead shrike falls (its no-gravity taken off in the death hook).
+    ShrikeFalls,
+    /// A size-4 bog slime splits into 2–3 of size 2.
+    SlimeSplits,
+    /// The lurker's grab holds its target at its mouth; `true`: 3 blows free it.
+    Grab { breaks: bool },
     /// The mob's box against data/mobs.json `hitbox` (a slime of this size).
     Hitbox { mob: String, size: u8 },
     /// The altar's and the event's scenarios (soulscraft_selftest_altar).
@@ -64,6 +70,9 @@ struct Live {
     mark: u64,
     note: String,
     saved: Option<Option<String>>,
+    /// A falling body's height at the start and the lowest seen since (shrike_falls_on_death).
+    y0: f64,
+    low: f64,
 }
 
 struct Run {
@@ -107,6 +116,10 @@ fn scenarios(data: &MobsFile, filter: Option<&str>) -> Vec<Scenario> {
         Scenario { name: "survive_unload".into(), kind: Kind::Survive, timeout: 600 },
         Scenario { name: "bleeding_ticks".into(), kind: Kind::Bleed, timeout: 120 },
         Scenario { name: "wave_stub".into(), kind: Kind::Waves, timeout: 60 },
+        Scenario { name: "shrike_falls_on_death".into(), kind: Kind::ShrikeFalls, timeout: 80 },
+        Scenario { name: "bog_slime_splits".into(), kind: Kind::SlimeSplits, timeout: 80 },
+        Scenario { name: "lurker_grab_holds".into(), kind: Kind::Grab { breaks: false }, timeout: 120 },
+        Scenario { name: "lurker_grab_breaks".into(), kind: Kind::Grab { breaks: true }, timeout: 120 },
     ]);
     for (name, timeout) in crate::game::soulscraft_selftest_altar::CASES {
         all.push(Scenario { name: (*name).to_owned(), kind: Kind::Altar(*name), timeout: *timeout });
@@ -429,6 +442,9 @@ fn step(game: &mut Game<'_>, dim: &str, now: u64, sc: &Scenario, live: &mut Live
         Kind::Survive => survive(game, dim, now, live),
         Kind::Bleed => bleed(game, dim, now, live, first),
         Kind::Waves => waves(game, dim, now, live),
+        Kind::ShrikeFalls => shrike_falls(game, dim, now, live, first),
+        Kind::SlimeSplits => slime_splits(game, dim, now, live, first),
+        Kind::Grab { breaks } => grab(game, dim, now, live, *breaks, first),
         Kind::Hitbox { mob, size } => hitbox(game, dim, live, mob, *size, first),
         Kind::Altar(name) => crate::game::soulscraft_selftest_altar::step(game, now, name, first),
         Kind::Turret(name) => crate::game::soulscraft_selftest_turret::step(game, now, name, first),
@@ -494,12 +510,23 @@ fn timing(game: &mut Game<'_>, dim: &str, now: u64, live: &mut Live, mob: &str, 
     let done = recs.iter().find(|r| r.phase == Phase::Done)?;
     let line = Timeline::of(&a);
     let t0 = recs.iter().find(|r| r.phase == Phase::Windup).map_or(0, |r| r.tick);
+    let strikes: Vec<_> = s.strikes.iter().filter(|r| r.mob == id && r.attack == attack && r.tick >= t0).cloned().collect();
+    let first_blow = strikes.first().map(|r| (r.tick - t0) as u32);
+    // A jump's window is the `recover` ticks after it lands (its blow); an ambush that bit ends on
+    // its blow, as the grab follows (soulscraft_rules::brain).
+    let grabbed = def.attacks.iter().any(|g| g.follows.as_deref() == Some(attack)) && first_blow.is_some_and(|b| b < line.recover_start());
+    let (recover_at, end_at) = match first_blow {
+        Some(land) if mob == "bog_slime" => (Some(land), land + line.recover),
+        Some(bit) if grabbed => (None, bit),
+        _ => (Some(line.recover_start()), line.end()),
+    };
     let mut problems = Vec::new();
     let mut want = vec![(Phase::Windup, 0)];
     if a.hold > 0 {
         want.push((Phase::Hold, line.windup));
     }
-    want.extend([(Phase::Hit, line.hit_start()), (Phase::Recover, line.recover_start())]);
+    want.push((Phase::Hit, line.hit_start()));
+    want.extend(recover_at.map(|t| (Phase::Recover, t)));
     for (phase, t) in want {
         match recs.iter().find(|r| r.phase == phase) {
             Some(r) if r.tick - t0 == u64::from(t) => {}
@@ -509,10 +536,9 @@ fn timing(game: &mut Game<'_>, dim: &str, now: u64, live: &mut Live, mob: &str, 
     }
     let end = (done.tick - t0) as u32;
     let open_charge = a.recover_if.as_deref() == Some("wall") && end == line.recover_start() + soulscraft_rules::brain::CHARGE_OPEN_RECOVER;
-    if end != line.end() && !open_charge {
-        problems.push(format!("end at {end} not {}", line.end()));
+    if end != end_at && !open_charge {
+        problems.push(format!("end at {end} not {end_at}"));
     }
-    let strikes: Vec<_> = s.strikes.iter().filter(|r| r.mob == id && r.attack == attack && r.tick >= t0).cloned().collect();
     drop(s);
     let melee = a.dash_blocks.is_none() && a.projectile.is_none() && !matches!(mob, "shrike" | "bog_slime");
     let after = health(game, live.golem?).unwrap_or(0.0);
@@ -718,5 +744,140 @@ fn waves(game: &mut Game<'_>, dim: &str, now: u64, live: &mut Live) -> Option<Re
             })
         }
         _ => None,
+    }
+}
+
+/// A dead flyer's body is taken away at death time 20 (game/creatures.rs:1378): the fall is read
+/// until then.
+const BODY_TICKS: u64 = 20;
+
+/// A shrike hovering 4 blocks over the platform (no target: it holds still, its gravity off),
+/// killed: its body falls at least a block (the death hook gives it its gravity back). The lowest
+/// height seen while the body lasts counts, at most 20 ticks after the kill.
+fn shrike_falls(game: &mut Game<'_>, dim: &str, now: u64, live: &mut Live, first: bool) -> Option<Result<(), String>> {
+    if first {
+        let at = [BASE[0], BASE[1] + 4.0, BASE[2]];
+        let id = crate::game::soulscraft_tools::summon(game, dim, "shrike", at, 0.0, 0);
+        live.mob = id;
+        return id.is_none().then(|| Err("shrike not spawned".into()));
+    }
+    let id = live.mob?;
+    let y = game.mobs.iter().find(|m| m.id == id && !m.removed).map(|m| m.position.y);
+    if live.mark == 0 {
+        // Adopted (its gravity off from then) and still for a few ticks: the kill.
+        let flying = crate::game::soulscraft_find::mob(game, id).is_some_and(|m| m.no_gravity);
+        if !server::state().mobs.contains_key(&id) || !flying || live.step < 6 {
+            return None;
+        }
+        live.y0 = y?;
+        live.low = live.y0;
+        if !game.native_kill_mob(dim, id) {
+            return Some(Err("the shrike was not killed".into()));
+        }
+        live.mark = now;
+        return None;
+    }
+    if let Some(y) = y {
+        live.low = live.low.min(y);
+    }
+    let gone = y.is_none() || now >= live.mark + BODY_TICKS;
+    if !gone {
+        return None;
+    }
+    let fell = live.y0 - live.low;
+    log::info!("soulscraft: selftest shrike_falls fell={fell:.2} in {} ticks", now - live.mark);
+    Some(if fell >= 1.0 { Ok(()) } else { Err(format!("the dead shrike fell {fell:.2} blocks in {} ticks, wanted 1", now - live.mark)) })
+}
+
+/// A size-4 bog slime killed on the platform: 2–3 slimes of size 2 appear round it
+/// (`passives.split`). They are taken away after.
+fn slime_splits(game: &mut Game<'_>, dim: &str, now: u64, live: &mut Live, first: bool) -> Option<Result<(), String>> {
+    if first {
+        let id = crate::game::soulscraft_tools::summon(game, dim, "bog_slime", BASE, 0.0, 4);
+        live.mob = id;
+        return id.is_none().then(|| Err("bog slime not spawned".into()));
+    }
+    let id = live.mob?;
+    if live.mark == 0 {
+        if !server::state().mobs.contains_key(&id) {
+            return None;
+        }
+        if !game.native_kill_mob(dim, id) {
+            return Some(Err("the slime was not killed".into()));
+        }
+        live.mark = now;
+        return None;
+    }
+    // Killed, split on its death tick, the children adopted the tick after: well within 10.
+    if now < live.mark + 10 {
+        return None;
+    }
+    let children: Vec<u32> = {
+        let s = server::state();
+        s.mobs
+            .iter()
+            .filter(|(c, t)| **c != id && t.alive && t.size == 2 && s.data.mobs[t.kind].id == "bog_slime")
+            .filter(|(_, t)| soulscraft_rules::geom::dist(t.pos, BASE) <= 4.0)
+            .map(|(c, _)| *c)
+            .collect()
+    };
+    for c in &children {
+        game.native_remove_mob(dim, *c);
+    }
+    Some(if (2..=3).contains(&children.len()) {
+        Ok(())
+    } else {
+        Err(format!("{} slimes of size 2 round the dead one, wanted 2 or 3", children.len()))
+    })
+}
+
+/// The lurker's ambush on the golem lands and its grab follows. `breaks` false: for 20 ticks the
+/// golem stays within 1.5 blocks of the lurker (held at its mouth). `breaks` true: 3 blows on the
+/// lurker (2 ticks apart, its hurt cooldown cleared) free the golem long before grab_max_ticks, and
+/// the lurker backs off.
+fn grab(game: &mut Game<'_>, dim: &str, now: u64, live: &mut Live, breaks: bool, first: bool) -> Option<Result<(), String>> {
+    if first {
+        live.note = "ambush".into();
+        return arrange(game, dim, "lurker", BASE, 0.0, live).err().map(Err);
+    }
+    let (mob, golem) = (live.mob?, live.golem?);
+    if live.mark == 0 {
+        if !aim(live, false) {
+            return None;
+        }
+        if let Err(e) = force(live, "ambush") {
+            return Some(Err(e));
+        }
+        live.mark = now;
+        return None;
+    }
+    let mode_since = |mode: &str, after: u64| {
+        server::state().modes.iter().find(|(id, m, t)| *id == mob && m == mode && *t >= after).map(|(_, _, t)| *t)
+    };
+    let grabbed = mode_since("grab", live.mark)?;
+    let since = now - grabbed;
+    if !breaks {
+        let at = |id: u32| game.mobs.iter().find(|m| m.id == id && !m.removed).map(|m| [m.position.x, m.position.y, m.position.z]);
+        let d = soulscraft_rules::geom::dist(at(mob)?, at(golem)?);
+        if d > 1.5 {
+            return Some(Err(format!("the golem is {d:.2} blocks from the lurker {since} ticks into the grab")));
+        }
+        return (since >= 20).then_some(Ok(()));
+    }
+    if matches!(since, 2 | 4 | 6) {
+        if let Some(m) = crate::game::soulscraft_find::mob_mut(game, mob) {
+            m.invulnerable = 0;
+        }
+        if !game.native_hurt_entity(dim, mob, 1.0, "minecraft:mob_attack", Some(golem)) {
+            return Some(Err(format!("blow {} on the lurker did not land", since / 2)));
+        }
+        return None;
+    }
+    let max = server::state().data.mob("lurker").and_then(|m| m.attack("grab")?.grab_max_ticks).unwrap_or(40);
+    match mode_since("backoff", grabbed + 1) {
+        Some(t) if t - grabbed > 6 && t - grabbed < u64::from(max) => Some(Ok(())),
+        Some(t) => Some(Err(format!("freed {} ticks into the grab, wanted just after the third blow (6)", t - grabbed))),
+        None if since > 12 => Some(Err("3 blows did not free the golem".into())),
+        None => None,
     }
 }

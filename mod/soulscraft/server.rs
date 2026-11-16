@@ -17,12 +17,14 @@
 use crate::game::Game;
 use crate::game::native_player_state::NativeEffect;
 use crate::mod_api::NativeServerPlayer;
+use horizon_client::particles::ParticleOptions;
 use soulscraft_rules::{
-    attack::Phase,
-    brain::{Brain, Event, Order, Senses, Strike, Style, TargetSense, Tick},
+    attack::{Phase, Timeline, wave_center, wave_hits},
+    brain::{Brain, DiveTurns, Event, Order, Senses, Strike, Style, TargetSense, Tick},
     data::{MobDef, MobsFile},
     geom::{self, V3},
     scale::{self, Scaled},
+    vanilla::Cue,
     wire,
 };
 use std::collections::HashMap;
@@ -99,6 +101,8 @@ pub(super) struct State {
     /// Bleed hits due, from the effect tick (which may not change the game): (dimension, mob
     /// or player, amplifier).
     pub bleeds: Vec<(String, Option<i32>, Option<u128>, i32)>,
+    /// The shrikes' dive turns: one dives at a target at a time (soulscraft_rules::brain::DiveTurns).
+    pub turns: DiveTurns,
 }
 
 static STATE: LazyLock<Mutex<State>> = LazyLock::new(|| {
@@ -121,6 +125,7 @@ static STATE: LazyLock<Mutex<State>> = LazyLock::new(|| {
         phases: Vec::new(),
         modes: Vec::new(),
         bleeds: Vec::new(),
+        turns: DiveTurns::default(),
     })
 });
 
@@ -411,13 +416,14 @@ fn tick_mob(
     // The hunter's book: the mob saw its target («Встречен», soulscraft_book).
     crate::game::soulscraft_book::saw(&m.kind, m.pos, target.as_ref().map(|t| (t.entity, t.player, t.pos)));
     let mut s = state();
-    let State { data, mobs, debug, .. } = &mut *s;
+    let State { data, mobs, debug, turns, .. } = &mut *s;
     let Some(t) = mobs.get_mut(&m.id) else { return };
     let def = &data.mobs[t.kind];
     t.seen = now;
     t.pos = m.pos;
     t.yaw = m.yaw;
     t.dim = dimension.to_owned();
+    let diver = t.brain.style == Style::Diver;
     let senses = Senses {
         now,
         pos: m.pos,
@@ -426,10 +432,16 @@ fn tick_mob(
         on_ground: m.on_ground,
         in_water: m.in_water,
         wall_hit: m.wall,
+        wait_turn: diver && target.as_ref().is_some_and(|tg| turns.waits(tg.entity, m.id, now)),
         target: target.as_ref().map(|t| t.sense),
     };
     let sc = scaled(def, t.p, t.size);
     let tick = t.brain.tick(def, &sc, &senses);
+    if diver && let Some(tg) = &target {
+        // The first shrike into its windup takes the target's turn; its dive's end gives it back.
+        let dive_ticks = def.attack("dive").map_or(0, |a| u64::from(Timeline::of(a).end()));
+        turns.note(tg.entity, m.id, now, &tick, dive_ticks);
+    }
     let contact = t.brain.contact(&senses);
     t.guarding = tick.guarding;
     let flags = (if tick.rage { wire::RAGE } else { 0 }) | (if tick.guarding { wire::GUARD } else { 0 });
@@ -455,10 +467,25 @@ fn tick_mob(
     drop(s);
     guard_snapshot(m, &tick, style);
     log_events(&def, m.id, now, &tick);
-    let path = drive(game, dimension, now, m, &tick, style, repath, path, &sc);
+    for cue in cues_of(&def, &tick) {
+        play_cue(game, m.id, m.pos, &cue);
+    }
+    let leap_up = def.jump_velocity_at(size).unwrap_or(LEAP_UP);
+    let path = drive(game, dimension, now, m, &tick, style, repath, path, &sc, leap_up);
     if let Some(t) = state().mobs.get_mut(&m.id) {
         t.path = path;
         t.stopped = matches!(tick.order, Order::Stay);
+    }
+    if let Some(at) = tick.hold
+        && let Some(tg) = &target
+    {
+        hold_target(game, dimension, tg, at, players);
+    }
+    if let Some(at) = tick.shadow
+        && let Some(kind) = def.params.get("shadow_particle").and_then(serde_json::Value::as_str)
+    {
+        // The slime's shadow where it lands: the cue's particles, round that point.
+        play_cue(game, m.id, at, &Cue { particle: Some(kind.to_owned()), ..Cue::default() });
     }
     for strike in &tick.strikes {
         deal(game, dimension, now, m, &def, &sc, strike, target.as_ref(), players, p, size);
@@ -468,14 +495,68 @@ fn tick_mob(
     }
 }
 
-/// The numbers of this mob at its P (the slime's by its size, from `sizes`).
+/// The slime's jump without `sizes.*.jump_velocity`: the upward speed it always had.
+const LEAP_UP: f64 = 0.62;
+
+/// The numbers of this mob at its P (the slime's by its size, from `sizes`: health, damage and
+/// its decision interval, `decide_mult`).
 pub(super) fn scaled(def: &MobDef, p: f64, size: u8) -> Scaled {
     let mut stats = def.stats;
     if let Some(sz) = def.sizes.iter().find(|s| s.size == u32::from(size)) {
         stats.health = sz.health;
         stats.damage = sz.damage;
     }
-    Scaled::at(&stats, p)
+    let mut sc = Scaled::at(&stats, p);
+    sc.decide_every = def.decide_every_at(size, sc.decide_every);
+    sc
+}
+
+/// The cues this tick starts: an attack's windup (its `cue`), the brute's roar as its rage starts
+/// (`passives.rage.cue`).
+fn cues_of(def: &MobDef, tick: &Tick) -> Vec<Cue> {
+    tick.events
+        .iter()
+        .filter_map(|e| match e {
+            Event::AttackStart { attack } => def.attacks.get(*attack)?.cue.clone(),
+            Event::Mode("rage") => serde_json::from_value(def.passive("rage")?.get("cue")?.clone()).ok(),
+            _ => None,
+        })
+        .collect()
+}
+
+/// A sound's source for the hostile mobs' cues (`SoundSource.HOSTILE`, as vanilla.rs plays them).
+const HOSTILE: usize = 5;
+
+/// A cue (data/mobs.json `cue`, the vanilla cue's schema) at mob `mob_id` standing at `at`: its
+/// sound at the chest, its particles round the feet, sized by the mob's box. The windup cue of
+/// soulscraft_vanilla (vanilla.rs:639-650), shared.
+pub(super) fn play_cue(game: &mut Game<'_>, mob_id: u32, at: V3, cue: &Cue) {
+    let (width, height) = crate::game::soulscraft_find::mob(game, mob_id).map_or((0.6, 1.95), |m| (m.kind.width, m.kind.height));
+    if let Some(sound) = &cue.sound {
+        let chest = geom::add(at, [0.0, height * 0.6, 0.0]);
+        let pitch = cue.pitch.unwrap_or(1.0);
+        game.with_level(|_, level, _| level.native_play_sound(sound, chest, HOSTILE, 1.0, pitch));
+    }
+    if let Some(kind) = &cue.particle {
+        let options = ParticleOptions::named(kind.clone());
+        let spread = [width * 0.6, height * 0.3, width * 0.6];
+        let feet = geom::add(at, [0.0, 0.2, 0.0]);
+        game.with_level(|_, level, _| level.native_send_particles(&options, None, feet, spread, 0.02, 12));
+    }
+}
+
+/// The lurker's grab: its target put at its mouth this tick (a player keeps where it looks).
+fn hold_target(game: &mut Game<'_>, dim: &str, tg: &Target, at: V3, players: &[(NativeServerPlayer, bool)]) {
+    match tg.player {
+        Some(uuid) => {
+            if let Some((p, _)) = players.iter().find(|(p, _)| p.uuid == uuid) {
+                game.native_teleport_player(uuid, dim, at, p.yaw, p.pitch);
+            }
+        }
+        None => {
+            game.native_teleport_mob(dim, tg.entity, at);
+        }
+    }
 }
 
 fn guard_snapshot(m: &Seen, tick: &Tick, style: Style) {
@@ -655,6 +736,7 @@ fn choose_target(game: &Game<'_>, m: &Seen, players: &[(NativeServerPlayer, bool
             pos,
             shield_up: *up,
             looking_at_me: looking,
+            sees_me: looking,
             at_wall: at_wall(game, m.pos, pos),
             under_roof: under_roof(game, pos),
         },
@@ -675,6 +757,7 @@ fn target_entity(game: &Game<'_>, m: &Seen, entity: u32, players: &[(NativeServe
                 pos,
                 shield_up: *up,
                 looking_at_me: geom::off_facing(pos, f64::from(p.yaw), m.pos) <= 60.0,
+                sees_me: geom::off_facing(pos, f64::from(p.yaw), m.pos) <= 60.0,
                 at_wall: at_wall(game, m.pos, pos),
                 under_roof: under_roof(game, pos),
             },
@@ -755,6 +838,7 @@ fn drive(
     repath: bool,
     path: Option<(V3, u64)>,
     sc: &Scaled,
+    leap_up: f64,
 ) -> Option<(V3, u64)> {
     if let Some(at) = tick.look_at {
         game.native_mob_look_at(dim, m.id, at);
@@ -802,7 +886,7 @@ fn drive(
         Order::Leap { to } => {
             let d = geom::flat_dir(m.pos, to);
             let reach = geom::flat_dist(m.pos, to).min(8.0) / 12.0;
-            set_velocity(game, m.id, [d[0] * reach, 0.62, d[2] * reach], true);
+            set_velocity(game, m.id, [d[0] * reach, leap_up, d[2] * reach], true);
             None
         }
     }
@@ -877,29 +961,25 @@ fn deal(
     } else if strike.hits_target
         && let Some(tg) = target
     {
-        if a.strikes_at.as_ref().is_some_and(|s| s.len() > 1) && t > soulscraft_rules::attack::Timeline::of(a).hit_start() {
+        // The grab's bites, 10 ticks apart, are meant to land too (its `follows` marks the grab).
+        let later = a.strikes_at.as_ref().is_some_and(|s| s.len() > 1) && t > Timeline::of(a).hit_start();
+        if later || a.follows.is_some() {
             clear_hurt_cooldown(game, tg);
         }
         landed = game.native_hurt_entity(dim, tg.entity, blow as f32, "minecraft:mob_attack", Some(m.id));
         if landed {
             crate::game::soulscraft_book::struck(&def.key, tg.entity, tg.player);
             give_effects(game, &a.effects, tg.player);
+            if strike.area.is_some()
+                && let Some(w) = &a.wave
+            {
+                // The one the slime landed on is in its mud too: the wave's slowness.
+                give_effects(game, &w.effects, tg.player);
+            }
         }
     }
     if let Some(radius) = strike.area {
-        let wave_blow = a.wave.as_ref().and_then(|w| w.damage).map_or(blow, |k| sc.blow(k));
-        let effects = a.wave.as_ref().map(|w| w.effects.clone()).unwrap_or_default();
-        for (p, _) in players {
-            let hit_already = target.is_some_and(|t| t.player == Some(p.uuid)) && strike.hits_target;
-            if hit_already || geom::dist(p.position, m.pos) > radius {
-                continue;
-            }
-            if game.native_hurt_entity(dim, p.entity_id as u32, wave_blow as f32, "minecraft:mob_attack", Some(m.id)) {
-                landed = true;
-                crate::game::soulscraft_book::struck(&def.key, p.entity_id as u32, Some(p.uuid));
-                give_effects(game, &effects, Some(p.uuid));
-            }
-        }
+        landed |= deal_wave(game, dim, m, def, sc, a, radius, blow, strike.hits_target, target, players);
     }
     let who = target.map_or("-", |t| t.name.as_str());
     log::log!(
@@ -916,6 +996,63 @@ fn deal(
     if n > LOG_KEEP {
         s.strikes.drain(..n - LOG_KEEP);
     }
+}
+
+/// The wave of a blow on the players it catches (the target the blow hit aside): from the impact
+/// point (`wave.impact_ahead_blocks` in front of the mob), within `radius`, and for a `jumpable`
+/// one only those not over it (soulscraft_rules::attack::wave_hits). True when one was hurt.
+#[allow(clippy::too_many_arguments)]
+fn deal_wave(
+    game: &mut Game<'_>,
+    dim: &str,
+    m: &Seen,
+    def: &MobDef,
+    sc: &Scaled,
+    a: &soulscraft_rules::data::AttackDef,
+    radius: f64,
+    blow: f64,
+    hits_target: bool,
+    target: Option<&Target>,
+    players: &[(NativeServerPlayer, bool)],
+) -> bool {
+    let wave = a.wave.clone().unwrap_or_default();
+    let wave_blow = wave.damage.map_or(blow, |k| sc.blow(k));
+    let center = wave_center(m.pos, m.yaw, &wave);
+    let mut landed = false;
+    for (p, _) in players {
+        let hit_already = target.is_some_and(|t| t.player == Some(p.uuid)) && hits_target;
+        // The ground under the player matters only for a wave that can be jumped.
+        let ground = if wave.jumpable { ground_under(game, p.position) } else { p.position[1] };
+        if hit_already || !wave_hits(center, radius, wave.jumpable, p.position, ground) {
+            continue;
+        }
+        if game.native_hurt_entity(dim, p.entity_id as u32, wave_blow as f32, "minecraft:mob_attack", Some(m.id)) {
+            landed = true;
+            crate::game::soulscraft_book::struck(&def.key, p.entity_id as u32, Some(p.uuid));
+            give_effects(game, &wave.effects, Some(p.uuid));
+        }
+    }
+    landed
+}
+
+/// The top of the ground under feet at `feet`: the highest collision box top at or below them in
+/// their block or the one beneath. None there (feet a block or more over the ground) gives
+/// minus infinity: they are over any wave.
+fn ground_under(game: &Game<'_>, feet: V3) -> f64 {
+    let (x, z) = (feet[0].floor() as i32, feet[2].floor() as i32);
+    let top = feet[1].floor() as i32;
+    for y in [top, top - 1] {
+        let surface = game
+            .native_block_collision([x, y, z])
+            .iter()
+            .map(|b| f64::from(y) + b[4])
+            .filter(|s| *s <= feet[1] + 1e-3)
+            .reduce(f64::max);
+        if let Some(s) = surface {
+            return s;
+        }
+    }
+    f64::NEG_INFINITY
 }
 
 /// A later strike of a several-strike attack (the stalker's double slash, 3 ticks apart) would
@@ -1022,6 +1159,11 @@ fn on_death(game: &mut Game<'_>, dim: &str, now: u64, m: &Seen) {
     };
     GUARDS.lock().unwrap_or_else(PoisonError::into_inner).shields.remove(&(m.id as i32));
     crate::game::soulscraft_cover::forget(m.id);
+    state().turns.release(m.id);
+    if def.stats.flying {
+        // Should the death hook have missed it: the body falls.
+        let _ = drop_dead_flyer(game, m.id);
+    }
     log::info!("soulscraft: death mob={} id={} tick={now}", def.id, m.id);
     let Some(split) = def.passive("split") else { return };
     let child = size / 2;
@@ -1040,9 +1182,45 @@ fn on_death(game: &mut Game<'_>, dim: &str, now: u64, m: &Seen) {
     }
 }
 
+/// `Game::mob_death_canceled` at its head (hook_mob_death.rs): a dead flyer of ours (the shrike,
+/// `stats.flying`) loses the no-gravity its steering needed, so its body falls while it dies.
+pub(super) fn on_mob_death(game: &mut Game<'_>, mob: &horizon_client::mobs::Mob) {
+    if !mob.kind.id.starts_with("soulscraft:") {
+        return;
+    }
+    // A death inside one of this module's own calls (the state held) is left to on_death, a tick
+    // later, rather than waiting on the lock.
+    let Ok(s) = STATE.try_lock() else { return };
+    let flying = s.data.by_key(&mob.kind.id).is_some_and(|(_, d)| d.stats.flying);
+    drop(s);
+    if flying && drop_dead_flyer(game, mob.id) {
+        log::log!(chatty(), "soulscraft: dead flyer falls mob={} id={}", mob.kind.id, mob.id);
+    }
+}
+
+/// Gravity back on mob `id` (adopt turned it off for flyers). True when it was off.
+fn drop_dead_flyer(game: &mut Game<'_>, id: u32) -> bool {
+    let Some(m) = crate::game::soulscraft_find::mob_mut(game, id) else { return false };
+    if !m.no_gravity {
+        return false;
+    }
+    m.no_gravity = false;
+    m.needs_sync = true;
+    true
+}
+
 fn forget_gone(dim: &str, now: u64) {
     let mut s = state();
-    s.mobs.retain(|_, t| t.dim != dim || now.saturating_sub(t.seen) < FORGET_AFTER);
+    let gone: Vec<u32> = s
+        .mobs
+        .iter()
+        .filter(|(_, t)| t.dim == dim && now.saturating_sub(t.seen) >= FORGET_AFTER)
+        .map(|(id, _)| *id)
+        .collect();
+    for id in gone {
+        s.mobs.remove(&id);
+        s.turns.release(id);
+    }
 }
 
 fn send_notes(
