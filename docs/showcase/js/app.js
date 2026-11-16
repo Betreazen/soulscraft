@@ -8,6 +8,13 @@
   const nav = document.getElementById('nav');
   let stages = [];
 
+  // The nav section of the pages js/defense.js, js/vanilla.js and js/recipes.js (they are loaded before this file).
+  SC.navSection(() => ['Правила', [
+    ['#defense', 'Оборона алтаря', 'defense'],
+    ['#vanilla', 'Ванильные мобы', 'vanilla'],
+    ['#recipes', 'Предметы и рецепты', 'recipes'],
+  ]]);
+
   const ENV = { land: 'земля', air: 'воздух', water: 'вода', land_water: 'земля и вода' };
   const pct = (v) => SC.num(Math.round(v * 1000) / 10) + '%';
   const sec = (ticks) => SC.num(Math.round((ticks / SC.TICK) * 100) / 100) + ' с';
@@ -138,20 +145,53 @@
       el('p', { class: 'small sc-cap' }, 'т — тики, 20 в секунду. Фаза удара (2 тика, у бросков дольше) — наше предположение: в бестиарии её нет.'));
   }
 
-  // Sounds and the data fields that work in 0.7.0 (what a mob script gives as `sounds` and `fields`):
-  // «когда → id звука» and «поле → значение: что делает». Every value is a hypothesis.
-  function factsPanel(def) {
+  // «Звуки» are the cues of the mob's own data (attacks[].cue, moves[].cue, passives[].cue, as vanilla.js reads
+  // a.cue). «Поля» come from the mob script's `fields`: [key, value, what], each a template: {path} reads this
+  // mob's data (params.keep_distance_blocks, attacks.grab.damage, sizes.4.jump_velocity; a list is found by
+  // its id or size), and a filter after | changes it: pct (0,25 → 25%), rest (0,8 → 20%), x (0,25 → × 0,25).
+  const CUE_WHEN = { windup: 'Замах', hit: 'Удар', recover: 'Восстановление' };
+  const FILTERS = { pct: (v) => SC.num(Math.round(v * 1000) / 10) + '%', rest: (v) => SC.num(Math.round((1 - v) * 1000) / 10) + '%', x: (v) => '× ' + SC.num(v) };
+
+  function dataAt(m, path) {
+    let cur = m;
+    for (const seg of path.split('.')) {
+      cur = Array.isArray(cur)
+        ? cur.find((e) => String(e.id !== undefined ? e.id : e.size) === seg) ?? (/^\d+$/.test(seg) ? cur[+seg] : undefined)
+        : cur && cur[seg];
+      if (cur === undefined || cur === null) throw new Error('В данных моба ' + m.id + ' нет поля ' + path);
+    }
+    return cur;
+  }
+
+  function fact(m, template) {
+    return template.replace(/\{([\w.]+)(?:\|(\w+))?\}/g,(_, path, filter) => {
+      const v = dataAt(m, path);
+      if (filter) return FILTERS[filter](v);
+      if (Array.isArray(v)) return v.map(SC.num).join('–');
+      return typeof v === 'boolean' ? (v ? 'да' : 'нет') : typeof v === 'number' ? SC.num(v) : String(v);
+    });
+  }
+
+  function soundRows(m) {
+    const rows = m.attacks.filter((a) => a.cue).map((a) => [CUE_WHEN[a.cue.on || 'windup'] + ': ' + a.name, a.cue]);
+    for (const x of (m.moves || []).concat(m.passives || [])) if (x.cue) rows.push([x.name, x.cue]);
+    return rows;
+  }
+
+  function factsPanel(m, def) {
     const out = [];
-    if (def && def.sounds && def.sounds.length)
+    const sounds = soundRows(m);
+    if (sounds.length)
       out.push(el('h2', {}, 'Звуки'), el('div', { class: 'wide' }, el('table', { class: 'sc-moves' },
         el('thead', {}, el('tr', {}, el('th', {}, 'Когда'), el('th', {}, 'Звук'))),
-        el('tbody', {}, def.sounds.map(([when, id]) => el('tr', {}, el('td', {}, when), el('td', {}, el('code', {}, id))))),
+        el('tbody', {}, sounds.map(([when, cue]) => el('tr', {}, el('td', {}, when),
+          el('td', {}, el('code', {}, cue.sound), cue.pitch ? el('small', {}, ' тон × ' + SC.num(cue.pitch)) : null)))),
         el('caption', { class: 'sc-cap' }, 'Звуки ванильные, выбор — гипотеза до плейтестов: что звучит, правят данные, а не код.'))));
     if (def && def.fields && def.fields.length)
       out.push(el('h2', {}, 'Поля данных, которые работают'), el('div', { class: 'wide' }, el('table', { class: 'sc-moves' },
         el('thead', {}, el('tr', {}, el('th', {}, 'Поле или правило'), el('th', {}, 'Значение'), el('th', {}, 'Что делает'))),
-        el('tbody', {}, def.fields.map(([k, v, what]) => el('tr', {}, el('td', {}, el('code', {}, k)), el('td', {}, v), el('td', {}, what)))),
-        el('caption', { class: 'sc-cap' }, 'Числа в data/mobs.json, все — гипотезы.'))));
+        el('tbody', {}, def.fields.map(([k, v, what]) => el('tr', {}, el('td', {}, el('code', {}, k)), el('td', {}, fact(m, v)), el('td', {}, fact(m, what))))),
+        el('caption', { class: 'sc-cap' }, 'Числа читаются из data/mobs.json, все — гипотезы.'))));
     return out;
   }
 
@@ -440,7 +480,7 @@
     main.append(el('h2', {}, 'Мувсет'), movesetTable(m));
     if (m.moves && m.moves.length)
       main.append(el('table', { class: 'sc-moves' }, el('tbody', {}, m.moves.map((mv) => el('tr', {}, el('td', {}, mv.name), el('td', {}, mv.note))))));
-    main.append(...factsPanel(def));
+    main.append(...factsPanel(m, def));
     if (def && def.scenes && SC.GLB[id]) {
       main.append(el('h2', {}, 'Сцены поведения'));
       main.append(scenesPanel(m, def));

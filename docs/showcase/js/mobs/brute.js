@@ -122,8 +122,13 @@ SC.mobScript('brute', function () {
   };
 
   SC.mob('brute', {
-    sounds: [['Вход в ярость (клип rage, 20 тиков)','minecraft:entity.ravager.roar'],['Замах удара сверху','minecraft:entity.ravager.attack']],
-    fields: [['impact_ahead_blocks','2','волна идёт от точки удара молота: громила плюс 2 блока по взгляду, а не от него самого'],['jumpable','да','игрок, чьи ноги выше земли больше чем на 0,5 блока, волну не получает'],['keep_distance_blocks','3–5','держит эту дистанцию для размаха'],['charge_if_farther_than_blocks','6','таран, если игрок дальше']],
+    fields: [
+      ['impact_ahead_blocks', '{attacks.overhead_wave.wave.impact_ahead_blocks}', 'волна идёт от точки удара молота: громила плюс {attacks.overhead_wave.wave.impact_ahead_blocks} блока по взгляду, а не от него самого'],
+      ['jumpable', '{attacks.overhead_wave.wave.jumpable}', 'игрок, чьи ноги выше земли больше чем на {attacks.overhead_wave.wave.jump_clear_blocks} блока, волну не получает'],
+      ['rage clip_ticks', '{passives.rage.clip_ticks}', 'при входе в ярость громила стоит и ревёт, клип rage; ярость при здоровье ниже {passives.rage.below_health|pct}'],
+      ['keep_distance_blocks', '{params.keep_distance_blocks}', 'держит эту дистанцию для размаха'],
+      ['charge_if_farther_than_blocks', '{params.charge_if_farther_than_blocks}', 'таран, если игрок дальше'],
+    ],
     notes: [
       'Молот — модель предмета soulscraft:brute_maul из элементов (не спрайт: боёк объёмный). Он висит в гнезде socket_hand_r той же цепочкой, что и меч латника: от гнезда rotX(−90), rotY(180), затем display.thirdperson_righthand молота. Гнездо стоит под частью hand_r без кубов — запястьем в середине правого кулака, а кулак — на предплечье forearm_r. Клипы поворачивают запястье, поэтому для удара сверху, размаха и стойки у молота свой угол.',
       'У рук громилы есть локоть: плечо arm_r и предплечье с кулаком forearm_r (слева так же). Локоть — шарнир, предплечье сгибается вперёд. В каждом ключе предплечье лежит поперёк рукояти там, где её держит кулак, поэтому рукоять проходит сквозь кулак, а не сквозь предплечье; молот не режет тело ни в одном ключе. В замахе размаха локти согнуты, удар идёт на прямых руках, после размаха руки складываются.',

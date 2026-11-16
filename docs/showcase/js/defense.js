@@ -8,12 +8,6 @@
   const def = () => SC.DATA.events[0].defense;
   const sec = (ticks) => SC.num(Math.round((ticks / SC.TICK) * 100) / 100);
 
-  SC.navSection(() => ['Правила', [
-    ['#defense', 'Оборона алтаря', 'defense'],
-    ['#vanilla', 'Ванильные мобы', 'vanilla'],
-    ['#recipes', 'Предметы и рецепты', 'recipes'],
-  ]]);
-
   const ROLES = {
     assault: ['Штурмовик', 'Идёт к алтарю; игрока бьёт только при перехвате.'],
     hunter: ['Охотник', 'Идёт к ближайшему участнику; к алтарю, если в зоне участников нет.'],

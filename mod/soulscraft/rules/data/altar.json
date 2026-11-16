@@ -5,7 +5,7 @@
   "frame": "cells in blocks: x east, z south, the core at (0, 0); the floor (slabs, sockets, the core) is layer y = 0, pieces stand on it from y = 1",
   "levels": [
     {"level": 1, "size": 3, "corner": null, "sockets": [], "spawn_boost": "слабый", "unlocks": "Ивенты первой ступени, слабый учащённый спавн"},
-    {"level": 2, "size": 5, "corner": "altar_pillar", "sockets": [[-2, 0], [2, 0]], "spawn_boost": "средний", "unlocks": "Ивенты второй ступени"},
+    {"level": 2, "size": 5, "corner": "altar_pillar", "sockets": [[-2, 0], [2, 0]], "spawn_boost": "слабый, как у первого", "unlocks": "Ивенты второй ступени"},
     {"level": 3, "size": 7, "corner": "altar_brazier", "sockets": [[0, -3], [0, 3]], "spawn_boost": "сильный", "unlocks": "Ивенты третьей ступени"},
     {"level": 4, "size": 9, "corner": "altar_obelisk", "sockets": [[2, -4], [4, 2], [-2, 4], [-4, -2]], "spawn_boost": "самый сильный", "unlocks": "Ивенты четвёртой ступени, самый сильный учащённый спавн"}
   ],

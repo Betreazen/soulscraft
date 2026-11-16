@@ -91,8 +91,12 @@ SC.mobScript('stalker', function () {
   };
 
   SC.mob('stalker', {
-    sounds: [['Выпад-рывок','minecraft:entity.fox.screech']],
-    fields: [['circle_radius_blocks','4–6','кружит на этом расстоянии и выбирает точку сбоку или сзади, больше 90° от взгляда игрока'],['flank_max_ticks','100','бьёт, когда игрок потерял его из вида, или через 100 тиков кружения'],['lunge_more_often_if_player_at_wall','да','игрока со спиной у стены атакует чаще'],['flee_below_health','0,25','убегает при здоровье ниже 25%, возвращается через 200 тиков (return_after_ticks)']],
+    fields: [
+      ['circle_radius_blocks', '{params.circle_radius_blocks}', 'кружит на этом расстоянии и выбирает точку сбоку или сзади, больше 90° от взгляда игрока (на {params.flank_angle_degrees}° от него)'],
+      ['flank_max_ticks', '{params.flank_max_ticks}', 'бьёт, когда игрок потерял его из вида, или через {params.flank_max_ticks} тиков кружения'],
+      ['lunge_more_often_if_player_at_wall', '{params.lunge_more_often_if_player_at_wall}', 'игрока со спиной у стены атакует чаще'],
+      ['flee_below_health', '{params.flee_below_health}', 'убегает при здоровье ниже {params.flee_below_health|pct}, возвращается через {params.return_after_ticks} тиков (return_after_ticks)'],
+    ],
     notes: [
       'Два серпа — один предмет soulscraft:stalker_sickle, спрайт 16×16 с родителем item/handheld, как ванильный меч: рукоять по диагонали снизу слева, клинок изгибается полумесяцем вправо, остриё смотрит вниз. Игра выдавливает спрайт на 1 пиксель. Правый серп стоит в гнезде socket_hand_r с display.thirdperson_righthand, левый в socket_hand_l с display.thirdperson_lefthand (зеркало). Гнёзда сдвинуты под длинную тонкую руку ловчего: низ кисти, передняя грань.',
       'Левая рука в игре не проверена: рисует ли Horizon предмет в socket_hand_l моба мода через thirdperson_lefthand так же, как правый, покажет прототип. Витрина и Blender повторяют цепочку игры.',
