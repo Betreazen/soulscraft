@@ -37,8 +37,9 @@ enum Kind {
     ShrikeFalls,
     /// A size-4 bog slime splits into 2–3 of size 2.
     SlimeSplits,
-    /// The lurker's grab holds its target at its mouth; `true`: 3 blows free it.
-    Grab { breaks: bool },
+    /// The lurker's grab: `holds` its target at its mouth, `breaks` on 3 blows of it, `keeps` the
+    /// one it grabbed when another is nearer.
+    Grab(&'static str),
     /// The mob's box against data/mobs.json `hitbox` (a slime of this size).
     Hitbox { mob: String, size: u8 },
     /// The altar's and the event's scenarios (soulscraft_selftest_altar).
@@ -73,6 +74,8 @@ struct Live {
     /// A falling body's height at the start and the lowest seen since (shrike_falls_on_death).
     y0: f64,
     low: f64,
+    /// A second golem (lurker_grab_keeps_its_prey).
+    other: Option<u32>,
 }
 
 struct Run {
@@ -118,8 +121,9 @@ fn scenarios(data: &MobsFile, filter: Option<&str>) -> Vec<Scenario> {
         Scenario { name: "wave_stub".into(), kind: Kind::Waves, timeout: 60 },
         Scenario { name: "shrike_falls_on_death".into(), kind: Kind::ShrikeFalls, timeout: 80 },
         Scenario { name: "bog_slime_splits".into(), kind: Kind::SlimeSplits, timeout: 80 },
-        Scenario { name: "lurker_grab_holds".into(), kind: Kind::Grab { breaks: false }, timeout: 120 },
-        Scenario { name: "lurker_grab_breaks".into(), kind: Kind::Grab { breaks: true }, timeout: 120 },
+        Scenario { name: "lurker_grab_holds".into(), kind: Kind::Grab("holds"), timeout: 120 },
+        Scenario { name: "lurker_grab_breaks".into(), kind: Kind::Grab("breaks"), timeout: 120 },
+        Scenario { name: "lurker_grab_keeps_its_prey".into(), kind: Kind::Grab("keeps"), timeout: 120 },
     ]);
     for (name, timeout) in crate::game::soulscraft_selftest_altar::CASES {
         all.push(Scenario { name: (*name).to_owned(), kind: Kind::Altar(*name), timeout: *timeout });
@@ -235,7 +239,7 @@ pub(super) fn on_tick(game: &mut Game<'_>, dim: &str, now: u64) {
     };
     if let Some(v) = verdict {
         let (sc, live) = run.current.take().unwrap();
-        for id in [live.mob, live.golem].into_iter().flatten() {
+        for id in [live.mob, live.golem, live.other].into_iter().flatten() {
             game.native_remove_mob(dim, id);
         }
         if let Some(saved) = live.saved {
@@ -444,7 +448,7 @@ fn step(game: &mut Game<'_>, dim: &str, now: u64, sc: &Scenario, live: &mut Live
         Kind::Waves => waves(game, dim, now, live),
         Kind::ShrikeFalls => shrike_falls(game, dim, now, live, first),
         Kind::SlimeSplits => slime_splits(game, dim, now, live, first),
-        Kind::Grab { breaks } => grab(game, dim, now, live, *breaks, first),
+        Kind::Grab(case) => grab(game, dim, now, live, case, first),
         Kind::Hitbox { mob, size } => hitbox(game, dim, live, mob, *size, first),
         Kind::Altar(name) => crate::game::soulscraft_selftest_altar::step(game, now, name, first),
         Kind::Turret(name) => crate::game::soulscraft_selftest_turret::step(game, now, name, first),
@@ -831,11 +835,17 @@ fn slime_splits(game: &mut Game<'_>, dim: &str, now: u64, live: &mut Live, first
     })
 }
 
-/// The lurker's ambush on the golem lands and its grab follows. `breaks` false: for 20 ticks the
-/// golem stays within 1.5 blocks of the lurker (held at its mouth). `breaks` true: 3 blows on the
-/// lurker (2 ticks apart, its hurt cooldown cleared) free the golem long before grab_max_ticks, and
-/// the lurker backs off.
-fn grab(game: &mut Game<'_>, dim: &str, now: u64, live: &mut Live, breaks: bool, first: bool) -> Option<Result<(), String>> {
+/// Where the second golem of lurker_grab_keeps_its_prey stands: 3 blocks east, out of the grab.
+const OTHER_AT: [f64; 3] = [BASE[0] + 3.0, BASE[1], BASE[2]];
+
+/// The lurker's ambush on the golem lands and its grab follows.
+/// - `holds`: for 20 ticks the golem stays within 1.5 blocks of the lurker (held at its mouth).
+/// - `breaks`: a magic hit (no blow of the golem) frees nothing; then 3 blows of the golem (2 ticks
+///   apart, the lurker's hurt cooldown cleared) free it long before grab_max_ticks, and the lurker
+///   backs off.
+/// - `keeps`: a tick into the grab its target is turned to a second golem (as a nearer player would
+///   be chosen); the grab still holds and bites the first, and the second is never moved or hurt.
+fn grab(game: &mut Game<'_>, dim: &str, now: u64, live: &mut Live, case: &str, first: bool) -> Option<Result<(), String>> {
     if first {
         live.note = "ambush".into();
         return arrange(game, dim, "lurker", BASE, 0.0, live).err().map(Err);
@@ -856,28 +866,72 @@ fn grab(game: &mut Game<'_>, dim: &str, now: u64, live: &mut Live, breaks: bool,
     };
     let grabbed = mode_since("grab", live.mark)?;
     let since = now - grabbed;
-    if !breaks {
-        let at = |id: u32| game.mobs.iter().find(|m| m.id == id && !m.removed).map(|m| [m.position.x, m.position.y, m.position.z]);
-        let d = soulscraft_rules::geom::dist(at(mob)?, at(golem)?);
-        if d > 1.5 {
-            return Some(Err(format!("the golem is {d:.2} blocks from the lurker {since} ticks into the grab")));
+    match case {
+        "breaks" => grab_breaks(game, dim, mob, golem, grabbed, since, mode_since("backoff", grabbed + 1)),
+        "keeps" if since == 1 => {
+            let other = summon(game, dim, "minecraft:iron_golem", OTHER_AT, "{NoAI:1b,PersistenceRequired:1b}");
+            live.other = other;
+            let Some(other) = other else { return Some(Err("no second golem".into())) };
+            server::state().mobs.get_mut(&mob)?.target_override = Some(other);
+            None
         }
-        return (since >= 20).then_some(Ok(()));
+        _ => {
+            let at = |id: u32| game.mobs.iter().find(|m| m.id == id && !m.removed).map(|m| [m.position.x, m.position.y, m.position.z]);
+            let d = soulscraft_rules::geom::dist(at(mob)?, at(golem)?);
+            if d > 1.5 {
+                return Some(Err(format!("the golem is {d:.2} blocks from the lurker {since} ticks into the grab")));
+            }
+            if since < 20 {
+                return None;
+            }
+            if case == "keeps" {
+                return Some(kept_prey(game, live, golem));
+            }
+            Some(Ok(()))
+        }
     }
-    if matches!(since, 2 | 4 | 6) {
+}
+
+/// lurker_grab_keeps_its_prey after 20 ticks: the first golem was bitten (at +10 and +20), the
+/// second is where it was put and unhurt.
+fn kept_prey(game: &Game<'_>, live: &Live, golem: u32) -> Result<(), String> {
+    let other = live.other.ok_or("no second golem")?;
+    let find = |id: u32| game.mobs.iter().find(|m| m.id == id && !m.removed);
+    let g = find(golem).ok_or("the first golem is gone")?;
+    let o = find(other).ok_or("the second golem is gone")?;
+    let moved = soulscraft_rules::geom::dist([o.position.x, o.position.y, o.position.z], OTHER_AT);
+    let bitten = g.health < g.attrs.max_health;
+    let spared = o.health >= o.attrs.max_health;
+    if bitten && spared && moved < 0.5 {
+        Ok(())
+    } else {
+        Err(format!("first golem bitten {bitten}; second golem unhurt {spared}, moved {moved:.2}"))
+    }
+}
+
+/// lurker_grab_breaks: a magic hit at +2 does not count; the golem's blows at +4, +6 and +8 free
+/// it, so the lurker backs off after +8 and before grab_max_ticks.
+#[allow(clippy::too_many_arguments)]
+fn grab_breaks(game: &mut Game<'_>, dim: &str, mob: u32, golem: u32, grabbed: u64, since: u64, freed: Option<u64>) -> Option<Result<(), String>> {
+    if matches!(since, 2 | 4 | 6 | 8) {
         if let Some(m) = crate::game::soulscraft_find::mob_mut(game, mob) {
             m.invulnerable = 0;
         }
-        if !game.native_hurt_entity(dim, mob, 1.0, "minecraft:mob_attack", Some(golem)) {
-            return Some(Err(format!("blow {} on the lurker did not land", since / 2)));
+        let landed = if since == 2 {
+            game.native_hurt_entity(dim, mob, 1.0, "minecraft:magic", None)
+        } else {
+            game.native_hurt_entity(dim, mob, 1.0, "minecraft:mob_attack", Some(golem))
+        };
+        if !landed {
+            return Some(Err(format!("the hit at +{since} on the lurker did not land")));
         }
         return None;
     }
     let max = server::state().data.mob("lurker").and_then(|m| m.attack("grab")?.grab_max_ticks).unwrap_or(40);
-    match mode_since("backoff", grabbed + 1) {
-        Some(t) if t - grabbed > 6 && t - grabbed < u64::from(max) => Some(Ok(())),
-        Some(t) => Some(Err(format!("freed {} ticks into the grab, wanted just after the third blow (6)", t - grabbed))),
-        None if since > 12 => Some(Err("3 blows did not free the golem".into())),
+    match freed {
+        Some(t) if t - grabbed > 8 && t - grabbed < u64::from(max) => Some(Ok(())),
+        Some(t) => Some(Err(format!("freed {} ticks into the grab, wanted just after the golem's third blow (+8)", t - grabbed))),
+        None if since > 14 => Some(Err("3 blows of the golem did not free it".into())),
         None => None,
     }
 }

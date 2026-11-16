@@ -133,20 +133,16 @@ impl Strikes {
     }
 }
 
-/// A jumpable wave passes under feet this high over the ground under them, in blocks (the
-/// brief's 0,5; hypothesis, 03-hypotheses.md Г6).
-pub const JUMP_CLEAR: f64 = 0.5;
-
 /// Where a wave starts: `impact_ahead_blocks` in front of a mob at `pos` facing `yaw`.
 pub fn wave_center(pos: V3, yaw: f64, wave: &WaveDef) -> V3 {
     geom::add(pos, geom::scale(geom::yaw_dir(yaw), wave.impact_ahead_blocks))
 }
 
 /// Whether a wave from `center` catches a target whose feet are at `target_feet`, the ground
-/// under them at `ground_y`: within `radius`, and for a `jumpable` wave not over it (feet more
-/// than [`JUMP_CLEAR`] over the ground).
-pub fn wave_hits(center: V3, radius: f64, jumpable: bool, target_feet: V3, ground_y: f64) -> bool {
-    if jumpable && target_feet[1] - ground_y > JUMP_CLEAR {
+/// under them at `ground_y`: within `radius`, and not over it when it can be jumped (feet more than
+/// `clearance`, the wave's `jump_clear_blocks`, over the ground: [`WaveDef::clearance`]).
+pub fn wave_hits(center: V3, radius: f64, clearance: Option<f64>, target_feet: V3, ground_y: f64) -> bool {
+    if clearance.is_some_and(|clear| target_feet[1] - ground_y > clear) {
         return false;
     }
     geom::dist(center, target_feet) <= radius
@@ -241,9 +237,9 @@ mod tests {
         assert!(crate::geom::dist(center, [0.0, 0.0, 2.0]) < 1e-9, "{center:?}");
         let r = w.radius_blocks;
         // 4.9 blocks in front of the brute is 2.9 from the impact: hit.
-        assert!(wave_hits(center, r, w.jumpable, [0.0, 0.0, 4.9], 0.0));
+        assert!(wave_hits(center, r, w.clearance(), [0.0, 0.0, 4.9], 0.0));
         // 2 blocks behind the brute is 4 from the impact: missed.
-        assert!(!wave_hits(center, r, w.jumpable, [0.0, 0.0, -2.0], 0.0));
+        assert!(!wave_hits(center, r, w.clearance(), [0.0, 0.0, -2.0], 0.0));
         // Facing east (yaw −90): the impact is at +x.
         let east = wave_center([10.0, 64.0, 0.0], -90.0, &w);
         assert!(crate::geom::dist(east, [12.0, 64.0, 0.0]) < 1e-9, "{east:?}");
@@ -257,14 +253,15 @@ mod tests {
         let w = slam_wave();
         let center = wave_center([0.0; 3], 0.0, &w);
         assert!(w.jumpable);
+        assert_eq!(w.clearance(), Some(0.5), "data: wave.jump_clear_blocks");
         // Feet 0.6 over the ground under them: over the wave.
-        assert!(!wave_hits(center, w.radius_blocks, true, [0.0, 0.6, 2.0], 0.0));
+        assert!(!wave_hits(center, w.radius_blocks, w.clearance(), [0.0, 0.6, 2.0], 0.0));
         // Feet 0.4 over it: still caught.
-        assert!(wave_hits(center, w.radius_blocks, true, [0.0, 0.4, 2.0], 0.0));
+        assert!(wave_hits(center, w.radius_blocks, w.clearance(), [0.0, 0.4, 2.0], 0.0));
         // On a step a block up the player stands on the ground there: caught.
-        assert!(wave_hits(center, w.radius_blocks, true, [0.0, 1.0, 2.0], 1.0));
+        assert!(wave_hits(center, w.radius_blocks, w.clearance(), [0.0, 1.0, 2.0], 1.0));
         // A wave that cannot be jumped catches the jumper.
-        assert!(wave_hits(center, w.radius_blocks, false, [0.0, 0.6, 2.0], 0.0));
+        assert!(wave_hits(center, w.radius_blocks, None, [0.0, 0.6, 2.0], 0.0));
     }
 
     #[test]

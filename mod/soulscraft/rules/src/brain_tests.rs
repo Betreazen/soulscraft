@@ -16,6 +16,7 @@ fn senses(now: u64, d: f64) -> Senses {
         in_water: false,
         wall_hit: false,
         wait_turn: false,
+        blows: 0,
         target: Some(TargetSense { pos: [0.0, 0.0, d], ..TargetSense::default() }),
     }
 }
@@ -297,13 +298,15 @@ fn brute_swings_in_reach_and_rages_when_low() {
     });
     assert!(starts(&out).is_empty(), "it roars first");
     let mut b = Brain::new(Style::Heavy, 9, 0);
-    let out = run(&mut b, &m, 0.0, 0, 25, |n| {
+    let roar = roar_ticks(&m) as usize;
+    let out = run(&mut b, &m, 0.0, 0, roar as u64 + 25, |n| {
         let mut s = senses(n, 3.0);
         s.health_frac = 0.2;
         s
     });
     let (when, a) = starts(&out)[0];
-    assert_eq!(when, 20, "after the roar's clip_ticks");
+    // On its first decision after the roar (one every 20 ticks at P 0).
+    assert!(when >= roar && when < roar + 20, "attacked at {when}, the roar lasts {roar}");
     assert!(a == m.attack_index("wide_swing").unwrap() || a == m.attack_index("overhead_wave").unwrap());
     assert!(out[0].rage);
     assert!((out[0].speed_mult - 1.2).abs() < 1e-9);
@@ -476,13 +479,26 @@ fn brute_roars_once_when_rage_starts() {
     assert!(first.events.contains(&Event::Mode("rage")));
     assert_eq!(first.order, Order::Stay);
     assert_eq!(b.clip().name, "rage");
-    for n in 1..20 {
+    let roar = roar_ticks(&m);
+    for n in 1..roar {
         let t = b.tick(&m, &sc, &low(n));
         assert_eq!(b.clip().name, "rage", "tick {n}");
         assert!(t.strikes.is_empty() && !t.events.iter().any(|e| matches!(e, Event::AttackStart { .. })));
     }
-    let rest = run(&mut b, &m, 0.0, 20, 200, low);
+    let rest = run(&mut b, &m, 0.0, roar, 200, low);
     assert!(!rest.iter().flat_map(|t| &t.events).any(|e| *e == Event::Mode("rage")), "the roar is once");
+}
+
+/// `passives.rage.clip_ticks`.
+fn roar_ticks(m: &MobDef) -> u64 {
+    m.passive("rage").and_then(|r| r["clip_ticks"].as_u64()).unwrap()
+}
+
+#[test]
+fn the_roar_lasts_the_rage_clip() {
+    let path = format!("{}/../../../assets/rigs/brute.rig.json", env!("CARGO_MANIFEST_DIR"));
+    let rig = crate::rig::Rig::parse(&std::fs::read_to_string(&path).unwrap()).unwrap();
+    assert_eq!(rig.clip_ticks("rage").map(u64::from), Some(roar_ticks(&mob("brute"))), "clip_ticks is the rig's rage clip");
 }
 
 /// A shrike 10 blocks over its target, in the air.
@@ -675,8 +691,11 @@ fn a_long_jump_recovers_after_it_lands() {
 }
 
 /// A lurker in water, its target 1.5 blocks south: the forced ambush lands on the hit phase's
-/// first tick (10). `hurt` gives the ticks the lurker loses health on.
-fn grab_run(hurt: &[u64], ticks: u64) -> Vec<Tick> {
+/// first tick (10). `blows` gives the ticks a blow of the grabbed target lands on (the server counts
+/// them: `Senses::blows`), `hurt` the ticks the lurker loses health to anything else (poison, a
+/// bleed, a turret), `gone` the tick from which the grabbed target is no more (the server pins the
+/// target to the grabbed one, so then it has none).
+fn grab_run_with(blows: &[u64], hurt: &[u64], gone: Option<u64>, ticks: u64) -> Vec<Tick> {
     let m = mob("lurker");
     let mut b = Brain::new(Style::Ambusher, 8, 0);
     b.force(m.attack_index("ambush").unwrap());
@@ -684,15 +703,38 @@ fn grab_run(hurt: &[u64], ticks: u64) -> Vec<Tick> {
     let mut health = 1.0;
     (0..ticks)
         .map(|n| {
-            if hurt.contains(&n) {
+            if hurt.contains(&n) || blows.contains(&n) {
                 health -= 0.05;
             }
             let mut s = senses(n, 1.5);
             s.in_water = true;
             s.health_frac = health;
+            s.blows = u32::from(blows.contains(&n));
+            if gone.is_some_and(|g| n >= g) {
+                s.target = None;
+            }
             b.tick(&m, &sc, &s)
         })
         .collect()
+}
+
+fn grab_run(blows: &[u64], ticks: u64) -> Vec<Tick> {
+    grab_run_with(blows, &[], None, ticks)
+}
+
+#[test]
+fn only_the_grabbed_targets_blows_break_the_grab() {
+    // Poison, bleeding, a turret: health lost, but no blow of the one in its mouth.
+    let out = grab_run_with(&[], &[12, 14, 16, 18, 20], None, 70);
+    assert_eq!(mode_at(&out, "backoff"), Some(50), "held to grab_max_ticks");
+}
+
+#[test]
+fn a_grabbed_target_that_is_gone_ends_the_grab() {
+    let out = grab_run_with(&[], &[], Some(15), 40);
+    assert_eq!(mode_at(&out, "grab"), Some(10));
+    assert_eq!(mode_at(&out, "backoff"), Some(15));
+    assert!(out[15..].iter().all(|t| t.hold.is_none() && t.strikes.is_empty()));
 }
 
 fn mode_at(out: &[Tick], mode: &str) -> Option<usize> {

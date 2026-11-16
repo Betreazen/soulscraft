@@ -138,6 +138,75 @@ struct Guards {
 }
 static GUARDS: LazyLock<Mutex<Guards>> = LazyLock::new(Mutex::default);
 
+/// A lurker's grab as the server keeps it: the one it grabbed (its target stays that one), where
+/// it holds it, the blows that one dealt it since the lurker's last tick and its health then.
+struct Grab {
+    prey: u32,
+    player: bool,
+    at: V3,
+    blows: u32,
+    health: f64,
+}
+
+/// Grabbing lurkers by entity id, for the damage hook too (it has no game).
+static GRABS: LazyLock<Mutex<HashMap<i32, Grab>>> = LazyLock::new(Mutex::default);
+
+/// The lurker's tick: its grab begins (mode `grab`: the target is the one it bit), goes on (`hold`)
+/// or ends.
+fn note_grab(m: &Seen, tick: &Tick, target: Option<&Target>) {
+    let mut grabs = GRABS.lock().unwrap_or_else(PoisonError::into_inner);
+    let key = m.id as i32;
+    match (tick.hold, target) {
+        (Some(_), Some(tg)) if tick.events.contains(&Event::Mode("grab")) => {
+            grabs.insert(key, Grab { prey: tg.entity, player: tg.player.is_some(), at: m.pos, blows: 0, health: m.health });
+        }
+        (Some(_), _) => {
+            if let Some(g) = grabs.get_mut(&key) {
+                g.at = m.pos;
+            }
+        }
+        (None, _) => {
+            grabs.remove(&key);
+        }
+    }
+}
+
+/// The grabbed one's blows on lurker `id` since its last tick, for its brain (`Senses::blows`): at
+/// most one a tick, and only one that took health (a blow in the hurt cooldown is no blow).
+fn take_blows(id: u32, health: f64) -> u32 {
+    let mut grabs = GRABS.lock().unwrap_or_else(PoisonError::into_inner);
+    let Some(g) = grabs.get_mut(&(id as i32)) else { return 0 };
+    let landed = g.blows > 0 && health < g.health;
+    g.blows = 0;
+    g.health = health;
+    u32::from(landed)
+}
+
+/// The damage hook on a grabbing lurker: a blow of the one it holds. A mob's blow names its
+/// attacker (`causing`); a player's does not in hook v1 (`mob_source`, game/native_hooks.rs:
+/// 9768-9772: `Who::Player` gives 0; v3, which names players, is only called for trait mods,
+/// 9676-9680), so a player's melee hit (`minecraft:player_attack`) counts when the grabbed player is
+/// the nearest one, which a player in its mouth is. Poison, bleeding, turrets and arrows do not.
+fn note_grab_blow(entity: i32, damage_type: &str, causing: i32) {
+    let mut grabs = GRABS.lock().unwrap_or_else(PoisonError::into_inner);
+    let Some(g) = grabs.get_mut(&entity) else { return };
+    let by_prey = if causing != 0 {
+        causing as u32 == g.prey
+    } else if g.player && damage_type == "minecraft:player_attack" {
+        let guards = GUARDS.lock().unwrap_or_else(PoisonError::into_inner);
+        guards
+            .players
+            .iter()
+            .min_by(|a, b| geom::dist(a.1, g.at).total_cmp(&geom::dist(b.1, g.at)))
+            .is_some_and(|(id, _)| *id as u32 == g.prey)
+    } else {
+        false
+    };
+    if by_prey {
+        g.blows += 1;
+    }
+}
+
 pub(super) fn state() -> MutexGuard<'static, State> {
     STATE.lock().unwrap_or_else(PoisonError::into_inner)
 }
@@ -409,10 +478,14 @@ fn tick_mob(
             return;
         }
     }
-    let target = match steer {
-        Some(Steering::Fight(e)) => target_entity(game, m, e, players),
+    // A grabbing lurker keeps the one in its mouth: gone or dead, it has no target and lets go.
+    let prey = GRABS.lock().unwrap_or_else(PoisonError::into_inner).get(&(m.id as i32)).map(|g| g.prey);
+    let target = match (prey, steer) {
+        (Some(e), _) => target_entity(game, m, e, players),
+        (None, Some(Steering::Fight(e))) => target_entity(game, m, e, players),
         _ => choose_target(game, m, players),
     };
+    let blows = take_blows(m.id, m.health);
     // The hunter's book: the mob saw its target («Встречен», soulscraft_book).
     crate::game::soulscraft_book::saw(&m.kind, m.pos, target.as_ref().map(|t| (t.entity, t.player, t.pos)));
     let mut s = state();
@@ -433,6 +506,7 @@ fn tick_mob(
         in_water: m.in_water,
         wall_hit: m.wall,
         wait_turn: diver && target.as_ref().is_some_and(|tg| turns.waits(tg.entity, m.id, now)),
+        blows,
         target: target.as_ref().map(|t| t.sense),
     };
     let sc = scaled(def, t.p, t.size);
@@ -442,6 +516,7 @@ fn tick_mob(
         let dive_ticks = def.attack("dive").map_or(0, |a| u64::from(Timeline::of(a).end()));
         turns.note(tg.entity, m.id, now, &tick, dive_ticks);
     }
+    note_grab(m, &tick, target.as_ref());
     let contact = t.brain.contact(&senses);
     t.guarding = tick.guarding;
     let flags = (if tick.rage { wire::RAGE } else { 0 }) | (if tick.guarding { wire::GUARD } else { 0 });
@@ -1046,8 +1121,8 @@ fn deal_wave(
     for (p, _) in players {
         let hit_already = target.is_some_and(|t| t.player == Some(p.uuid)) && hits_target;
         // The ground under the player matters only for a wave that can be jumped.
-        let ground = if wave.jumpable { ground_under(game, p.position) } else { p.position[1] };
-        if hit_already || !wave_hits(center, radius, wave.jumpable, p.position, ground) {
+        let ground = if wave.clearance().is_some() { ground_under(game, p.position) } else { p.position[1] };
+        if hit_already || !wave_hits(center, radius, wave.clearance(), p.position, ground) {
             continue;
         }
         if game.native_hurt_entity(dim, p.entity_id as u32, wave_blow as f32, "minecraft:mob_attack", Some(m.id)) {
@@ -1184,6 +1259,7 @@ fn on_death(game: &mut Game<'_>, dim: &str, now: u64, m: &Seen) {
     GUARDS.lock().unwrap_or_else(PoisonError::into_inner).shields.remove(&(m.id as i32));
     crate::game::soulscraft_cover::forget(m.id);
     state().turns.release(m.id);
+    GRABS.lock().unwrap_or_else(PoisonError::into_inner).remove(&(m.id as i32));
     if def.stats.flying {
         // Should the death hook have missed it: the body falls.
         let _ = drop_dead_flyer(game, m.id);
@@ -1244,6 +1320,7 @@ fn forget_gone(dim: &str, now: u64) {
     for id in gone {
         s.mobs.remove(&id);
         s.turns.release(id);
+        GRABS.lock().unwrap_or_else(PoisonError::into_inner).remove(&(id as i32));
     }
 }
 
@@ -1308,6 +1385,7 @@ fn send_notes(
 pub(super) fn on_incoming_damage(entity: i32, kind: &str, damage_type: &str, causing: i32, amount: &mut f32) {
     // A hit on a wave mob breaks its drain and may turn it on the participant (Г12).
     crate::game::soulscraft_event::on_damage(entity, causing);
+    note_grab_blow(entity, damage_type, causing);
     if kind != "soulscraft:revenant" || !matches!(damage_type, "minecraft:player_attack" | "minecraft:mob_attack" | "minecraft:arrow") {
         return;
     }

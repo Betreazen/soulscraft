@@ -92,6 +92,9 @@ pub struct Senses {
     pub wall_hit: bool,
     /// Another shrike holds the dive turn on this target ([`DiveTurns`]): this one circles.
     pub wait_turn: bool,
+    /// Blows of the grabbed target that landed on the mob since the last tick (the server tells them
+    /// apart from other damage).
+    pub blows: u32,
     pub target: Option<TargetSense>,
 }
 
@@ -229,9 +232,6 @@ pub struct Brain {
     last_stick: u64,
     /// The brute roared once its rage started.
     raged: bool,
-    /// Its health share last tick, and whether it fell since (a blow taken).
-    last_health: Option<f64>,
-    hurt: bool,
 }
 
 impl Brain {
@@ -251,8 +251,6 @@ impl Brain {
             fled: false,
             last_stick: 0,
             raged: false,
-            last_health: None,
-            hurt: false,
         }
     }
 
@@ -311,8 +309,6 @@ impl Brain {
             hold: None,
             shadow: None,
         };
-        self.hurt = self.last_health.is_some_and(|h| s.health_frac < h - 1e-9);
-        self.last_health = Some(s.health_frac);
         let decide = s.now >= self.next_decision;
         if decide {
             self.next_decision = s.now + u64::from(sc.decide_every.max(1));
@@ -551,17 +547,17 @@ impl Brain {
     }
 
     /// One tick of the grab: the target held at the mouth (drawn down with `pulls_down`), a bite
-    /// every `grab_hit_every_ticks`. `break_hits` blows taken, the end of `grab_max_ticks` or a
-    /// lost target free it and the mob backs off: false then.
+    /// every `grab_hit_every_ticks`. `break_hits` blows of the grabbed target (`Senses::blows`), the
+    /// end of `grab_max_ticks` or the grabbed target gone (the server keeps the target on it) free
+    /// it and the mob backs off: false then.
     fn grab(&mut self, mob: &MobDef, s: &Senses, out: &mut Tick) -> bool {
         let Mode::Grab { attack, since, until, mut hits } = self.mode else { return false };
         let Some(g) = mob.attacks.get(attack) else {
             self.set_mode(Mode::Engage, s.now, &mut out.events);
             return false;
         };
-        if self.hurt {
-            hits += 1;
-        }
+        // Only the grabbed target's own blows count (the server tells them from poison or a turret).
+        hits += s.blows;
         let broken = g.break_hits.is_some_and(|n| hits >= n);
         if broken || s.now >= until || s.target.is_none() {
             let from = s.target.map_or(s.pos, |t| t.pos);

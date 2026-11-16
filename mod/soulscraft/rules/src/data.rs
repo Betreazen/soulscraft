@@ -301,6 +301,16 @@ pub struct WaveDef {
     /// mob's own feet (the slime's landing).
     #[serde(default)]
     pub impact_ahead_blocks: f64,
+    /// A `jumpable` wave passes under feet this high over the ground under them, in blocks.
+    #[serde(default)]
+    pub jump_clear_blocks: Option<f64>,
+}
+
+impl WaveDef {
+    /// How high over the ground feet go over this wave: none for a wave that cannot be jumped.
+    pub fn clearance(&self) -> Option<f64> {
+        if self.jumpable { self.jump_clear_blocks } else { None }
+    }
 }
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq)]
@@ -434,6 +444,9 @@ impl MobDef {
             && !(h.width > 0.0 && h.height > 0.0 && h.eye > 0.0 && h.eye < h.height)
         {
             return Err(format!("mob {}: hitbox {h:?}: sizes above 0, eyes below the top", self.id));
+        }
+        if let Some(a) = self.attacks.iter().find(|a| a.wave.as_ref().is_some_and(|w| w.jumpable && w.jump_clear_blocks.is_none())) {
+            return Err(format!("mob {} attack {}: a jumpable wave needs its wave.jump_clear_blocks", self.id, a.id));
         }
         for a in &self.attacks {
             if a.follows.is_some() {
@@ -651,7 +664,7 @@ mod tests {
         assert_eq!(sound("brute", "wide_swing"), None);
         assert_eq!(f.mob("shrike").unwrap().attack("dive").unwrap().cue.as_ref().unwrap().on, CueOn::Windup, "on the windup");
         let roar = f.mob("brute").unwrap().passive("rage").unwrap();
-        assert_eq!(roar["clip_ticks"], 20);
+        assert_eq!(roar["clip_ticks"], 34, "the rig's rage clip");
         assert_eq!(roar["cue"]["sound"], "minecraft:entity.ravager.roar");
         let grab = f.mob("lurker").unwrap().attack("grab").unwrap();
         assert_eq!(grab.grab_max_ticks, Some(40));
@@ -664,6 +677,13 @@ mod tests {
         assert_eq!(f.mob("brute").unwrap().attack("overhead_wave").unwrap().wave.as_ref().unwrap().impact_ahead_blocks, 2.0);
         // A vanilla move keeps its own cue (VanillaAttack.cue), not the flattened AttackDef's.
         assert!(f.vanilla.groups.iter().flat_map(|g| &g.attacks).all(|a| a.def.cue.is_none()));
+    }
+
+    #[test]
+    fn a_jumpable_wave_needs_its_clearance() {
+        let text = EMBEDDED.replacen(", \"jump_clear_blocks\": 0.5", "", 1);
+        assert_ne!(text, EMBEDDED, "the brute's jump_clear_blocks was found");
+        assert!(MobsFile::parse(&text).unwrap_err().contains("jump_clear_blocks"));
     }
 
     #[test]
