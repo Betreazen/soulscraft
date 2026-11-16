@@ -477,7 +477,9 @@
       "altar_health": 200,
       "tier": 1,
       "item": "soulscraft:rotten_horn",
-      "flow": { "zone_chunks": 3, "below_blocks": 8, "above_blocks": 8, "rebuild_min_ticks": 20, "spawn_blocks": [12, 20], "telegraph_ticks": 60, "participant_grace_ticks": 60, "drain_blocks": 3, "source": "06-altar.md, «Ивент на алтаре» и «Путь к алтарю»; зона 3×3 чанка — раунд 2, остальное — предложение кода" },
+      "bearer_scale": 1.3,
+      "bearer_note": "знаменосец — большой зомби: атрибут minecraft:scale на волне 5; гипотеза задачи 3 среза 0.7.0",
+      "flow": { "zone_chunks": 3, "below_blocks": 8, "above_blocks": 8, "rebuild_min_ticks": 20, "spawn_blocks": [12, 20], "telegraph_ticks": 60, "participant_grace_ticks": 60, "drain_blocks": 3, "outline_ticks": 100, "source": "06-altar.md, «Ивент на алтаре» и «Путь к алтарю»; зона 3×3 чанка — раунд 2, остальное — предложение кода" },
       "defense": { "intercept_blocks": 6, "return_blocks": 16, "return_unseen_seconds": 10, "drain_windup_ticks": 40, "drain_per_second": 1, "altar_damage_cap_per_second": 4, "curse_after_seconds": 30, "curse_per_second": 0.25, "breach": { "hits_by_hardness": [[2, 1], [5, 2], [50, 6]], "attack": "overhead_wave", "never_namespaces": ["rustcraft:"], "never_blocks": ["minecraft:bedrock", "minecraft:barrier", "minecraft:spawner", "minecraft:reinforced_deepslate"], "never_prefixes": ["soulscraft:altar_", "soulscraft:banner_"] }, "source": "06-altar.md, «Оборона алтаря»; гипотеза Г12. Пролом: никогда блоки алтаря, знамёна, блоки с содержимым (block entity), неразрушимые и всё пространство имён rustcraft: (ответ RustCraft 2026-11-13: у рельсов монорельса нет block entity)" },
       "target": "алтарь; зомби бьют игроков, которые стоят на пути",
       "waves": [
@@ -487,7 +489,7 @@
         { "wave": 4, "mobs": [{ "type": "minecraft:zombie", "count": 12, "armored": 4 }] },
         { "wave": 5, "mobs": [{ "type": "minecraft:zombie", "count": 14 }, { "type": "banner_zombie", "name": "большой зомби-знаменосец", "count": 1, "health_mult": 3 }] }
       ],
-      "assumed": ["altar_health", "waves.*.mobs.*.armored"]
+      "assumed": ["altar_health", "waves.*.mobs.*.armored", "bearer_scale", "flow.outline_ticks"]
     },
     {
       "id": "grave_night",
@@ -497,7 +499,7 @@
       "altar_health": 300,
       "tier": 2,
       "item": "soulscraft:grave_horn",
-      "flow": { "zone_chunks": 3, "below_blocks": 8, "above_blocks": 8, "rebuild_min_ticks": 20, "spawn_blocks": [12, 20], "telegraph_ticks": 60, "participant_grace_ticks": 60, "drain_blocks": 3, "source": "как у test_zombies" },
+      "flow": { "zone_chunks": 3, "below_blocks": 8, "above_blocks": 8, "rebuild_min_ticks": 20, "spawn_blocks": [12, 20], "telegraph_ticks": 60, "participant_grace_ticks": 60, "drain_blocks": 3, "outline_ticks": 100, "source": "как у test_zombies" },
       "defense": { "intercept_blocks": 6, "return_blocks": 16, "return_unseen_seconds": 10, "drain_windup_ticks": 40, "drain_per_second": 1, "altar_damage_cap_per_second": 4, "curse_after_seconds": 30, "curse_per_second": 0.25, "breach": { "hits_by_hardness": [[2, 1], [5, 2], [50, 6]], "attack": "overhead_wave", "never_namespaces": ["rustcraft:"], "never_blocks": ["minecraft:bedrock", "minecraft:barrier", "minecraft:spawner", "minecraft:reinforced_deepslate"], "never_prefixes": ["soulscraft:altar_", "soulscraft:banner_"] }, "source": "как у test_zombies" },
       "target": "алтарь; мертвецы бьют игроков на пути, арбалетчики стреляют по защитникам",
       "waves": [
@@ -508,7 +510,7 @@
         { "wave": 5, "mobs": [{ "type": "revenant", "count": 4 }, { "type": "marksman", "count": 3 }, { "type": "stalker", "count": 2 }] },
         { "wave": 6, "mobs": [{ "type": "revenant", "count": 4 }, { "type": "marksman", "count": 2 }, { "type": "stalker", "count": 2 }, { "type": "revenant", "name": "латник-капитан", "count": 1, "health_mult": 2.5 }] }
       ],
-      "assumed": ["altar_health", "waves"]
+      "assumed": ["altar_health", "waves", "flow.outline_ticks"]
     },
     {
       "id": "claw_storm",
@@ -518,7 +520,7 @@
       "altar_health": 400,
       "tier": 3,
       "item": "soulscraft:storm_horn",
-      "flow": { "zone_chunks": 3, "below_blocks": 8, "above_blocks": 8, "rebuild_min_ticks": 20, "spawn_blocks": [12, 20], "telegraph_ticks": 60, "participant_grace_ticks": 60, "drain_blocks": 3, "source": "как у test_zombies" },
+      "flow": { "zone_chunks": 3, "below_blocks": 8, "above_blocks": 8, "rebuild_min_ticks": 20, "spawn_blocks": [12, 20], "telegraph_ticks": 60, "participant_grace_ticks": 60, "drain_blocks": 3, "outline_ticks": 100, "source": "как у test_zombies" },
       "defense": { "intercept_blocks": 6, "return_blocks": 16, "return_unseen_seconds": 10, "drain_windup_ticks": 40, "drain_per_second": 1, "altar_damage_cap_per_second": 4, "curse_after_seconds": 30, "curse_per_second": 0.25, "breach": { "hits_by_hardness": [[2, 1], [5, 2], [50, 6]], "attack": "overhead_wave", "never_namespaces": ["rustcraft:"], "never_blocks": ["minecraft:bedrock", "minecraft:barrier", "minecraft:spawner", "minecraft:reinforced_deepslate"], "never_prefixes": ["soulscraft:altar_", "soulscraft:banner_"] }, "source": "как у test_zombies" },
       "target": "алтарь; ловчие и сорокопуты охотятся на защитников, громила ломает стены",
       "waves": [
@@ -530,7 +532,7 @@
         { "wave": 6, "mobs": [{ "type": "shrike", "count": 3 }, { "type": "stalker", "count": 3 }, { "type": "marksman", "count": 2 }, { "type": "bog_slime", "count": 2 }] },
         { "wave": 7, "mobs": [{ "type": "brute", "count": 2 }, { "type": "revenant", "count": 3 }, { "type": "marksman", "count": 2 }] }
       ],
-      "assumed": ["altar_health", "waves"]
+      "assumed": ["altar_health", "waves", "flow.outline_ticks"]
     },
     {
       "id": "last_stand",
@@ -540,7 +542,7 @@
       "altar_health": 500,
       "tier": 4,
       "item": "soulscraft:abyss_horn",
-      "flow": { "zone_chunks": 3, "below_blocks": 8, "above_blocks": 8, "rebuild_min_ticks": 20, "spawn_blocks": [12, 20], "telegraph_ticks": 60, "participant_grace_ticks": 60, "drain_blocks": 3, "source": "как у test_zombies" },
+      "flow": { "zone_chunks": 3, "below_blocks": 8, "above_blocks": 8, "rebuild_min_ticks": 20, "spawn_blocks": [12, 20], "telegraph_ticks": 60, "participant_grace_ticks": 60, "drain_blocks": 3, "outline_ticks": 100, "source": "как у test_zombies" },
       "defense": { "intercept_blocks": 6, "return_blocks": 16, "return_unseen_seconds": 10, "drain_windup_ticks": 40, "drain_per_second": 1, "altar_damage_cap_per_second": 4, "curse_after_seconds": 30, "curse_per_second": 0.25, "breach": { "hits_by_hardness": [[2, 1], [5, 2], [50, 6]], "attack": "overhead_wave", "never_namespaces": ["rustcraft:"], "never_blocks": ["minecraft:bedrock", "minecraft:barrier", "minecraft:spawner", "minecraft:reinforced_deepslate"], "never_prefixes": ["soulscraft:altar_", "soulscraft:banner_"] }, "source": "как у test_zombies" },
       "target": "алтарь; всё, что есть у SoulsCraft на суше",
       "waves": [
@@ -553,7 +555,7 @@
         { "wave": 7, "mobs": [{ "type": "brute", "count": 2 }, { "type": "revenant", "count": 3 }, { "type": "stalker", "count": 2 }] },
         { "wave": 8, "mobs": [{ "type": "brute", "count": 3 }, { "type": "revenant", "count": 2 }, { "type": "marksman", "count": 3 }, { "type": "revenant", "name": "латник-капитан", "count": 1, "health_mult": 2.5 }] }
       ],
-      "assumed": ["altar_health", "waves"]
+      "assumed": ["altar_health", "waves", "flow.outline_ticks"]
     }
   ],
   "natural": {
@@ -564,11 +566,13 @@
       { "mob": "marksman", "biomes": ["plains", "meadow", "savanna", "badlands", "peaks", "slopes"], "weight": 12, "min": 1, "max": 2 },
       { "mob": "brute", "biomes_with_zombie": true, "weight": 3, "min": 1, "max": 1, "max_y": 39 },
       { "mob": "brute", "biomes": ["peaks", "slopes"], "weight": 3, "min": 1, "max": 1 },
-      { "mob": "shrike", "biomes": ["peaks", "slopes", "windswept"], "weight": 10, "min": 1, "max": 2, "min_y": 80 },
+      { "mob": "shrike", "biomes": ["peaks", "slopes", "windswept"], "weight": 10, "min": 2, "max": 3, "min_y": 80 },
       { "mob": "bog_slime", "biomes": ["swamp"], "weight": 18, "min": 1, "max": 2 }
     ],
     "lurker": { "mob": "lurker", "biomes": ["deep_ocean", "deep_cold_ocean", "deep_lukewarm_ocean", "deep_frozen_ocean"], "every_ticks": 200, "chance": 0.25, "radius_blocks": [16, 40], "max_y": 40, "near_cap": 2, "near_blocks": 64 },
-    "assumed": ["mobs", "lurker"]
+    "tier_gate_blocks": 128,
+    "tier_note": "моб SoulsCraft появляется сам (список спавна и спавнер удильщика), только если у кого-то из игроков в tier_gate_blocks P не ниже его tier_p; сорокопут — группой, как его params.group_size; в ивентах и ускорении алтаря ступень не действует (задача 3 среза 0.7.0)",
+    "assumed": ["mobs", "lurker", "tier_gate_blocks"]
   },
   "soul_shard": {
     "item": "soulscraft:soul_shard",

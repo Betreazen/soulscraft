@@ -281,6 +281,12 @@ pub struct SizeDef {
 #[derive(Clone, Debug, Deserialize)]
 pub struct EventDef {
     pub id: String,
+    /// What players read: the altar menu and the event's bar (`Ночь мертвецов`).
+    #[serde(default)]
+    pub name: String,
+    /// The banner-bearer's `minecraft:scale` (a big zombie); 1 for an event without one.
+    #[serde(default = "one")]
+    pub bearer_scale: f64,
     #[serde(default)]
     pub rest_seconds: Vec<f64>,
     /// The altar's health at the start, before the resilience banner (hypothesis Г12).
@@ -300,6 +306,10 @@ pub struct EventDef {
     pub defense: Map<String, Value>,
     #[serde(default)]
     pub waves: Vec<EventWave>,
+}
+
+fn one() -> f64 {
+    1.0
 }
 
 #[derive(Clone, Debug, Deserialize)]

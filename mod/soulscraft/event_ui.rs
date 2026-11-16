@@ -45,9 +45,10 @@ pub(super) fn show_bar(game: &mut Game<'_>, r: &mut EventRun, now: u64) {
         _ => "",
     };
     let name = format!(
-        "Волна {} из {} · {} · алтарь {:.0}/{:.0}",
+        "Волна {} из {} · {} · {} · алтарь {:.0}/{:.0}",
         r.run.wave() + 1,
         r.plan.waves.len(),
+        r.name,
         phase,
         r.hp.hp.ceil(),
         r.hp.max
@@ -77,7 +78,8 @@ pub(super) fn show_bar(game: &mut Game<'_>, r: &mut EventRun, now: u64) {
     }
 }
 
-/// What clients draw of a run: wave, health, the coming spawn points and the beams.
+/// What clients draw of a run: wave, health, the coming spawn points, the beams, and the zone's
+/// border for its first `flow.outline_ticks`.
 pub(super) fn view(dim: &str, core: [i32; 3], _now: u64) -> Option<view::EventView> {
     let ev = events();
     let r = ev.get(&(dim.to_owned(), core))?;
@@ -101,6 +103,7 @@ pub(super) fn view(dim: &str, core: [i32; 3], _now: u64) -> Option<view::EventVi
             .values()
             .filter_map(|w| w.beam.map(|k| Beam { from: geom::add(w.pos, [0.0, 1.4, 0.0]), kind: k }))
             .collect(),
+        outline: (_now < r.started + r.flow.outline_ticks).then(|| r.flow.outline(r.core)),
     })
 }
 
@@ -116,7 +119,7 @@ pub(super) fn menu_lines(dim: &str, core: [i32; 3], _now: u64) -> Vec<String> {
     };
     let names: Vec<String> = r.parts_now.iter().filter_map(|p| p.player).filter_map(|u| r.joined.get(&u).cloned()).collect();
     vec![
-        format!("Ивент «{}»: волна {} из {} ({phase})", r.event, r.run.wave() + 1, r.plan.waves.len()),
+        format!("Ивент «{}»: волна {} из {} ({phase})", r.name, r.run.wave() + 1, r.plan.waves.len()),
         format!("Здоровье алтаря: {:.0} / {:.0}", r.hp.hp.ceil(), r.hp.max),
         format!("Участники: {}", if names.is_empty() { format!("{} в зоне", r.parts_now.len()) } else { names.join(", ") }),
     ]
