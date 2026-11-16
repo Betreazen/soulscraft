@@ -37,7 +37,7 @@ use soulscraft_rules::{
     wire,
 };
 use std::collections::{HashMap, HashSet};
-use std::sync::{LazyLock, Mutex, MutexGuard, PoisonError};
+use std::sync::{Arc, LazyLock, Mutex, MutexGuard, PoisonError};
 
 const TAG_P: &str = "soulscraft.p=";
 const TAG_SPAWNER: &str = "soulscraft.spawner";
@@ -116,6 +116,28 @@ pub(super) fn state() -> MutexGuard<'static, VState> {
     STATE.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
+/// The groups of data/mobs.json and which group each vanilla type is in, built once per version of
+/// the data (`data_generation`) rather than copied every tick.
+struct Groups {
+    generation: u64,
+    groups: Arc<[VanillaDef]>,
+    by_type: Arc<HashMap<String, usize>>,
+}
+
+static GROUPS: Mutex<Option<Groups>> = Mutex::new(None);
+
+fn groups() -> (Arc<[VanillaDef]>, Arc<HashMap<String, usize>>) {
+    let generation = crate::game::soulscraft_server::data_generation();
+    let mut cache = GROUPS.lock().unwrap_or_else(PoisonError::into_inner);
+    if let Some(c) = cache.as_ref().filter(|c| c.generation == generation) {
+        return (Arc::clone(&c.groups), Arc::clone(&c.by_type));
+    }
+    let groups: Arc<[VanillaDef]> = crate::game::soulscraft_server::state().data.vanilla.groups.clone().into();
+    let by_type: HashMap<String, usize> = groups.iter().enumerate().flat_map(|(i, g)| g.types.iter().map(move |t| (t.clone(), i))).collect();
+    let c = cache.insert(Groups { generation, groups, by_type: Arc::new(by_type) });
+    (Arc::clone(&c.groups), Arc::clone(&c.by_type))
+}
+
 fn held(id: u32) -> u8 {
     HELD.lock().unwrap_or_else(PoisonError::into_inner).get(&id).copied().unwrap_or(0)
 }
@@ -182,11 +204,10 @@ struct Target {
 /// After SoulsCraft's own mobs on the level tick: adopt new vanilla mobs, drive the known ones.
 pub(super) fn on_level_tick(game: &mut Game<'_>, dim: &str, now: u64, hunters: &[(NativeServerPlayer, bool)]) {
     let players: Vec<&NativeServerPlayer> = hunters.iter().map(|(p, _)| p).collect();
-    let groups = crate::game::soulscraft_server::state().data.vanilla.groups.clone();
+    let (groups, index) = groups();
     if groups.is_empty() {
         return;
     }
-    let index: HashMap<&str, usize> = groups.iter().enumerate().flat_map(|(i, g)| g.types.iter().map(move |t| (t.as_str(), i))).collect();
     let seen: Vec<Seen> = game
         .mobs
         .iter()
@@ -282,7 +303,7 @@ fn adopt(game: &mut Game<'_>, dim: &str, now: u64, m: &Seen, g: &VanillaDef, pla
     if let Some((base_health, max)) = base {
         crate::game::soulscraft_server::set_xp_tag(game, m.id, base_health, max);
     }
-    if !spawner && let Some(mob) = game.mobs.iter_mut().find(|x| x.id == m.id) {
+    if !spawner && let Some(mob) = crate::game::soulscraft_find::mob_mut(game, m.id) {
         if !mob.ai.goals.has("SoulscraftGate") {
             mob.ai.goals.add(GATE_PRIORITY, Gate { flags: MOVE | LOOK | JUMP });
             mob.ai.goals.add(GATE_PRIORITY + 1, Gate { flags: JUMP });
@@ -335,7 +356,7 @@ fn spawner_near(game: &Game<'_>, at: V3, radius: i32) -> bool {
 /// Г2 on a vanilla mob: modifiers on its own base (a slime's size², a baby's speed stay its own),
 /// armour on its type's. Returns (base health, scaled max health) for PCT's tag.
 fn apply_power(game: &mut Game<'_>, id: u32, p: f64) -> Option<(f64, f64)> {
-    let i = game.mobs.iter().position(|m| m.id == id)?;
+    let i = crate::game::soulscraft_find::index_of(game, id)?;
     let base_armor = f64::from(game.mobs[i].kind.armor);
     let kind = game.mobs[i].kind.id.to_string();
     {
@@ -383,7 +404,7 @@ fn target_of(game: &Game<'_>, m: &Seen, players: &[&NativeServerPlayer]) -> Opti
         Who::Mob(e) => match players.iter().find(|p| p.entity_id as u32 == e) {
             Some(p) => player(p),
             None => {
-                let x = game.mobs.iter().find(|x| x.id == e && !x.removed && x.alive())?;
+                let x = crate::game::soulscraft_find::mob(game, e).filter(|x| !x.removed && x.alive())?;
                 Target { entity: e, pos: [x.position.x, x.position.y, x.position.z], name: format!("mob{e}") }
             }
         },
@@ -533,7 +554,7 @@ fn hold(game: &mut Game<'_>, dim: &str, id: u32, tick: &VTick) {
             v.path = None;
         }
     }
-    let Some(m) = game.mobs.iter_mut().find(|m| m.id == id) else { return };
+    let Some(m) = crate::game::soulscraft_find::mob_mut(game, id) else { return };
     if let Some(a) = tick.aggressive
         && m.ai.aggressive != a
     {
@@ -593,7 +614,7 @@ fn drive(game: &mut Game<'_>, dim: &str, now: u64, m: &Seen, tick: &VTick, slide
 /// also stops what is left of a cube's own hop along the ground and in the air.
 fn stand(game: &mut Game<'_>, dim: &str, id: u32, slide: bool) {
     game.native_mob_stop(dim, id);
-    let Some(m) = game.mobs.iter_mut().find(|m| m.id == id) else { return };
+    let Some(m) = crate::game::soulscraft_find::mob_mut(game, id) else { return };
     m.ai.mov.operation = horizon_client::mobs::control::Operation::Wait;
     m.ai.zza = 0.0;
     m.ai.xxa = 0.0;
@@ -605,7 +626,7 @@ fn stand(game: &mut Game<'_>, dim: &str, id: u32, slide: bool) {
 }
 
 fn set_velocity(game: &mut Game<'_>, id: u32, v: V3, with_y: bool) {
-    if let Some(m) = game.mobs.iter_mut().find(|m| m.id == id) {
+    if let Some(m) = crate::game::soulscraft_find::mob_mut(game, id) {
         m.velocity.x = v[0];
         m.velocity.z = v[2];
         if with_y {
@@ -648,7 +669,7 @@ fn deal(game: &mut Game<'_>, dim: &str, now: u64, m: &Seen, g: &VanillaDef, stri
     let mut landed = false;
     if strike.ranged {
         if let Some(tg) = target {
-            let damage = game.mobs.iter().find(|x| x.id == m.id).map_or(0.0, |x| f64::from(x.attrs.attack_damage));
+            let damage = crate::game::soulscraft_find::mob(game, m.id).map_or(0.0, |x| f64::from(x.attrs.attack_damage));
             landed = throw(game, dim, m, tg, a.projectile.as_deref().unwrap_or("bolt"), damage * a.damage);
         }
     } else if strike.hits_target
@@ -682,7 +703,7 @@ fn deal(game: &mut Game<'_>, dim: &str, now: u64, m: &Seen, g: &VanillaDef, stri
 /// series would fall in the target's hurt cooldown: it is cleared first (as the server half does).
 fn blow(game: &mut Game<'_>, dim: &str, mob: u32, target: u32, mult: f64, series: bool) -> bool {
     if series {
-        if let Some(t) = game.mobs.iter_mut().find(|m| m.id == target) {
+        if let Some(t) = crate::game::soulscraft_find::mob_mut(game, target) {
             t.invulnerable = 0;
         }
         if let Some(host) = game.lan.as_mut()
@@ -692,14 +713,14 @@ fn blow(game: &mut Game<'_>, dim: &str, mob: u32, target: u32, mult: f64, series
             motion.health.hurt.cooldown = 0;
         }
     }
-    let Some(i) = game.mobs.iter().position(|m| m.id == mob) else { return false };
+    let Some(i) = crate::game::soulscraft_find::index_of(game, mob) else { return false };
     let was = game.mobs[i].attrs.attack_damage;
     game.mobs[i].attrs.attack_damage = (f64::from(was) * mult) as f32;
     if let Some(m) = game.mobs.get_mut(i) {
         m.swing();
     }
     let ok = game.native_mob_attack(dim, mob, target);
-    if let Some(m) = game.mobs.iter_mut().find(|m| m.id == mob) {
+    if let Some(m) = crate::game::soulscraft_find::mob_mut(game, mob) {
         m.attrs.attack_damage = was;
     }
     ok
@@ -866,7 +887,7 @@ pub(super) fn set_target(mob: u32, entity: u32) {
 }
 
 pub(super) fn force(mob: u32, attack: &str) -> bool {
-    let groups = crate::game::soulscraft_server::state().data.vanilla.groups.clone();
+    let (groups, _) = groups();
     let mut s = state();
     let Some(v) = s.mobs.get_mut(&mob) else { return false };
     let Some(idx) = groups.get(v.group).and_then(|g| g.attack_index(attack)) else { return false };

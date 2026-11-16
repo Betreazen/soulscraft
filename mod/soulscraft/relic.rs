@@ -3,9 +3,11 @@
 // The Abyss Heart gives +4 max health while it is in the off hand. Horizon 7e4e421 applies no
 // attribute modifier of an off-hand item and no max_health modifier of any item (checked on the
 // bench 2026-11-16: a stick with +3 armour in the off hand gives 0, a chestplate with +4 max health
-// gives 20), while the `attribute` command works. So twice a second the server asks each player's
-// off hand (`execute if items`) and puts on or takes off the item's own modifier, by the same id
-// as the item's component: were the engine to apply the item one day, it would never count twice.
+// gives 20), while the `attribute` command works. So twice a second the server reads each player's
+// off hand (`native_player_equipment`, game/native_player_reads.rs:185; until 0.6.2 a command per
+// player, `execute if items`) and, only when it changed, puts on or takes off the item's own
+// modifier, by the same id as the item's component: were the engine to apply the item one day, it
+// would never count twice.
 // A player's first check this session takes it off when the hand is empty, so a modifier saved in
 // the player's data never outlives the item.
 //
@@ -35,7 +37,9 @@ pub(super) fn on_level_tick(game: &mut Game<'_>, dim: &str, now: u64) {
     let mut on = ON.lock().unwrap_or_else(PoisonError::into_inner);
     on.retain(|u, _| players.iter().any(|p| p.uuid == *u));
     for p in &players {
-        let holds = game.native_run_command_captured(&format!("execute if items entity {} weapon.offhand {ITEM}", p.name)).result > 0;
+        let holds = game
+            .native_player_equipment(p.uuid, horizon_client::mod_api::EquipmentSlot::OffHand)
+            .is_some_and(|s| &*s.item == ITEM);
         if on.get(&p.uuid) == Some(&holds) {
             continue;
         }

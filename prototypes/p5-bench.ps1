@@ -17,18 +17,20 @@
 # writes everything to prototypes/logs/p5-<time>.txt.
 #   .\prototypes\p5-world.ps1 init         once
 #   .\prototypes\p5-bench.ps1 [-Runs 3] [-Seconds 30] [-Settle 10] [-Count 50] [-Cases crowd,empty]
+#                             [-Engine PATH] [-Label before]
+# -Engine runs another engine than the joint server's (p5-world.ps1), -Label names the log file.
 # Only on a quiet PC: it refuses while a native build, another game server, OBS or a busy GPU is
 # seen (-Force skips that check), and holds C:\ai-bridge\heavy.lock for the measurement only.
 param([int]$Runs = 3, [int]$Seconds = 30, [int]$Count = 50, [int]$Settle = 10, [int]$Crowd = 150, [int]$Herd = 450,
     [ValidateSet('revenants', 'mixed', 'zombies', 'empty', 'crowd')][string[]]$Cases = @('revenants', 'mixed', 'zombies', 'empty', 'crowd'),
-    [switch]$Force)
+    [string]$Engine = '', [string]$Label = '', [switch]$Force)
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'lib\bot.ps1')
 Use-P5Server
 $World = Join-Path $PSScriptRoot 'p5-world.ps1'
 $Server = "F:\horizon-servers\soulscraft-p5"
 $Lock = 'C:\ai-bridge\heavy.lock'
-$Out = Join-Path $PSScriptRoot ("logs\p5-{0}.txt" -f (Get-Date -Format 'yyyy-MM-dd-HHmm'))
+$Out = Join-Path $PSScriptRoot ("logs\p5-{0}{1}.txt" -f (Get-Date -Format 'yyyy-MM-dd-HHmm'), $(if ($Label) { "-$Label" } else { '' }))
 $cx = -499.5; $cy = 101; $cz = 500.5
 $Inv = [Globalization.CultureInfo]::InvariantCulture
 
@@ -93,7 +95,7 @@ function Measure-Case([string]$Case, [scriptblock]$Spawn) {
 }
 
 function Invoke-Run([int]$N) {
-    & $World start | Tee-Object -FilePath $Out -Append | Write-Host
+    & $World start -Engine $Engine | Tee-Object -FilePath $Out -Append | Write-Host
     $bot = $null
     try {
         $bot = Start-Bot sc_a
@@ -103,6 +105,14 @@ function Invoke-Run([int]$N) {
         Invoke-Console 'effect give sc_a minecraft:resistance infinite 4 true' | Out-Null
         Invoke-Console 'effect give sc_a minecraft:saturation infinite 0 true' | Out-Null
         Invoke-Console 'sc p 0.5' | Out-Null
+        # relic.rs reads the off hand twice a second: +4 max health with the Abyss Heart, back after.
+        Invoke-Console 'item replace entity sc_a weapon.offhand with soulscraft:abyss_heart' | Out-Null
+        Start-Sleep -Milliseconds 1500
+        $held = (Invoke-Console 'attribute sc_a minecraft:max_health get') -join ' '
+        Invoke-Console 'item replace entity sc_a weapon.offhand with minecraft:air' | Out-Null
+        Start-Sleep -Milliseconds 1500
+        $bare = (Invoke-Console 'attribute sc_a minecraft:max_health get') -join ' '
+        "  relic | heart in the off hand: $held | hand empty again: $bare" | Tee-Object -FilePath $Out -Append | Write-Host
         $zombies = {
             for ($i = 0; $i -lt $Count; $i++) {
                 $a = $i * 2 * [math]::PI / $Count

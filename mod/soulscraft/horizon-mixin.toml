@@ -665,6 +665,13 @@ file = "crates/horizon-client/src/game.rs"
 name = "soulscraft_cost"
 source = "cost.rs"
 
+# A level's mob by id through an index rebuilt each level tick, checked at every look-up.
+[[module]]
+id = "find"
+file = "crates/horizon-client/src/game.rs"
+name = "soulscraft_find"
+source = "find.rs"
+
 # The loot crate: chest horns and shards, zombies' Rotten Horn (data/loot.json, copied in by
 # mod/sync.ps1). Its helper compiles inside horizon-world, so the crate is horizon-world's.
 [[crate]]

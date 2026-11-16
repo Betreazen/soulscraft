@@ -9,6 +9,8 @@ use std::sync::{Mutex, PoisonError};
 /// The parts of the level tick timed on their own, in the order the tick runs them.
 #[derive(Clone, Copy)]
 pub(super) enum Part {
+    /// The level's mob index (find.rs).
+    Index,
     /// Queued `/sc` tasks and test waves.
     Tasks,
     /// Altars and their events, the path map included.
@@ -27,29 +29,32 @@ pub(super) enum Part {
     Book,
 }
 
-pub(super) const PART_NAMES: [&str; 9] = ["tasks", "altar", "trophy", "spawning", "relic", "power", "own_mobs", "vanilla", "book"];
+/// How many parts.
+pub(super) const PARTS: usize = 10;
+
+pub(super) const PART_NAMES: [&str; PARTS] = ["index", "tasks", "altar", "trophy", "spawning", "relic", "power", "own_mobs", "vanilla", "book"];
 
 struct Totals {
     nanos: u64,
     level_ticks: u64,
     server_ticks: u64,
     last_time: Option<u64>,
-    parts: [u64; 9],
+    parts: [u64; PARTS],
 }
 
-static TOTALS: Mutex<Totals> = Mutex::new(Totals { nanos: 0, level_ticks: 0, server_ticks: 0, last_time: None, parts: [0; 9] });
+static TOTALS: Mutex<Totals> = Mutex::new(Totals { nanos: 0, level_ticks: 0, server_ticks: 0, last_time: None, parts: [0; PARTS] });
 
 /// One level tick's clock: `lap` charges the time since the last lap to a part.
 pub(super) struct Clock {
     started: std::time::Instant,
     last: std::time::Instant,
-    parts: [u64; 9],
+    parts: [u64; PARTS],
 }
 
 impl Clock {
     pub(super) fn start() -> Self {
         let now = std::time::Instant::now();
-        Self { started: now, last: now, parts: [0; 9] }
+        Self { started: now, last: now, parts: [0; PARTS] }
     }
 
     pub(super) fn lap(&mut self, part: Part) {
@@ -75,11 +80,11 @@ impl Clock {
 }
 
 pub(super) fn reset() {
-    *TOTALS.lock().unwrap_or_else(PoisonError::into_inner) = Totals { nanos: 0, level_ticks: 0, server_ticks: 0, last_time: None, parts: [0; 9] };
+    *TOTALS.lock().unwrap_or_else(PoisonError::into_inner) = Totals { nanos: 0, level_ticks: 0, server_ticks: 0, last_time: None, parts: [0; PARTS] };
 }
 
 /// The totals since the last reset: (nanoseconds, level ticks, server ticks, nanoseconds by part).
-pub(super) fn totals() -> (u64, u64, u64, [u64; 9]) {
+pub(super) fn totals() -> (u64, u64, u64, [u64; PARTS]) {
     let t = TOTALS.lock().unwrap_or_else(PoisonError::into_inner);
     (t.nanos, t.level_ticks, t.server_ticks, t.parts)
 }

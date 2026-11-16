@@ -172,6 +172,7 @@ pub(super) fn reload() -> Result<String, String> {
             }
             s.data = d;
             s.source = "config".into();
+            DATA_GENERATION.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             let respec: Vec<u32> = s.mobs.keys().copied().collect();
             drop(s);
             RESPEC.lock().unwrap_or_else(PoisonError::into_inner).extend(respec);
@@ -185,6 +186,15 @@ pub(super) fn reset_data() {
     let mut s = state();
     s.data = MobsFile::embedded();
     s.source = "built-in".into();
+    DATA_GENERATION.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// Rises each time `state().data` is replaced: what is built from the data once (the vanilla
+/// groups' type index) is built again when it moves.
+static DATA_GENERATION: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+pub(super) fn data_generation() -> u64 {
+    DATA_GENERATION.load(std::sync::atomic::Ordering::Relaxed)
 }
 
 /// Mobs whose stats are set again on the next tick (after a reload).
@@ -218,6 +228,8 @@ pub(super) fn on_level_tick(game: &mut Game<'_>, dimension: &str) {
     use crate::game::soulscraft_cost::{Clock, Part};
     let mut clock = Clock::start();
     let now = game.world.game_time.max(0) as u64;
+    crate::game::soulscraft_find::reindex(game);
+    clock.lap(Part::Index);
     crate::game::soulscraft_tools::run_due(game, dimension, now);
     clock.lap(Part::Tasks);
     // A frozen world (`/tick freeze`) still runs the level hooks with its clock stopped: the mobs
@@ -544,7 +556,7 @@ fn adopt(game: &mut Game<'_>, dimension: &str, now: u64, m: &Seen, players: &[(N
         game.native_entity_remove_tag(e, TAG_FRESH);
     }
     if style.steered()
-        && let Some(mob) = game.mobs.iter_mut().find(|x| x.id == m.id)
+        && let Some(mob) = crate::game::soulscraft_find::mob_mut(game, m.id)
     {
         // Flyers and swimmers are steered by velocity: no gravity pulls them off their course.
         mob.no_gravity = true;
@@ -563,7 +575,7 @@ fn adopt(game: &mut Game<'_>, dimension: &str, now: u64, m: &Seen, players: &[(N
 /// width and height (mobs/living.rs:489); the path finder sizes its steps by it (mobs/path.rs:430).
 pub(super) fn fit_hitbox(game: &mut Game<'_>, id: u32, kind: usize, size: u8) {
     let hb = state().data.mobs[kind].hitbox_at(size);
-    let Some(m) = game.mobs.iter_mut().find(|m| m.id == id) else { return };
+    let Some(m) = crate::game::soulscraft_find::mob_mut(game, id) else { return };
     let same = |a: f64, b: f64| (a - b).abs() < 1e-6;
     if same(m.kind.width, hb.width) && same(m.kind.height, hb.height) && same(m.kind.eye_height, hb.eye) {
         return;
@@ -578,7 +590,7 @@ pub(super) fn fit_hitbox(game: &mut Game<'_>, id: u32, kind: usize, size: u8) {
 pub(super) fn apply_stats(game: &mut Game<'_>, id: u32, kind: usize, p: f64, size: u8, fresh: bool) {
     let def = state().data.mobs[kind].clone();
     let sc = scaled(&def, p, size);
-    let Some(m) = game.mobs.iter_mut().find(|m| m.id == id) else { return };
+    let Some(m) = crate::game::soulscraft_find::mob_mut(game, id) else { return };
     m.attrs.max_health = sc.max_health as f32;
     m.attrs.speed = sc.speed;
     m.attrs.attack_damage = sc.damage as f32;
@@ -601,7 +613,7 @@ pub(super) fn apply_stats(game: &mut Game<'_>, id: u32, kind: usize, p: f64, siz
 /// template's, as the command would for a zombie, and read by the damage code
 /// (mobs/armor.rs:43-63).
 fn set_armor(game: &mut Game<'_>, id: u32, armor: f64) {
-    let Some(i) = game.mobs.iter().position(|m| m.id == id) else { return };
+    let Some(i) = crate::game::soulscraft_find::index_of(game, id) else { return };
     if game.mobs[i].extra.armor_attributes.is_none() {
         game.mobs[i].extra.armor_attributes = game.motion.attributes.create("minecraft:zombie").map(Box::new);
     }
@@ -618,7 +630,7 @@ fn set_armor(game: &mut Game<'_>, id: u32, armor: f64) {
 fn choose_target(game: &Game<'_>, m: &Seen, players: &[(NativeServerPlayer, bool)]) -> Option<Target> {
     let forced = state().mobs.get(&m.id).and_then(|t| t.target_override.map(|o| (o, t.test_shield)));
     if let Some((id, shield_up)) = forced {
-        let t = game.mobs.iter().find(|x| x.id == id && !x.removed && x.alive())?;
+        let t = crate::game::soulscraft_find::mob(game, id).filter(|x| !x.removed && x.alive())?;
         let pos = [t.position.x, t.position.y, t.position.z];
         return Some(Target {
             entity: id,
@@ -668,7 +680,7 @@ fn target_entity(game: &Game<'_>, m: &Seen, entity: u32, players: &[(NativeServe
             },
         });
     }
-    let t = game.mobs.iter().find(|x| x.id == entity && !x.removed && x.alive())?;
+    let t = crate::game::soulscraft_find::mob(game, entity).filter(|x| !x.removed && x.alive())?;
     let pos = [t.position.x, t.position.y, t.position.z];
     Some(Target { entity, pos, name: format!("mob{entity}"), player: None, sense: TargetSense { pos, ..TargetSense::default() } })
 }
@@ -748,7 +760,7 @@ fn drive(
         game.native_mob_look_at(dim, m.id, at);
     }
     let speed = sc.speed * tick.speed_mult;
-    if let Some(mob) = game.mobs.iter_mut().find(|x| x.id == m.id) {
+    if let Some(mob) = crate::game::soulscraft_find::mob_mut(game, m.id) {
         mob.attrs.speed = speed;
     }
     match tick.order {
@@ -798,7 +810,7 @@ fn drive(
 
 /// Sets a mob's velocity (`with_y`: all three, else only the ground plane).
 fn set_velocity(game: &mut Game<'_>, id: u32, v: V3, with_y: bool) {
-    if let Some(m) = game.mobs.iter_mut().find(|m| m.id == id) {
+    if let Some(m) = crate::game::soulscraft_find::mob_mut(game, id) {
         m.velocity.x = v[0];
         m.velocity.z = v[2];
         if with_y {
@@ -912,7 +924,7 @@ fn deal(
 /// cooldown is cleared first.
 fn clear_hurt_cooldown(game: &mut Game<'_>, tg: &Target) {
     if tg.player.is_none() {
-        if let Some(m) = game.mobs.iter_mut().find(|m| m.id == tg.entity) {
+        if let Some(m) = crate::game::soulscraft_find::mob_mut(game, tg.entity) {
             m.invulnerable = 0;
         }
         return;
@@ -1179,7 +1191,7 @@ fn hurt_bleeders(game: &mut Game<'_>, dim: &str) {
 /// would end a SoulsCraft mob: its type, rig and P. The counter is held at its "not in water" value
 /// after each mob tick (docs/research/horizon-mob-models.md, 12).
 fn no_drowned_conversion(game: &mut Game<'_>, id: u32) {
-    if let Some(m) = game.mobs.iter_mut().find(|m| m.id == id)
+    if let Some(m) = crate::game::soulscraft_find::mob_mut(game, id)
         && (m.extra.counter >= 0 || m.extra.counter2 != 0)
     {
         m.extra.counter = -1;

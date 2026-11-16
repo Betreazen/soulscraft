@@ -609,7 +609,7 @@ fn adopt_zombie(game: &mut Game<'_>, id: u32, w: &WaveMob, power: f64) {
     }
     let sc = Scaled::at(&ZOMBIE, power);
     let max = sc.max_health * w.health_mult;
-    if let Some(m) = game.mobs.iter_mut().find(|m| m.id == id) {
+    if let Some(m) = crate::game::soulscraft_find::mob_mut(game, id) {
         m.ai.goals.clear();
         m.ai.targets.clear();
         m.ai.goals.add(0, horizon_client::mobs::goals::Float);
@@ -649,7 +649,7 @@ fn push(game: &mut Game<'_>, dim: &str, id: u32, from: V3, to: V3) {
         return;
     }
     let d = geom::flat_dir(from, to);
-    if let Some(m) = game.mobs.iter_mut().find(|m| m.id == id) {
+    if let Some(m) = crate::game::soulscraft_find::mob_mut(game, id) {
         m.velocity.x = d[0] * STEP;
         m.velocity.z = d[2] * STEP;
         m.needs_sync = true;

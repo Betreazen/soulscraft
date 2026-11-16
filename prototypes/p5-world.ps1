@@ -9,11 +9,13 @@
 # difficulty normal, and the server never pauses when empty.
 #   .\prototypes\p5-world.ps1 init       once: make the server folder
 #   .\prototypes\p5-world.ps1 start      engine and content from the joint server, fresh world, rules
+#   .\prototypes\p5-world.ps1 start -Engine PATH   another engine the bench built (joint-dev\engines\…):
+#                                        a before/after pair that another session's try can't swap
 #   .\prototypes\p5-world.ps1 stop
 #   .\prototypes\p5-world.ps1 status
 # No native build here: build with `.\joint.ps1 server` first. Start it only while no native build
 # runs and %LOCALAPPDATA%\Horizon\joint-dev\maintenance.txt is absent (the bench's rules).
-param([ValidateSet('init', 'start', 'stop', 'status')][string]$Part = 'status')
+param([ValidateSet('init', 'start', 'stop', 'status')][string]$Part = 'status', [string]$Engine = '')
 $ErrorActionPreference = 'Stop'
 
 $ServerTool = "$env:LOCALAPPDATA\Horizon\current\horizon-server.exe"
@@ -55,8 +57,8 @@ function Initialize-P5 {
 
 # The joint server's engine and installed content: the very build the bench made.
 function Sync-FromJoint {
-    $engine = (Select-String -Path "$JointServer\server.toml" -Pattern "^path = '(.+)'").Matches[0].Groups[1].Value
-    if (-not (Test-Path $engine)) { throw "No joint engine at $engine" }
+    $engine = if ($Engine) { $Engine } else { (Select-String -Path "$JointServer\server.toml" -Pattern "^path = '(.+)'").Matches[0].Groups[1].Value }
+    if (-not (Test-Path $engine)) { throw "No engine at $engine" }
     Invoke-Tool @('config', 'set', "engine.path=$engine") | Out-Null
     $mods = "$Server\horizon-mods"
     if (Test-Path $mods) { Remove-Item -LiteralPath $mods -Recurse -Force }
