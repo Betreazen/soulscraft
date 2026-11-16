@@ -8,15 +8,20 @@
 #   mixed       all seven mobs in turn, 7 of each (/sc bench 49 mixed)
 #   zombies     $Count vanilla zombies (midnight, the clock stopped: none burn)
 #   empty       the arena with the bot only
-# Per case: the server's average tick (native_tick_stats), SoulsCraft's own time in its level tick,
-# and each mob type's own ticks (native_mob_cost_sampling, summed by type). After $Runs runs it
-# prints the median and the spread (min..max) of each number, and writes everything to
-# prototypes/logs/p5-<time>.txt.
+#   crowd       a live server's mix (12-playtest-tidewill.md): $Crowd adopted vanilla monsters
+#               (zombies, skeletons, spiders in turn) round the bot and $Herd cows farther out,
+#               which SoulsCraft never adopts but every search through the level's mobs passes
+# Per case: the server's average tick (native_tick_stats), SoulsCraft's own time per server tick,
+# whole and by part (cost.rs), and each mob type's own ticks (native_mob_cost_sampling, summed by
+# type). After $Runs runs it prints the median and the spread (min..max) of each number, and
+# writes everything to prototypes/logs/p5-<time>.txt.
 #   .\prototypes\p5-world.ps1 init         once
-#   .\prototypes\p5-bench.ps1 [-Runs 3] [-Seconds 30] [-Settle 10] [-Count 50]
+#   .\prototypes\p5-bench.ps1 [-Runs 3] [-Seconds 30] [-Settle 10] [-Count 50] [-Cases crowd,empty]
 # Only on a quiet PC: it refuses while a native build, another game server, OBS or a busy GPU is
 # seen (-Force skips that check), and holds C:\ai-bridge\heavy.lock for the measurement only.
-param([int]$Runs = 3, [int]$Seconds = 30, [int]$Count = 50, [int]$Settle = 10, [switch]$Force)
+param([int]$Runs = 3, [int]$Seconds = 30, [int]$Count = 50, [int]$Settle = 10, [int]$Crowd = 150, [int]$Herd = 450,
+    [ValidateSet('revenants', 'mixed', 'zombies', 'empty', 'crowd')][string[]]$Cases = @('revenants', 'mixed', 'zombies', 'empty', 'crowd'),
+    [switch]$Force)
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'lib\bot.ps1')
 Use-P5Server
@@ -70,12 +75,13 @@ function Measure-Case([string]$Case, [scriptblock]$Spawn) {
     Start-Sleep -Seconds 1
     $lines = Get-Content $log | Select-Object -Skip $since | Select-String 'soulscraft: cost ' |
         ForEach-Object { $_.Line -replace '^.*soulscraft: ', '' }
-    $row = [ordered]@{ case = $Case; tick_ms = $null; own_ms = $null; mobs_ms = 0.0; kinds = @{}; noisy = ($noisy -join ' ') }
+    $row = [ordered]@{ case = $Case; tick_ms = $null; own_ms = $null; mobs_ms = 0.0; kinds = @{}; parts = @{}; noisy = ($noisy -join ' ') }
     if ($row.noisy) { Add-Content $Out "  $Case | NOISY: $($row.noisy) ran during the sample" }
     foreach ($l in $lines) {
         Add-Content $Out "  $Case | $l"
         if ($l -match '^cost over') { $row.tick_ms = Get-Number $l 'average ([\d.]+) ms' }
-        elseif ($l -match '^cost soulscraft_level_tick') { $row.own_ms = Get-Number $l 'ms_per_tick=([\d.]+)' }
+        elseif ($l -match '^cost soulscraft_level_tick') { $row.own_ms = Get-Number $l 'ms_per_server_tick=([\d.]+)' }
+        elseif ($l -match '^cost soulscraft_part part=(\S+)') { $row.parts[$Matches[1]] = Get-Number $l 'ms_per_server_tick=([\d.]+)' }
         elseif ($l -match '^cost kind=(\S+)') {
             $kind = $Matches[1]
             $ms = Get-Number $l 'ms_per_server_tick=([\d.]+)'
@@ -106,13 +112,36 @@ function Invoke-Run([int]$N) {
                 Invoke-Console "summon minecraft:zombie $x $cy $z {PersistenceRequired:1b}" | Out-Null
             }
         }
+        # Monsters on rings 6..20 blocks out, cows on rings 24..60: one block apart or more, so the
+        # engine's collisions stay what a herd in a field costs.
+        $crowd = {
+            $kinds = 'minecraft:zombie', 'minecraft:skeleton', 'minecraft:spider'
+            for ($i = 0; $i -lt $Crowd; $i++) {
+                $a = $i * 2.399963
+                $r = 6 + 14 * [math]::Sqrt(($i + 0.5) / $Crowd)
+                $x = ($cx + $r * [math]::Sin($a)).ToString('F1', $Inv)
+                $z = ($cz + $r * [math]::Cos($a)).ToString('F1', $Inv)
+                Invoke-Console "summon $($kinds[$i % 3]) $x $cy $z {PersistenceRequired:1b}" | Out-Null
+            }
+            for ($i = 0; $i -lt $Herd; $i++) {
+                $a = $i * 2.399963
+                $r = 24 + 36 * [math]::Sqrt(($i + 0.5) / $Herd)
+                $x = ($cx + $r * [math]::Sin($a)).ToString('F1', $Inv)
+                $z = ($cz + $r * [math]::Cos($a)).ToString('F1', $Inv)
+                Invoke-Console "summon minecraft:cow $x $cy $z {PersistenceRequired:1b}" | Out-Null
+            }
+        }
         $mixed = 7 * [math]::Floor($Count / 7)
-        @(
-            Measure-Case 'revenants' { Invoke-Console "sc bench $Count" | Out-Null }
-            Measure-Case 'mixed' { Invoke-Console "sc bench $mixed mixed" | Out-Null }
-            Measure-Case 'zombies' $zombies
-            Measure-Case 'empty' { }
-        ) | ForEach-Object { $_ | Add-Member run $N -PassThru }
+        $spawns = [ordered]@{
+            revenants = { Invoke-Console "sc bench $Count" | Out-Null }
+            mixed = { Invoke-Console "sc bench $mixed mixed" | Out-Null }
+            zombies = $zombies
+            empty = { }
+            crowd = $crowd
+        }
+        @(foreach ($case in $spawns.Keys) {
+                if ($Cases -contains $case) { Measure-Case $case $spawns[$case] }
+            }) | ForEach-Object { $_ | Add-Member run $N -PassThru }
     } finally {
         if ($bot) { Stop-Bot $bot }
         & $World stop | Out-Null
@@ -128,7 +157,7 @@ function Format-Stat($Values) {
 }
 
 function Show-Stats($Rows) {
-    $cases = 'revenants', 'mixed', 'zombies', 'empty'
+    $cases = @('revenants', 'mixed', 'zombies', 'empty', 'crowd' | Where-Object { $Cases -contains $_ })
     $table = foreach ($case in $cases) {
         $r = @($Rows | Where-Object { $_.case -eq $case -and -not $_.noisy })
         [pscustomobject]@{
@@ -145,8 +174,14 @@ function Show-Stats($Rows) {
             if ($v.Count) { [pscustomobject]@{ kind = $k; case = $case; 'ms per server tick' = Format-Stat $v } }
         }
     }
-    ($table | Format-Table -AutoSize | Out-String -Width 200) + ($kinds | Format-Table -AutoSize | Out-String -Width 200) |
-        Tee-Object -FilePath $Out -Append | Write-Host
+    $parts = foreach ($k in ($Rows | ForEach-Object { $_.parts.Keys } | Sort-Object -Unique)) {
+        foreach ($case in $cases) {
+            $v = @($Rows | Where-Object { $_.case -eq $case -and -not $_.noisy } | ForEach-Object { $_.parts[$k] } | Where-Object { $null -ne $_ })
+            if ($v.Count) { [pscustomobject]@{ part = $k; case = $case; 'SoulsCraft ms per server tick' = Format-Stat $v } }
+        }
+    }
+    ($table | Format-Table -AutoSize | Out-String -Width 200) + ($parts | Format-Table -AutoSize | Out-String -Width 200) +
+    ($kinds | Format-Table -AutoSize | Out-String -Width 200) | Tee-Object -FilePath $Out -Append | Write-Host
 }
 
 New-Item -ItemType Directory -Force (Split-Path $Out) | Out-Null

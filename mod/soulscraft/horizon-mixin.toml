@@ -656,6 +656,15 @@ file = "crates/horizon-client/src/game.rs"
 name = "soulscraft_relic"
 source = "relic.rs"
 
+# ---- 0.6.2: the optimisation plan of docs/design/12-playtest-tidewill.md ----
+
+# SoulsCraft's own time in its level ticks, whole and by part, per server tick (`/sc cost`).
+[[module]]
+id = "cost"
+file = "crates/horizon-client/src/game.rs"
+name = "soulscraft_cost"
+source = "cost.rs"
+
 # The loot crate: chest horns and shards, zombies' Rotten Horn (data/loot.json, copied in by
 # mod/sync.ps1). Its helper compiles inside horizon-world, so the crate is horizon-world's.
 [[crate]]

@@ -160,14 +160,14 @@ fn info(game: &mut Game<'_>) {
 fn cost(game: &mut Game<'_>, on: bool) {
     if on {
         game.native_mob_cost_sampling(true);
-        server::reset_own_time();
+        crate::game::soulscraft_cost::reset();
         tools().cost_since = Some(std::time::Instant::now());
         return say(game, "cost sampling on");
     }
     game.native_mob_cost_sampling(false);
     let costs = game.native_take_mob_costs();
     let since = tools().cost_since.take().map_or(0.0, |t| t.elapsed().as_secs_f64());
-    let (own_ns, own_ticks) = server::own_time();
+    let (own_ns, level_ticks, server_ticks, parts) = crate::game::soulscraft_cost::totals();
     let (rate, mspt) = game.native_tick_stats();
     say(game, format!("cost over {since:.1} s: tick rate {rate}, server tick average {mspt:.2} ms"));
     // The samples come per mob type entry, and each SoulsCraft mob has its own (its type is
@@ -191,8 +191,18 @@ fn cost(game: &mut Game<'_>, on: bool) {
             format!("cost kind={kind} mob_ticks={ticks} total_ms={:.2} us_per_mob_tick={per:.2} ms_per_server_tick={ms_per_tick:.3}", *nanos as f64 / 1e6),
         );
     }
-    let per_tick = own_ns as f64 / own_ticks.max(1) as f64 / 1e6;
-    say(game, format!("cost soulscraft_level_tick ticks={own_ticks} ms_per_tick={per_tick:.3}"));
+    // Per server tick: the hook runs once per loaded level, and a server tick pays for all of them.
+    let per_tick = |nanos: u64| nanos as f64 / server_ticks.max(1) as f64 / 1e6;
+    say(
+        game,
+        format!(
+            "cost soulscraft_level_tick level_ticks={level_ticks} server_ticks={server_ticks} ms_per_server_tick={:.3}",
+            per_tick(own_ns)
+        ),
+    );
+    for (name, nanos) in crate::game::soulscraft_cost::PART_NAMES.iter().zip(parts) {
+        say(game, format!("cost soulscraft_part part={name} ms_per_server_tick={:.4}", per_tick(nanos)));
+    }
 }
 
 /// The level's tick: the queued tasks of this level, and the waves.

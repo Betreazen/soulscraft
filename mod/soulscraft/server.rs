@@ -215,9 +215,11 @@ pub(super) struct Target {
 }
 
 pub(super) fn on_level_tick(game: &mut Game<'_>, dimension: &str) {
-    let started = std::time::Instant::now();
+    use crate::game::soulscraft_cost::{Clock, Part};
+    let mut clock = Clock::start();
     let now = game.world.game_time.max(0) as u64;
     crate::game::soulscraft_tools::run_due(game, dimension, now);
+    clock.lap(Part::Tasks);
     // A frozen world (`/tick freeze`) still runs the level hooks with its clock stopped: the mobs
     // advance once per game tick, or a blow due on a tick would land again and again.
     {
@@ -228,15 +230,21 @@ pub(super) fn on_level_tick(game: &mut Game<'_>, dimension: &str) {
         last.insert(dimension.to_owned(), now);
     }
     hurt_bleeders(game, dimension);
+    clock.lap(Part::Own);
     crate::game::soulscraft_altar::on_level_tick(game, dimension, now);
+    clock.lap(Part::Altar);
     crate::game::soulscraft_trophy::on_level_tick(game, dimension, now);
+    clock.lap(Part::Trophy);
     crate::game::soulscraft_spawn_boost::on_level_tick(dimension, now);
     crate::game::soulscraft_natural::on_level_tick(game, dimension, now);
+    clock.lap(Part::Spawning);
     crate::game::soulscraft_relic::on_level_tick(game, dimension, now);
+    clock.lap(Part::Relic);
     if dimension == "minecraft:overworld" {
         let online = game.native_server_players();
         crate::game::soulscraft_power::refresh(game, &online, now);
     }
+    clock.lap(Part::Power);
     let players = players_in(game, dimension);
     let seen = seen_mobs(game);
     remember_players(&players, &seen);
@@ -246,32 +254,18 @@ pub(super) fn on_level_tick(game: &mut Game<'_>, dimension: &str) {
     }
     forget_gone(dimension, now);
     send_notes(game, dimension, now, &players, notes);
+    clock.lap(Part::Own);
     // The approved vanilla changes (07-vanilla-mobs.md): adopt and drive vanilla mobs.
     crate::game::soulscraft_vanilla::on_level_tick(game, dimension, now, &players);
+    clock.lap(Part::Vanilla);
     crate::game::soulscraft_book::on_level_tick(game, dimension, now);
-    let spent = started.elapsed().as_nanos() as u64;
-    {
-        let mut t = OWN_TIME.lock().unwrap_or_else(PoisonError::into_inner);
-        t.0 += spent;
-        t.1 += 1;
-    }
+    clock.lap(Part::Book);
+    clock.finish(now);
     crate::game::soulscraft_selftest::on_tick(game, dimension, now);
 }
 
 /// The game tick each level was last driven at.
 static LAST_TICK: LazyLock<Mutex<HashMap<String, u64>>> = LazyLock::new(Mutex::default);
-
-/// SoulsCraft's own time in its level ticks (nanoseconds, ticks) since the last reset: the
-/// number hypothesis Г8 bounds (П5).
-static OWN_TIME: Mutex<(u64, u64)> = Mutex::new((0, 0));
-
-pub(super) fn reset_own_time() {
-    *OWN_TIME.lock().unwrap_or_else(PoisonError::into_inner) = (0, 0);
-}
-
-pub(super) fn own_time() -> (u64, u64) {
-    *OWN_TIME.lock().unwrap_or_else(PoisonError::into_inner)
-}
 
 fn seen_mobs(game: &Game<'_>) -> Vec<Seen> {
     game.mobs
