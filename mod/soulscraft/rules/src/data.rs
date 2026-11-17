@@ -323,6 +323,11 @@ pub struct MoveDef {
     pub cue: Option<crate::vanilla::Cue>,
 }
 
+/// The shield cooldown of an axe's blow, the only one the engine gives a mob that holds one (the
+/// axe's `disable_blocking_seconds` 5 × 20; Horizon game/shield.rs:198-262): `params.shield_disable_ticks`
+/// is 0 or this.
+pub const SHIELD_DISABLE_AXE_TICKS: f64 = 100.0;
+
 /// The kin groups of the kin banners (data/altar.json `kin_names`).
 pub const KINS: [&str; 5] = ["undead", "beasts", "slimes", "flyers", "water"];
 
@@ -460,6 +465,17 @@ impl MobDef {
         }
         if let Some(a) = self.attacks.iter().find(|a| a.wave.as_ref().is_some_and(|w| w.jumpable && w.jump_clear_blocks.is_none())) {
             return Err(format!("mob {} attack {}: a jumpable wave needs its wave.jump_clear_blocks", self.id, a.id));
+        }
+        // The engine puts a shield on cooldown only through an axe's blow, for the axe's 100 ticks:
+        // the mob holds one for that blow (soulscraft_server knock_blow), so no other length exists.
+        if let Some(t) = self.param("shield_disable_ticks")
+            && t != 0.0
+            && t != SHIELD_DISABLE_AXE_TICKS
+        {
+            return Err(format!(
+                "mob {}: params.shield_disable_ticks {t} must be 0 (off) or {SHIELD_DISABLE_AXE_TICKS}: the cooldown comes from the axe the mob holds for the blow, the engine has no other length",
+                self.id
+            ));
         }
         for a in &self.attacks {
             if a.follows.is_some() {
@@ -697,6 +713,17 @@ mod tests {
         let text = EMBEDDED.replacen(", \"jump_clear_blocks\": 0.5", "", 1);
         assert_ne!(text, EMBEDDED, "the brute's jump_clear_blocks was found");
         assert!(MobsFile::parse(&text).unwrap_err().contains("jump_clear_blocks"));
+    }
+
+    #[test]
+    fn shield_disable_ticks_is_the_axes_or_none() {
+        assert_eq!(MobsFile::embedded().mob("revenant").unwrap().param("shield_disable_ticks"), Some(100.0));
+        let text = EMBEDDED.replacen("\"shield_disable_ticks\": 100", "\"shield_disable_ticks\": 60", 1);
+        assert_ne!(text, EMBEDDED, "the revenant's shield_disable_ticks was found");
+        let err = MobsFile::parse(&text).unwrap_err();
+        assert!(err.contains("shield_disable_ticks") && err.contains("axe"), "{err}");
+        let off = EMBEDDED.replacen("\"shield_disable_ticks\": 100", "\"shield_disable_ticks\": 0", 1);
+        assert!(MobsFile::parse(&off).is_ok());
     }
 
     #[test]
