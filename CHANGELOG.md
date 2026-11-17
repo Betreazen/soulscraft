@@ -31,9 +31,10 @@
 
 ### Проверка
 
-- Правила: `cargo test` в `mod/soulscraft/rules`, 236 тестов (было 194).
-- 17 новых сценариев самотеста (было 87): `revenant_shield_bash_knocks`, `revenant_shield_front`, `marksman_reload_cover`, `shrike_falls_on_death`, `bog_slime_splits`, `lurker_grab_holds`, `lurker_grab_breaks`, `lurker_grab_keeps_its_prey`, `wave_skeleton_keeps_group`, `event_group_power`, `event_one_life`, `event_hardcore_spare`, `altar_horn_tier_gate`, `event_restore_orphans`, `natural_tier_gate`, `reward_tier_item`, `repair_with_shard`. Они закрывают то, что раньше не проверяли: щит 80%, деление слизи, одну жизнь, страховку хардкора, ступень горна, силу группы, `restore_orphans`, починку осколками, ступень P.
-- Проверка на стенде: самотест SoulsCraft 104/104, RustCraft 143/143, Path-of-craft-tree 42/42 (Horizon 7e4e421).
+- Правила: `cargo test` в `mod/soulscraft/rules`, 237 тестов (было 194).
+- 18 новых сценариев самотеста (было 87): `revenant_shield_bash_knocks`, `brute_wave_spares_jumper`, `revenant_shield_front`, `marksman_reload_cover`, `shrike_falls_on_death`, `bog_slime_splits`, `lurker_grab_holds`, `lurker_grab_breaks`, `lurker_grab_keeps_its_prey`, `wave_skeleton_keeps_group`, `event_group_power`, `event_one_life`, `event_hardcore_spare`, `altar_horn_tier_gate`, `event_restore_orphans`, `natural_tier_gate`, `reward_tier_item`, `repair_with_shard`. Они закрывают то, что раньше не проверяли: щит 80%, деление слизи, одну жизнь, страховку хардкора, ступень горна, силу группы, `restore_orphans`, починку осколками, ступень P.
+- Проверка на стенде: самотест SoulsCraft 105/105, RustCraft 143/143, Path-of-craft-tree 42/42 (Horizon 7e4e421).
+- Боты на стенде (`prototypes/check-final.ps1`, снимки в `prototypes/evidence/final/`): латник догоняет в задержке и бьёт щитом с отбросом, ловчий ждёт под взглядом и бьёт, когда от него отвернулись, арбалетчик перезаряжается за стеной, через волну громилы можно перепрыгнуть, сорокопуты пикируют по очереди и мёртвый падает, слизь прыгает на 4 блока и делится, хватка удильщика отпускает после трёх ударов, меню алтаря с четырьмя ивентами, граница зоны и полоса ивента, знаменосец крупнее зомби. Запись LetsCam ивента второй ступени: `tier2_event_fight_720p.mp4` и листы кадров.
 
 ### Пределы
 

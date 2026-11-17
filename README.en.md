@@ -139,7 +139,7 @@ The `/sc` commands are for operators of level 2 and up and for the console.
 | `/sc power` · `/sc p <strength>` | Show the strength of players nearby · set enemy strength by hand |
 | `/sc info` | How many of the mod's mobs and changed vanilla mobs are in the world |
 | `/sc reload` | Re-read `config/soulscraft/mobs.json` in the server folder without a restart |
-| `soulscraft_selftest run [filter]` | Console only: the in-world self-test, 104 scenarios of attacks, the altar, events, trophies and the book |
+| `soulscraft_selftest run [filter]` | Console only: the in-world self-test, 105 scenarios of attacks, the altar, events, trophies and the book |
 
 ### Numbers without a rebuild
 
