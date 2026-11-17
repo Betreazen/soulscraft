@@ -24,6 +24,7 @@
 use crate::game::Game;
 use crate::game::soulscraft_altar::{self as altar_srv, Altar};
 use crate::game::soulscraft_server as server;
+use horizon_client::mobs::Who;
 use soulscraft_rules::{
     altar as ra,
     data::Stats,
@@ -608,6 +609,7 @@ fn drive_mobs(game: &mut Game<'_>, r: &mut EventRun, parts: &[Part], now: u64) {
             })
             .collect();
         let altar_visible = sight(r.field.as_ref(), eye, core_c);
+        let fights = w.led && led_fights(game, id, pos, parts);
         let goal = if w.mind.cursed {
             Goal::Altar
         } else {
@@ -635,7 +637,7 @@ fn drive_mobs(game: &mut Game<'_>, r: &mut EventRun, parts: &[Part], now: u64) {
                 if w.soul {
                     STEER.lock().unwrap_or_else(PoisonError::into_inner).insert(id, Steering::Own);
                 }
-                to_altar(game, r, id, &mut w, altar_visible, now);
+                to_altar(game, r, id, &mut w, altar_visible, fights, now);
             }
         }
         r.mobs.insert(id, w);
@@ -647,6 +649,20 @@ fn gone(r: &mut EventRun, id: u32) {
     WAVE_IDS.lock().unwrap_or_else(PoisonError::into_inner).remove(&id);
     LED.lock().unwrap_or_else(PoisonError::into_inner).remove(&id);
     STEER.lock().unwrap_or_else(PoisonError::into_inner).remove(&id);
+}
+
+/// A vanilla-led wave mob whose own target (its goals', or the self-test's forced one) is a
+/// participant within its group's reach (soulscraft_vanilla::FOLLOW): its group fights them, so the
+/// event does not walk it to the altar meanwhile (a skeleton shoots instead of fighting the path).
+fn led_fights(game: &Game<'_>, id: u32, pos: V3, parts: &[Part]) -> bool {
+    let forced = crate::game::soulscraft_vanilla::state().targets.get(&id).copied();
+    let who = forced.map(Who::Mob).or_else(|| crate::game::soulscraft_find::mob(game, id).and_then(|m| m.ai.target));
+    let near = |p: &&Part| geom::dist(p.pos, pos) <= crate::game::soulscraft_vanilla::FOLLOW;
+    match who {
+        Some(Who::Mob(e)) => parts.iter().filter(near).any(|p| p.entity == e),
+        Some(Who::Player) => parts.iter().filter(near).any(|p| p.player.is_some()),
+        None => false,
+    }
 }
 
 /// A vanilla-led mob after a participant: the event's walk stops, its own goals take over.
@@ -772,7 +788,9 @@ fn chase(game: &mut Game<'_>, dim: &str, id: u32, w: &mut WaveMob, p: &Part, pow
 
 /// A mob going for the altar: along the path map, then the drain with its windup; walled out
 /// for long it curses the altar from where it stands; the brute breaks a way through.
-fn to_altar(game: &mut Game<'_>, r: &mut EventRun, id: u32, w: &mut WaveMob, altar_visible: bool, now: u64) {
+/// `fights`: a vanilla-led mob its group has on a participant (`led_fights`) drains at the altar as
+/// any other, but is not walked there while it fights.
+fn to_altar(game: &mut Game<'_>, r: &mut EventRun, id: u32, w: &mut WaveMob, altar_visible: bool, fights: bool, now: u64) {
     let dim = r.dim.clone();
     let core_c = core_centre(r.core);
     let flat = geom::flat_dist(w.pos, core_c);
@@ -820,6 +838,10 @@ fn to_altar(game: &mut Game<'_>, r: &mut EventRun, id: u32, w: &mut WaveMob, alt
         }
         Drain::Away => {
             w.beam = None;
+            if fights {
+                let_go(game, &dim, id, w);
+                return;
+            }
             let Some(field) = r.field.as_ref() else {
                 nav_to(game, &dim, id, w, cell_of(core_c), now);
                 return;

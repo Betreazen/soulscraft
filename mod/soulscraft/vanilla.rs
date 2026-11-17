@@ -45,7 +45,7 @@ const TAG_FRESH: &str = "soulscraft.fresh";
 /// The modifier id of Г2's growth on a vanilla mob's attributes.
 const POWER_MOD: &str = "soulscraft:power";
 /// A target farther than this is no target for the moves.
-const FOLLOW: f64 = 32.0;
+pub(super) const FOLLOW: f64 = 32.0;
 /// A walk is asked a new path at most this often unless it moved.
 const REPATH_EVERY: u64 = 10;
 /// A tracked mob not seen for this long left: forgotten.
