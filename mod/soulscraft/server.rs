@@ -1259,24 +1259,21 @@ fn deal_wave(
     landed
 }
 
-/// The top of the ground under feet at `feet`: the highest collision box top at or below them in
-/// their block or the one beneath. None there (feet a block or more over the ground) gives
-/// minus infinity: they are over any wave.
+/// The top of the ground under a player's feet at `feet`, over every column its box stands on
+/// (soulscraft_rules::attack::ground_under: a player on a block's edge stands on it): in each, the
+/// highest collision box top at or below the feet in their block or the one beneath. None
+/// anywhere (feet a block or more over the ground) gives minus infinity: they are over any wave.
 fn ground_under(game: &Game<'_>, feet: V3) -> f64 {
-    let (x, z) = (feet[0].floor() as i32, feet[2].floor() as i32);
     let top = feet[1].floor() as i32;
-    for y in [top, top - 1] {
-        let surface = game
-            .native_block_collision([x, y, z])
-            .iter()
-            .map(|b| f64::from(y) + b[4])
-            .filter(|s| *s <= feet[1] + 1e-3)
-            .reduce(f64::max);
-        if let Some(s) = surface {
-            return s;
-        }
-    }
-    f64::NEG_INFINITY
+    soulscraft_rules::attack::ground_under(feet, |[x, z]| {
+        [top, top - 1].into_iter().find_map(|y| {
+            game.native_block_collision([x, y, z])
+                .iter()
+                .map(|b| f64::from(y) + b[4])
+                .filter(|s| *s <= feet[1] + 1e-3)
+                .reduce(f64::max)
+        })
+    })
 }
 
 /// A later strike of a several-strike attack (the stalker's double slash, 3 ticks apart) would

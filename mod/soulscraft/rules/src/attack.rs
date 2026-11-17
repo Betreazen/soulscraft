@@ -148,6 +148,25 @@ pub fn wave_hits(center: V3, radius: f64, clearance: Option<f64>, target_feet: V
     geom::dist(center, target_feet) <= radius
 }
 
+/// Half a player's box (vanilla `EntityType.PLAYER`: 0.6 wide), less a hair so a box that only
+/// touches a block's side does not stand on it.
+const PLAYER_HALF_WIDTH: f64 = 0.3 - 1e-3;
+
+/// The top of the ground under a player whose feet are at `feet`: the highest of `surface` over
+/// every block column its box stands over (its centre and its four corners), so a player on a
+/// block's edge with the centre over air stands on that block. `surface` gives a column's ground
+/// top at or below the feet, if any near. None anywhere gives minus infinity: over any wave.
+pub fn ground_under(feet: V3, surface: impl Fn([i32; 2]) -> Option<f64>) -> f64 {
+    let h = PLAYER_HALF_WIDTH;
+    let mut columns: Vec<[i32; 2]> = [[0.0, 0.0], [-h, -h], [-h, h], [h, -h], [h, h]]
+        .iter()
+        .map(|d| [(feet[0] + d[0]).floor() as i32, (feet[2] + d[1]).floor() as i32])
+        .collect();
+    columns.sort_unstable();
+    columns.dedup();
+    columns.into_iter().filter_map(surface).fold(f64::NEG_INFINITY, f64::max)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -262,6 +281,23 @@ mod tests {
         assert!(wave_hits(center, w.radius_blocks, w.clearance(), [0.0, 1.0, 2.0], 1.0));
         // A wave that cannot be jumped catches the jumper.
         assert!(wave_hits(center, w.radius_blocks, None, [0.0, 0.6, 2.0], 0.0));
+    }
+
+    #[test]
+    fn player_on_a_block_edge_stands_on_it() {
+        // One block at column (10, 0), its top at y 65; air all round.
+        let world = |c: [i32; 2]| (c == [10, 0]).then_some(65.0);
+        // The centre 0.2 past the block's east side, over air: a corner is still over the block.
+        let ground = ground_under([11.2, 65.0, 0.5], world);
+        assert_eq!(ground, 65.0);
+        let w = slam_wave();
+        let center = [12.0, 65.0, 0.5];
+        assert!(wave_hits(center, w.radius_blocks, w.clearance(), [11.2, 65.0, 0.5], ground), "an edge stander is caught");
+        // The centre 0.3 past the side: the box only touches the block, the player is over air.
+        assert_eq!(ground_under([11.3, 65.0, 0.5], world), f64::NEG_INFINITY);
+        // The highest column counts: a step a block up under one corner.
+        let steps = |c: [i32; 2]| Some(if c[0] == 10 { 66.0 } else { 65.0 });
+        assert_eq!(ground_under([10.1, 66.0, 0.5], steps), 66.0);
     }
 
     #[test]
