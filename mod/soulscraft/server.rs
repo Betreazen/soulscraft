@@ -19,7 +19,7 @@ use crate::game::native_player_state::NativeEffect;
 use crate::mod_api::NativeServerPlayer;
 use horizon_client::particles::ParticleOptions;
 use soulscraft_rules::{
-    attack::{Phase, Timeline, wave_center, wave_hits},
+    attack::{Phase, Timeline, clears_wave, wave_center, wave_hits},
     brain::{self, Brain, DiveTurns, Event, Order, Senses, Strike, Style, TargetSense, Tick},
     data::{MobDef, MobsFile},
     geom::{self, V3},
@@ -1130,11 +1130,15 @@ fn deal(
     let t = state().mobs.get(&m.id).and_then(|x| x.brain.attack(now)).map_or(0, |(_, t)| t);
     let blow = sc.blow(a.damage);
     let mut landed = false;
+    // A target mid-jump over a jumpable wave (the brute's overhead_wave) is over its blow too.
+    let clearance = a.wave.as_ref().and_then(|w| w.clearance());
+    let jumped = clearance.is_some() && target.is_some_and(|tg| clears_wave(clearance, tg.pos[1], ground_under(game, tg.pos)));
+    let hits_target = strike.hits_target && !jumped;
     if strike.ranged {
         if let Some(tg) = target {
             landed = shoot(game, dim, m, tg, blow, def.hitbox_at(size).eye);
         }
-    } else if strike.hits_target
+    } else if hits_target
         && let Some(tg) = target
     {
         // The grab's bites, 10 ticks apart, are meant to land too (its `follows` marks the grab).
@@ -1161,16 +1165,17 @@ fn deal(
         }
     }
     if let Some(radius) = strike.area {
-        landed |= deal_wave(game, dim, m, def, sc, a, radius, blow, strike.hits_target, target, players);
+        landed |= deal_wave(game, dim, m, def, sc, a, radius, blow, hits_target, target, players);
     }
     let who = target.map_or("-", |t| t.name.as_str());
     log::log!(
         chatty(),
-        "soulscraft: strike mob={} id={} attack={} t={t} tick={now} hit={} dmg={blow:.2} target={who}",
+        "soulscraft: strike mob={} id={} attack={} t={t} tick={now} hit={} dmg={blow:.2} target={who}{}",
         def.id,
         m.id,
         a.id,
-        landed
+        landed,
+        if jumped { " jumped=true" } else { "" }
     );
     let mut s = state();
     s.strikes.push(StrikeRecord { mob: m.id, attack: a.id.clone(), t, tick: now, hit: landed, damage: blow });

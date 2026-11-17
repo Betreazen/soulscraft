@@ -142,10 +142,18 @@ pub fn wave_center(pos: V3, yaw: f64, wave: &WaveDef) -> V3 {
 /// under them at `ground_y`: within `radius`, and not over it when it can be jumped (feet more than
 /// `clearance`, the wave's `jump_clear_blocks`, over the ground: [`WaveDef::clearance`]).
 pub fn wave_hits(center: V3, radius: f64, clearance: Option<f64>, target_feet: V3, ground_y: f64) -> bool {
-    if clearance.is_some_and(|clear| target_feet[1] - ground_y > clear) {
+    if clears_wave(clearance, target_feet[1], ground_y) {
         return false;
     }
     geom::dist(center, target_feet) <= radius
+}
+
+/// Whether feet at `feet_y` are over a wave that can be jumped: more than `clearance` (its
+/// `jump_clear_blocks`, [`WaveDef::clearance`]) over `ground_y`. Such a target is over the blow
+/// that makes the wave too: the brute's hammer strikes the ground at the impact point, so the
+/// target it swung at, mid-jump there, is spared with the wave (data: «не получает урона»).
+pub fn clears_wave(clearance: Option<f64>, feet_y: f64, ground_y: f64) -> bool {
+    clearance.is_some_and(|clear| feet_y - ground_y > clear)
 }
 
 /// Half a player's box (vanilla `EntityType.PLAYER`: 0.6 wide), less a hair so a box that only
@@ -281,6 +289,20 @@ mod tests {
         assert!(wave_hits(center, w.radius_blocks, w.clearance(), [0.0, 1.0, 2.0], 1.0));
         // A wave that cannot be jumped catches the jumper.
         assert!(wave_hits(center, w.radius_blocks, None, [0.0, 0.6, 2.0], 0.0));
+    }
+
+    #[test]
+    fn jumping_target_clears_the_blow_of_a_jumpable_wave() {
+        // The target the brute swings at, mid-jump at the impact point: over the hammer too.
+        let w = slam_wave();
+        assert!(clears_wave(w.clearance(), 65.6, 65.0));
+        assert!(!clears_wave(w.clearance(), 65.4, 65.0), "0.4 up is under the 0.5 clearance");
+        // Feet a block up over nothing near (ground_under gives minus infinity): clear.
+        assert!(clears_wave(w.clearance(), 66.0, f64::NEG_INFINITY));
+        // A wave that cannot be jumped (the slime's landing) never spares its target.
+        let slime = MobsFile::embedded().mob("bog_slime").unwrap().attack("high_jump").unwrap().wave.clone().unwrap();
+        assert!(!clears_wave(slime.clearance(), 66.0, 65.0));
+        assert!(!clears_wave(None, 70.0, 65.0));
     }
 
     #[test]

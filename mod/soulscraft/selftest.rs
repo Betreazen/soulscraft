@@ -52,7 +52,7 @@ enum Kind {
     /// The vanilla changes (soulscraft_selftest_vanilla); `vslow_` ones only when the filter
     /// names them.
     Vanilla(String),
-    /// The revenant's, the stalker's and the marksman's fight ([`DUEL_CASES`]).
+    /// The revenant's, the stalker's, the marksman's and the brute's fight ([`DUEL_CASES`]).
     Duel(&'static str),
 }
 
@@ -768,7 +768,12 @@ fn waves(game: &mut Game<'_>, dim: &str, now: u64, live: &mut Live) -> Option<Re
 ///                                the same blow from behind (`shield_front_reduction`)
 ///   marksman_reload_cover        after its shot it reloads behind a 3×3 wall off to its side, out
 ///                                of the golem's sight (`reload_cover_blocks`)
-const DUEL_CASES: &[(&str, u64)] = &[("revenant_shield_bash_knocks", 140), ("revenant_shield_front", 60), ("marksman_reload_cover", 140)];
+const DUEL_CASES: &[(&str, u64)] = &[
+    ("revenant_shield_bash_knocks", 140),
+    ("revenant_shield_front", 60),
+    ("marksman_reload_cover", 140),
+    ("brute_wave_spares_jumper", 160),
+];
 
 /// The blow `revenant_shield_front` deals from each side.
 const SHIELD_TEST_BLOW: f32 = 10.0;
@@ -799,6 +804,7 @@ fn duel(game: &mut Game<'_>, dim: &str, now: u64, live: &mut Live, name: &str, f
         "revenant_shield_bash_knocks" => shield_bash_knocks(game, dim, now, live, first),
         "revenant_shield_front" => shield_front(game, dim, live, first),
         "marksman_reload_cover" => marksman_reload_cover(game, dim, now, live, first),
+        "brute_wave_spares_jumper" => brute_wave_spares_jumper(game, dim, now, live, first),
         other => Some(Err(format!("no scenario {other}"))),
     }
 }
@@ -995,6 +1001,85 @@ fn marksman_reload_cover(game: &mut Game<'_>, dim: &str, now: u64, live: &mut Li
     let seen = [eye, top].iter().any(|h| crate::game::soulscraft_cover::sees(game, seer, [at[0], at[1] + h, at[2]]));
     live.note = format!("shot, still seen at {:.1},{:.1},{:.1}", at[0], at[1], at[2]);
     (!seen).then_some(Ok(()))
+}
+
+/// Where brute_wave_spares_jumper's golem stands: at the hammer's impact point (`impact_ahead_blocks`
+/// 2 south of a brute facing south), on the platform, or a block up for the jump.
+const WAVE_GOLEM_AT: [f64; 3] = [BASE[0], BASE[1], BASE[2] + 2.0];
+/// Ticks after the first overhead_wave's blow before the second is forced: its recover (20) is over.
+const WAVE_RECOVER: u64 = 25;
+
+/// A still brute (NoAI: the brain runs, the body stays) swings `overhead_wave` at a still iron
+/// golem at its impact point twice: the golem on the platform loses health; then held a block up
+/// (no gravity, put back every tick), as a player mid-jump is over `jump_clear_blocks` 0.5, it
+/// loses none and the blow does not land (soulscraft_rules::attack::clears_wave).
+fn brute_wave_spares_jumper(game: &mut Game<'_>, dim: &str, now: u64, live: &mut Live, first: bool) -> Option<Result<(), String>> {
+    let up = [WAVE_GOLEM_AT[0], WAVE_GOLEM_AT[1] + 1.0, WAVE_GOLEM_AT[2]];
+    if first {
+        let snbt = format!("{{Rotation:[0f,0f],Tags:[\"soulscraft.p=0.00\",\"{}\"],PersistenceRequired:1b,NoAI:1b}}", server::TAG_FRESH);
+        live.mob = summon(game, dim, "soulscraft:brute", BASE, &snbt);
+        live.golem = summon(game, dim, "minecraft:iron_golem", WAVE_GOLEM_AT, "{NoAI:1b,PersistenceRequired:1b}");
+        return (live.mob.is_none() || live.golem.is_none()).then(|| Err("brute or golem not spawned".into()));
+    }
+    let (mob, golem) = (live.mob?, live.golem?);
+    let blow_since = |mark: u64| {
+        server::state().strikes.iter().rev().find(|r| r.mob == mob && r.attack == "overhead_wave" && r.tick > mark).cloned()
+    };
+    match live.note.as_str() {
+        "" => {
+            if !aim(live, false) {
+                return None;
+            }
+            live.golem_health = health(game, golem)?;
+            if let Err(e) = force(live, "overhead_wave") {
+                return Some(Err(e));
+            }
+            live.mark = now;
+            live.note = "ground".into();
+            None
+        }
+        "ground" => {
+            let rec = blow_since(live.mark)?;
+            if now < rec.tick + WAVE_RECOVER {
+                return None;
+            }
+            let lost = live.golem_health - health(game, golem)?;
+            if !rec.hit || lost <= 0.0 {
+                return Some(Err(format!("the grounded golem was not hit (hit={}, lost {lost:.2})", rec.hit)));
+            }
+            game.native_teleport_mob(dim, golem, up);
+            if let Some(g) = crate::game::soulscraft_find::mob_mut(game, golem) {
+                g.no_gravity = true;
+                g.velocity.x = 0.0;
+                g.velocity.y = 0.0;
+                g.velocity.z = 0.0;
+                g.invulnerable = 0;
+                g.needs_sync = true;
+            }
+            live.golem_health = health(game, golem)?;
+            if let Err(e) = force(live, "overhead_wave") {
+                return Some(Err(e));
+            }
+            live.mark = now;
+            live.note = "air".into();
+            None
+        }
+        _ => {
+            let Some(rec) = blow_since(live.mark) else {
+                // Held where a jump would have it until the blow falls.
+                game.native_teleport_mob(dim, golem, up);
+                return None;
+            };
+            let y = pos_of(game, golem)?[1];
+            let lost = live.golem_health - health(game, golem)?;
+            log::info!("soulscraft: selftest brute_wave_spares_jumper hit={} lost={lost:.2} feet={:.2}", rec.hit, y - BASE[1]);
+            Some(if !rec.hit && lost <= 0.0 && y - BASE[1] > 0.5 {
+                Ok(())
+            } else {
+                Err(format!("the golem {:.2} over the platform: blow hit={}, lost {lost:.2}", y - BASE[1], rec.hit))
+            })
+        }
+    }
 }
 
 /// A dead flyer's body is taken away at death time 20 (game/creatures.rs:1378): the fall is read
