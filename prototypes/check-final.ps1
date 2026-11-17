@@ -26,6 +26,8 @@
 # the phase/strike lines, positions and health, and says so in its reason.
 param([string[]]$Only)
 $ErrorActionPreference = 'Stop'
+# The server's replies are UTF-8 (the boss bar's Russian name): read them so whatever shell started us.
+[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
 . (Join-Path $PSScriptRoot 'lib\bot.ps1')
 $Repo = Split-Path $PSScriptRoot
 $Out = Join-Path $PSScriptRoot 'evidence\final'
@@ -197,7 +199,7 @@ try {
         Start-Sleep -Seconds 2
         $mark = Mark
         $a = Get-Attack 'revenant' 'overhead'
-        $bp = @($cx, $cy, $cz - 3)
+        $bp = @($cx, $cy, ($cz - 3))
         C 'tick freeze' | Out-Null
         C 'sc force overhead' | Out-Null
         $stops = [ordered]@{ windup_end = $a.windup; hold_mid = $a.windup + [math]::Floor($a.hold / 2); hit = $a.windup + $a.hold }
@@ -238,7 +240,7 @@ try {
         # no strike. Trial B: a fresh stalker, the bot looks away (`look`, re-aimed every 0.4 s so the
         # stalker never gets into the view): it strikes before flank_max_ticks.
         Set-Survivor
-        $bp = @($cx, $cy, $cz - 3)
+        $bp = @($cx, $cy, ($cz - 3))
         $max = [int]$MobData.mobs.Where({ $_.id -eq 'stalker' })[0].params.flank_max_ticks
         if ($max -le 0) { $max = 100 }
         # A
@@ -289,9 +291,11 @@ try {
 
     Run-Scene 'marksman_cover' {
         # Wall x -496..-494, y 101..103, z 502 (3x3), 5.4 blocks from the marksman at z 500.5; the
-        # bot is its target 10 blocks north. After the shot the marksman reloads: behind the wall means
+        # bot is its target 10 blocks north (in survival: a creative player is no target, and the
+        # first re-run's forced shot went off at nobody). After the shot the marksman reloads: behind the wall means
         # its line to the bot crosses the wall's plane inside the wall and it stands past it.
         $cam = Get-Cam
+        Set-Survivor
         C 'fill -496 101 502 -494 103 502 stone' | Out-Null
         C "tp sc_a $cx $cy $($cz - 5) 0 0" | Out-Null
         Start-Sleep -Seconds 1
@@ -312,7 +316,7 @@ try {
             if ($m -and $m[2] -gt 503.2) { break }
         }
         Take-Shot $cam 'marksman_cover_after'
-        $bp = @($cx, $cy, $cz - 10)
+        $bp = @($cx, $cy, ($cz - 10))
         $behind = $false
         if ($m -and $m[2] -gt 503.0) {
             $xAtWall = $bp[0] + ($m[0] - $bp[0]) * (502.5 - $bp[2]) / ($m[2] - $bp[2])
@@ -326,17 +330,22 @@ try {
     }
 
     Run-Scene 'brute_wave' {
-        # overhead_wave (windup 16) with the bot 2 blocks in front of the brute, the impact point.
-        # Standing: health must drop. Jumping: `key space tap` at three delays after the console's
-        # answer, one of which should put the bot in the air (feet > 0.5 over the ground) at the hit
-        # tick. Timing by wall clock: a jump that still loses health may only be a mistimed one (see
-        # the per-attempt lines and the strike log).
+        # overhead_wave (windup 16, the blow at t 16) with the bot 2 blocks in front of the brute, the
+        # impact point. The world is frozen and stepped (shots.ps1), so the jump is timed in ticks,
+        # not by the wall clock: the attack is stepped to t = $pre - 1, the bot holds space (players
+        # move while the world is frozen), then the world steps on through the blow, which falls
+        # 16 - $pre + 1 ticks (about 150-200 ms) into the jump, the feet about 0.7-1 block up.
+        # Standing: health must drop. Jumping: none lost, and the strike line says `jumped=true`
+        # (server.rs deal: the target over a jumpable wave is over the hammer too, 0.7.0 bench fix).
         $trial = {
-            param([double]$JumpAfter)
+            param([bool]$Jump, [int]$Pre)
+            C 'tick unfreeze' | Out-Null
             C 'sc clear' | Out-Null
+            if ((Get-Health) -le 0) { Invoke-Bot $script:Bot 'respawn' | Out-Null; Start-Sleep -Seconds 3 }
             C 'gamemode survival sc_a' | Out-Null
             C 'effect clear sc_a' | Out-Null
-            C 'effect give sc_a minecraft:instant_health 1 10 true' | Out-Null
+            C 'effect give sc_a minecraft:instant_health 1 3 true' | Out-Null
+            C 'effect give sc_a minecraft:resistance 60 1 true' | Out-Null
             C "tp sc_a $cx $cy $($cz - 3) 0 0" | Out-Null
             C 'sc spawn brute 0 1' | Out-Null
             Start-Sleep -Seconds 2
@@ -345,27 +354,35 @@ try {
             Start-Sleep -Seconds 2
             $h0 = Get-Health
             $mark = Mark
+            C 'tick freeze' | Out-Null
             C 'sc force overhead_wave' | Out-Null
-            if ($JumpAfter -ge 0) { Start-Sleep -Milliseconds ([int]($JumpAfter * 1000)); Invoke-Bot $script:Bot 'key space tap' | Out-Null }
-            Start-Sleep -Milliseconds 1800
+            Step-World $Pre
+            $ys = @()
+            if ($Jump) { Invoke-Bot $script:Bot 'key space down' | Out-Null }
+            C 'tick step 8' | Out-Null
+            for ($i = 0; $i -lt 4; $i++) { $ys += [math]::Round([double]((Get-BotPos)[1]) - $b[1], 2); Start-Sleep -Milliseconds 40 }
+            if ($Jump) { Invoke-Bot $script:Bot 'key space up' | Out-Null }
+            Step-World 30
+            C 'tick unfreeze' | Out-Null
+            Start-Sleep -Milliseconds 500
             $h1 = Get-Health
             $lines = @(Get-LogSince $mark 'soulscraft: (phase|strike) mob=brute')
-            [pscustomobject]@{ lost = [math]::Round($h0 - $h1, 2); lines = $lines }
+            [pscustomobject]@{ lost = [math]::Round($h0 - $h1, 2); lines = $lines; ys = ($ys -join ' '); jumped = @($lines | Where-Object { $_ -match 'jumped=true' }).Count -gt 0 }
         }
-        $stand = & $trial (-1)
-        Note 'brute standing' (@($stand.lines) + "health lost $($stand.lost)")
+        $stand = & $trial $false 14
+        Note 'brute standing' (@($stand.lines) + "feet over the floor after the step: $($stand.ys); health lost $($stand.lost)")
         Take-Shot $script:Bot 'brute_wave_standing_after'
         $jumps = @()
-        foreach ($d in 0.05, 0.2, 0.35) {
-            $j = & $trial $d
-            $jumps += [pscustomobject]@{ delay = $d; lost = $j.lost }
-            Note "brute jumping (space $d s after the console answer)" (@($j.lines) + "health lost $($j.lost)")
+        foreach ($pre in 14, 13) {
+            $j = & $trial $true $pre
+            $jumps += [pscustomobject]@{ pre = $pre; lost = $j.lost; jumped = $j.jumped }
+            Note "brute jumping (space held at t $($pre - 1), the blow $(17 - $pre) ticks later)" (@($j.lines) + "feet over the floor just after the step: $($j.ys); health lost $($j.lost)")
         }
         $dodged = @($jumps | Where-Object { $_.lost -le 0 })
-        $summary = ($jumps | ForEach-Object { "$($_.delay)s:-$($_.lost)" }) -join ' '
+        $summary = ($jumps | ForEach-Object { "t$($_.pre - 1):-$($_.lost)$(if ($_.jumped) { ' jumped' })" }) -join ' '
         if ($stand.lost -le 0) { return V 'FAIL' "the standing bot lost no health (wave did not hit; jumps $summary)" }
-        if ($dodged.Count -eq 0) { return V 'FAIL' "standing lost $($stand.lost); no jump attempt dodged it ($summary): the wave hits jumpers or the timing missed, see console.txt" }
-        V 'PASS' "standing lost $($stand.lost); jumping $summary ($($dodged.Count) of 3 attempts took nothing)"
+        if ($dodged.Count -eq 0) { return V 'FAIL' "standing lost $($stand.lost); no tick-timed jump dodged it ($summary): the hammer hits a jumping target (fixed in server.rs deal, needs the rebuilt bundle)" }
+        V 'PASS' "standing lost $($stand.lost); jumping $summary ($($dodged.Count) of $($jumps.Count) tick-timed jumps took nothing)"
     }
 
     Run-Scene 'shrike_turns' {
@@ -422,30 +439,48 @@ try {
     }
 
     Run-Scene 'bog_slime' {
-        # A: frozen, `sc force high_jump`, the slime stepped through its jump with the camera at the
-        # side. Its height is measured; the smoke shadow at the landing spot is in the shots only.
-        # B: a size-4 slime killed by the bot, the size-2 slimes counted (adopt lines, and the
-        # server's count of bog slimes).
+        # A: frozen and stepped one tick at a time from a slime standing on the ground (one caught
+        # mid-hop is stepped down first: a jump forced in the air starts from there, which gave the
+        # first run's 7.5), `sc force high_jump`, its Y read every tick: the apex against vanilla
+        # physics for sizes.4.jump_velocity (y += v; v = (v - 0.08) * 0.98: 0.8 gives ~3.97). The camera
+        # stands 5 blocks east, 2 up (the slime is small: 0.8 block across at size 4), framing the slime's path and its landing spot, where the smoke
+        # shadow is (for the eye). B: a size-4 slime killed by the bot, the size-2 slimes counted.
         $cam = Get-Cam
         Set-Survivor
-        C "tp sc_b $($cx + 6) $($cy + 2.5) $($cz - 0.5) -90 10" | Out-Null
+        C "tp sc_b $($cx + 5) $($cy + 2) $($cz - 1.5) 90 0" | Out-Null
         C 'sc spawn bog_slime 0 1' | Out-Null
         Start-Sleep -Seconds 2
-        Invoke-Bot $cam "look-at $cx $($cy + 1) $($cz - 0.5)" | Out-Null
-        $ground = (Get-MobPos 'soulscraft:bog_slime')[1]
+        Invoke-Bot $cam "look-at $cx $($cy + 2) $($cz - 1.5)" | Out-Null
+        $sel = "@e[type=soulscraft:bog_slime,limit=1,sort=nearest,x=$cx,y=$cy,z=$cz]"
         C 'tick freeze' | Out-Null
-        C 'sc force high_jump' | Out-Null
+        $settle = 0
+        for ($i = 0; $i -lt 40 -and $settle -lt 3; $i++) {
+            if (((C "data get entity $sel OnGround") -join ' ') -match '1b') { $settle++ } else { $settle = 0 }
+            if ($settle -lt 3) { C 'tick step 1' | Out-Null; Start-Sleep -Milliseconds 150 }
+        }
+        $start = Get-MobPos 'soulscraft:bog_slime'
+        $ground = $start[1]
+        $camSt = (Invoke-Bot $cam 'state' | Out-String | ConvertFrom-Json).player
         $a = Get-Attack 'bog_slime' 'high_jump'
-        $at = -1; $top = $ground; $lines = @()
-        foreach ($stop in ($a.windup + 3), ($a.windup + 9), ($a.windup + 15), ($a.windup + 21)) {
-            Step-World ($stop - $at); $at = $stop
+        $jv = [double](($MobData.mobs | Where-Object id -eq 'bog_slime').sizes | Where-Object size -eq 4).jump_velocity
+        $want = 0.0; $v = $jv; while ($v -gt 0) { $want += $v; $v = ($v - 0.08) * 0.98 }
+        $mark = Mark
+        C 'sc force high_jump' | Out-Null
+        $shots = @(3, 6, 10, 16) | ForEach-Object { [int]$a.windup + $_ }
+        $top = $ground; $topAt = 0; $ys = @()
+        for ($t = 1; $t -le $a.windup + 30; $t++) {
+            C 'tick step 1' | Out-Null
+            Start-Sleep -Milliseconds 150
             $p = Get-MobPos 'soulscraft:bog_slime'
-            if ($p) { $top = [math]::Max($top, $p[1]); $lines += "t=$at slime at $(($p | ForEach-Object { [math]::Round($_, 2) }) -join ',')" }
-            Take-Shot $cam "bog_slime_midjump_t$at"
+            if ($p) { $ys += [math]::Round($p[1] - $ground, 2); if ($p[1] -gt $top) { $top = $p[1]; $topAt = $t } }
+            if ($shots -contains $t) { Start-Sleep -Milliseconds 1200; Take-Shot $cam "bog_slime_midjump_t$t" }
+            # The shadow is smoke every shadow_every_ticks (4): a shot right after each of 4 ticks in a row,
+            # before the client lets the puffs fade, catches one.
+            if ($t -ge $a.windup + 7 -and $t -le $a.windup + 10) { Take-Shot $cam "bog_slime_shadow_t$t" }
         }
         C 'tick unfreeze' | Out-Null
         $height = $top - $ground
-        Note "bog slime jump (ground y $ground)" $lines
+        Note "bog slime jump (ground y $ground, jump_velocity $jv, vanilla apex $([math]::Round($want, 2)))" (@(Get-LogSince $mark 'soulscraft: (phase|strike) mob=bog_slime') + "height over the ground, tick by tick from the force: $($ys -join ' ')" + "apex $([math]::Round($height, 2)) at step $topAt" + "slime from $($start -join ' '); camera at $($camSt.position -join ' ') yaw $($camSt.yaw) pitch $($camSt.pitch)")
         C 'sc clear' | Out-Null
         Start-Sleep -Seconds 1
         $mark = Mark
@@ -459,56 +494,70 @@ try {
         $count = (C "execute if entity @e[type=soulscraft:bog_slime,x=$cx,y=$cy,z=$cz,distance=..30]") -join ' '
         Note 'bog slime split' (@($adopts | ForEach-Object { "adopt size=$($_.size) fresh=$($_.fresh)" }) + "size-2 adopts: $two; server says: $count")
         Take-Shot $script:Bot 'bog_slime_split'
-        if ($height -lt 0.25) { return V 'FAIL' "the slime rose only $([math]::Round($height, 2)) blocks in the jump steps" }
+        if ([math]::Abs($height - $want) -gt 0.3) { return V 'FAIL' "the jump's apex is $([math]::Round($height, 2)) blocks, vanilla physics at jump_velocity $jv gives $([math]::Round($want, 2))" }
         $total = if ($count -match 'count: (\d+)') { [int]$Matches[1] } else { -1 }
-        if ($two -in 2..3 -or $total -in 2..3) { return V 'PASS' "jump rose $([math]::Round($height, 2)); split into $two size-2 slimes (server count $total); the smoke shadow is for the eye in bog_slime_midjump_*" }
-        V 'FAIL' "jump rose $([math]::Round($height, 2)); after the kill $two size-2 adopts, server count $total (want 2-3)"
+        if ($two -in 2..3 -or $total -in 2..3) { return V 'PASS' "apex $([math]::Round($height, 2)) (vanilla $([math]::Round($want, 2)) at $jv); split into $two size-2 slimes (server count $total); the smoke shadow is for the eye in bog_slime_midjump_*" }
+        V 'FAIL' "apex $([math]::Round($height, 2)); after the kill $two size-2 adopts, server count $total (want 2-3)"
     }
 
     Run-Scene 'lurker_grab' {
         # The arena's pool (tools.rs: x -493..-489, z 507..511, water to y 100). The bot swims in it
-        # (survival, resistance). The mod prints no grab line of its own: a grab is read from a
-        # `phase/strike ... attack=grab|ambush hit=true` line and the bot staying within 1.6 blocks of
-        # the lurker. Then three blows (ctl attack on the lurker's id) and the bot must come loose.
+        # (survival, resistance). Frozen and stepped from the summon on, so the grab (grab_max_ticks
+        # 40) is never half over before the blows: 20 ticks to settle and adopt, then `sc force
+        # ambush` if no grab came by itself, stepped 2 ticks at a time until `mode=grab`. The three
+        # blows are the console's `damage <lurker> 1 minecraft:player_attack by sc_a` (the bot's own
+        # `attack` is refused under water as out of reach; the mod counts a player_attack hit while
+        # the grabbed player is the nearest, server.rs note_grab_blow), 11 ticks apart (past the
+        # lurker's hurt cooldown, where a blow takes no health and does not count). Freed: a
+        # `mode=backoff` line after the grab and before grab_max_ticks, and the lurker 2+ blocks off.
         Set-Survivor
+        $sel = '@e[type=soulscraft:lurker,limit=1,sort=nearest,x=-491.5,y=100,z=509]'
+        $mark = Mark
+        C 'tick freeze' | Out-Null
         C 'summon soulscraft:lurker -491.5 99.6 510.5' | Out-Null
         C 'tp sc_a -491.5 100.2 507.5 0 20' | Out-Null
-        Start-Sleep -Seconds 2
-        $mark = Mark
-        $grabbed = $false; $t0 = Get-Date; $forced = $false; $near = 0
-        while (((Get-Date) - $t0).TotalSeconds -lt 25 -and -not $grabbed) {
-            Start-Sleep -Milliseconds 600
-            $l = Get-MobPos 'soulscraft:lurker' @(-491.5, 100, 509)
-            $b = Get-BotPos
-            $lines = @(Get-Rows $mark 'phase|strike' | Where-Object { $_.mob -eq 'lurker' })
-            $hit = @($lines | Where-Object { $_.attack -eq 'grab' -or ($_.kind -eq 'strike' -and $_.attack -eq 'ambush' -and $_.hit -eq 'true') }).Count -gt 0
-            $near = if ($l) { Dist2 $b $l } else { 99 }
-            $grabbed = $hit -and $near -le 1.8
-            if (-not $forced -and ((Get-Date) - $t0).TotalSeconds -gt 8) { C 'sc force ambush' | Out-Null; $forced = $true }
+        Start-Sleep -Seconds 1
+        Step-World 20
+        $grabRow = { @(Get-Rows $mark 'mode' | Where-Object { $_.mob -eq 'lurker' -and $_.mode -eq 'grab' }) | Select-Object -First 1 }
+        $g = & $grabRow
+        if (-not $g) { C 'sc force ambush' | Out-Null }
+        for ($i = 0; $i -lt 30 -and -not $g; $i++) {
+            C 'tick step 2' | Out-Null
+            Start-Sleep -Milliseconds 300
+            $g = & $grabRow
         }
-        Take-Shot $script:Bot 'lurker_grabbed'
-        if (-not $grabbed) {
+        if (-not $g) {
+            C 'tick unfreeze' | Out-Null
             Note 'lurker (no grab seen)' (Get-LogSince $mark 'soulscraft: (phase|strike|adopt|mode) ')
-            return V 'FAIL' "no grab in 25 s (last distance bot-lurker $([math]::Round($near, 2)))"
+            return V 'FAIL' 'no grab in 80 stepped ticks (natural or forced ambush)'
         }
-        $ents = Invoke-Bot $script:Bot 'entities 8' | Out-String | ConvertFrom-Json
-        $id = ($ents.entities | Where-Object { $_.type -like '*lurker' } | Select-Object -First 1).id
-        $replies = @()
-        if ($id) {
-            for ($i = 1; $i -le 3; $i++) {
-                Invoke-Bot $script:Bot "look-at-entity $id" | Out-Null
-                $replies += "blow ${i}: " + ((Invoke-Bot $script:Bot "attack $id") -join ' ')
-                Start-Sleep -Milliseconds 800
-            }
+        Start-Sleep -Milliseconds 800
+        Take-Shot $script:Bot 'lurker_grabbed'
+        $l = Get-MobPos 'soulscraft:lurker' @(-491.5, 100, 509)
+        $near = Dist2 (Get-BotPos) $l
+        $blows = @()
+        for ($i = 1; $i -le 3; $i++) {
+            $h0 = ((C "data get entity $sel Health") -join ' ') -replace '.*: ', ''
+            C "damage $sel 1 minecraft:player_attack by sc_a" | Out-Null
+            $h1 = ((C "data get entity $sel Health") -join ' ') -replace '.*: ', ''
+            $blows += "blow ${i}: lurker health $h0 -> $h1"
+            Step-World 11
         }
-        Start-Sleep -Seconds 2
+        $free = @(Get-Rows $mark 'mode' | Where-Object { $_.mob -eq 'lurker' -and $_.mode -eq 'backoff' -and [int64]$_.tick -gt [int64]$g.tick }) | Select-Object -First 1
+        # Its backoff lasts 30 ticks, then it engages and may grab again (the first re-run's 2 s
+        # wait caught that second grab): the distance is read 26 ticks on, still frozen, in the backoff.
+        # Held means within 1.5 blocks of its mouth (selftest lurker_grab_holds); freed, it swims off.
+        Step-World 26
         $l2 = Get-MobPos 'soulscraft:lurker' @(-491.5, 100, 509)
         $far = if ($l2) { Dist2 (Get-BotPos) $l2 } else { 99 }
         Take-Shot $script:Bot 'lurker_freed'
-        Note 'lurker grab' (@(Get-LogSince $mark 'soulscraft: (phase|strike|mode|death) mob=lurker') + $replies + "distance after the blows $([math]::Round($far, 2)); lurker id $id")
-        if (-not $id) { return V 'FAIL' 'grabbed, but the bot saw no lurker entity to hit' }
-        if ($far -ge 2.0 -or -not $l2) { return V 'PASS' "grabbed (within 1.6), freed by 3 blows: $([math]::Round($far, 2)) blocks apart after 2 s" }
-        V 'FAIL' "three blows did not free the bot: still $([math]::Round($far, 2)) blocks from the lurker"
+        C 'tick unfreeze' | Out-Null
+        $after = if ($free) { [int64]$free.tick - [int64]$g.tick } else { $null }
+        Note 'lurker grab' (@(Get-LogSince $mark 'soulscraft: (phase|strike|mode|death) mob=lurker') + "bot $([math]::Round($near, 2)) blocks from the lurker at the grab" + $blows + "backoff $after ticks into the grab; distance 26 ticks after the third blow's step $([math]::Round($far, 2))")
+        if (-not $free) { return V 'FAIL' "grabbed ($([math]::Round($near, 2)) blocks off), but no backoff after 3 player_attack blows" }
+        if ($after -ge 40) { return V 'FAIL' "backed off only $after ticks into the grab: grab_max_ticks ran out, the blows did not free it" }
+        if ($far -le 1.5 -or $far -lt $near + 0.5) { return V 'FAIL' "freed at +$after ticks, but the lurker is still $([math]::Round($far, 2)) blocks off in its backoff" }
+        V 'PASS' "grabbed ($([math]::Round($near, 2)) blocks off), three blows freed it $after ticks into the grab (< 40); $([math]::Round($far, 2)) blocks apart in its backoff"
     }
 
     Run-Scene 'altar_menu' {
@@ -538,25 +587,40 @@ try {
     }
 
     Run-Scene 'event_zone' {
-        # Tier 2 (grave_night, 6 waves): the camera sc_b hangs 28 blocks up and 34 north of the altar
-        # before the horn; shots at about 0.5, 1.5 and 2.5 s after the click (the outline shows for
-        # outline_ticks = 100, 5 s) and the boss bar from the bot's own view; then the wave, and the
-        # wave 2 skeletons in the log (wave 1 is killed to reach it).
+        # Tier 2 (grave_night, 6 waves). The zone is 3x3 chunks round the altar's chunk (x -528..-481,
+        # z 480..527); its outline shows for outline_ticks = 100 (5 s). The camera sc_b stands inside
+        # it 6 blocks up, about 10 blocks from the edge, looking down at an angle: at the north-west
+        # corner post (shot a, ~0.5 s after the horn), then at the north rail's middle (shot b, ~2 s).
+        # The boss bar: the server is asked who sees it (`bossbar get <id> players`: the bot must be
+        # on it; the event sets the players once a second, event_ui.rs show_bar) and the bot's own
+        # view is shot 1.5 s in. Then the wave, and the wave 2 skeletons in the log (wave 1 killed).
         $cam = Get-Cam
         Set-Survivor
         C 'sc altar 2 banners' | Out-Null
         Start-Sleep -Seconds 2
-        C "tp sc_b $($ax + 0.5) $($ay + 28) $($az - 34) 0 40" | Out-Null
-        Start-Sleep -Seconds 3
+        C "tp sc_b -518.5 107 490.5" | Out-Null
+        Start-Sleep -Seconds 2
+        Invoke-Bot $cam 'look-at -528 101 480' | Out-Null
+        Start-Sleep -Seconds 1
         $mark = Mark
         Start-Event 'soulscraft:grave_horn'
+        Start-Sleep -Milliseconds 300
         Take-Shot $cam 'event_zone_outline_a'
+        C "tp sc_b -500.5 107 490.5" | Out-Null
+        Invoke-Bot $cam 'look-at -500 101 480' | Out-Null
+        Start-Sleep -Milliseconds 700
         $bars = @(C 'bossbar list')
         Take-Shot $script:Bot 'event_bossbar'
         Take-Shot $cam 'event_zone_outline_b'
+        $barId = $null
+        foreach ($n in 1..100) {
+            $r = (C "bossbar get soulscraft:altar_$n visible") -join ' '
+            if ($r -match 'is currently (visible|hidden)') { $barId = "soulscraft:altar_$n" }
+        }
+        $barPlayers = if ($barId) { (C "bossbar get $barId players") -join ' ' } else { 'no soulscraft:altar_N bar found' }
         $started = @(Get-LogSince $mark 'soulscraft: event start')
-        Note 'event start' ($started + "bossbar list: $($bars -join ' ')" + "bot messages: $((Invoke-Bot $script:Bot 'messages') -join ' ')")
-        Start-Sleep -Seconds 8
+        Note 'event start' ($started + "bossbar list: $($bars -join ' ')" + "bossbar $barId players: $barPlayers" + "bot messages: $((Invoke-Bot $script:Bot 'messages') -join ' ')")
+        Start-Sleep -Seconds 7
         Invoke-Bot $cam "look-at $ax $($ay + 1) $az" | Out-Null
         C "tp sc_b $($ax - 14) $($ay + 10) $($az - 14) 0 0" | Out-Null
         Invoke-Bot $cam "look-at $ax $($ay + 1) $az" | Out-Null
@@ -578,10 +642,11 @@ try {
         Note 'event wave 2 skeleton lines' (@($skel | ForEach-Object { ($_.PSObject.Properties | ForEach-Object { "$($_.Name)=$($_.Value)" }) -join ' ' }) + "skeleton vadopt ids: $($skelIds -join ',')")
         if ($started.Count -eq 0) { return V 'FAIL' 'the horn did not start the event (no `event start` line)' }
         if (-not $barOk) { return V 'FAIL' "boss bar list lacks «Волна 1 из 6 · Ночь мертвецов»: $barText" }
+        if ($barPlayers -notmatch 'sc_a') { return V 'FAIL' "the boss bar $barId is not shown to the bot, a participant: $barPlayers" }
         if ($spawn1 -eq 0) { return V 'FAIL' 'no `event spawn wave=1` line in 11 s' }
         if (-not $reached) { return V 'FAIL' 'wave 2 never spawned in 120 s after killing wave 1' }
         if ($skel.Count -eq 0) { return V 'FAIL' 'wave 2 came, but no skeleton vphase/vstrike/vmode line (the skeletons neither shot nor moved by their group)' }
-        V 'SEE-SHOT' "event started, bar «Волна 1 из 6 · Ночь мертвецов» in bossbar list, wave 1 spawned, $($skel.Count) skeleton behaviour line(s) in wave 2; the zone outline within 5 s is only in event_zone_outline_a/b.jpg"
+        V 'SEE-SHOT' "event started, bar «Волна 1 из 6 · Ночь мертвецов» shown to sc_a (bossbar get players), wave 1 spawned, $($skel.Count) skeleton behaviour line(s) in wave 2; the zone outline (rails, posts) is in event_zone_outline_a/b.jpg, the bar in event_bossbar.jpg"
     }
 
     Run-Scene 'event_bearer' {
@@ -601,28 +666,64 @@ try {
         Invoke-Bot $cam "look-at $ax $($ay + 1) $az" | Out-Null
         Start-Sleep -Seconds 1
         Take-Shot $cam 'event_bearer_wave5'
+        # The close shot: the world frozen, the bearer told by its health (health_mult x3 over the
+        # other zombies'; `/attribute ... minecraft:scale get` reads the engine's own 1.0, while the
+        # event grows it in the mod's attribute map and model scale, event.rs set_scale). The bearer
+        # and one ordinary zombie are tagged and the rest of the wave killed (teleporting event mobs
+        # does not hold: the event drives them back), stepped 25 ticks for the bodies to go, then the
+        # camera 5 blocks north of the pair at their height.
+        C 'tick freeze' | Out-Null
         $ents = Invoke-Bot $cam 'entities 60 zombie' | Out-String
         Set-Content (Join-Path $Out 'event_bearer_entities.json') $ents
-        $sizes = @()
-        try {
-            $z = ($ents | ConvertFrom-Json).entities
-            foreach ($e in $z) { foreach ($n in 'scale', 'height') { if ($e.PSObject.Properties.Name -contains $n -and $e.$n -is [ValueType]) { $sizes += [double]$e.$n } } }
-        } catch { }
-        Note 'banner-bearer' @("entities dump in event_bearer_entities.json; sizes seen: $($sizes -join ' ')")
-        if ($sizes.Count -ge 2) {
-            $sorted = $sizes | Sort-Object
-            $ratio = $sorted[-1] / [math]::Max($sorted[[int]($sorted.Count / 2)], 0.01)
-            if ($ratio -ge 1.25) { return V 'PASS' "the largest zombie is $([math]::Round($ratio, 2)) times the median" }
+        $zs = @()
+        try { $zs = @(($ents | ConvertFrom-Json).entities | Where-Object { $_.type -eq 'minecraft:zombie' }) } catch { }
+        $hs = @($zs | ForEach-Object { [double]$_.health } | Sort-Object)
+        $median = if ($hs.Count) { $hs[[int]($hs.Count / 2)] } else { 0 }
+        $bearer = $zs | Where-Object { [double]$_.health -ge 2 * $median } | Select-Object -First 1
+        $plain = $zs | Where-Object { [double]$_.health -eq $median } | Select-Object -First 1
+        $pair = @()
+        if ($bearer -and $plain) {
+            foreach ($z in $bearer, $plain) {
+                C "tag @e[type=minecraft:zombie,limit=1,sort=nearest,x=$($z.pos[0]),y=$($z.pos[1]),z=$($z.pos[2])] add sc.bearer_pair" | Out-Null
+            }
+            C 'kill @e[tag=soulscraft.wave,tag=!sc.bearer_pair]' | Out-Null
+            Step-World 25
+            foreach ($i in 0, 1) {
+                $r = (C "data get entity @e[tag=sc.bearer_pair,limit=1,sort=$(if ($i) { 'furthest' } else { 'nearest' }),x=$ax,y=$ay,z=$az] Pos") -join ' '
+                if ($r -match '\[(-?[\d.]+)d, (-?[\d.]+)d, (-?[\d.]+)d\]') { $pair += , @([double]$Matches[1], [double]$Matches[2], [double]$Matches[3]) }
+            }
+            if ($pair.Count -eq 2) {
+                $mid = @((($pair[0][0] + $pair[1][0]) / 2), [math]::Min($pair[0][1], $pair[1][1]), (($pair[0][2] + $pair[1][2]) / 2))
+                C "tp sc_b $($mid[0]) $($mid[1] + 1.2) $($mid[2] - 5)" | Out-Null
+                Start-Sleep -Milliseconds 800
+                Invoke-Bot $cam "look-at $($mid[0]) $($mid[1] + 1.1) $($mid[2])" | Out-Null
+                Start-Sleep -Seconds 1
+                Take-Shot $cam 'event_bearer_beside_zombie'
+            }
+            C 'tag @e[tag=sc.bearer_pair] remove sc.bearer_pair' | Out-Null
         }
-        V 'SEE-SHOT' 'wave 5 spawned; the bot cannot read minecraft:scale, check event_bearer_wave5.jpg for the one big zombie (1.3x)'
+        C 'tick unfreeze' | Out-Null
+        $who = if ($bearer) { "health $($bearer.health) at $(($bearer.pos | ForEach-Object { [math]::Round($_, 1) }) -join ' ')" } else { 'none told by health' }
+        Note 'banner-bearer' @("zombie healths: $($hs -join ' ') (median $median)", "bearer: $who", "pair after the others were killed: $(($pair | ForEach-Object { ($_ | ForEach-Object { [math]::Round($_, 1) }) -join ' ' }) -join ' and ')", 'entities dump in event_bearer_entities.json')
+        if ($bearer -and $plain) { return V 'SEE-SHOT' "the bearer (health $([math]::Round([double]$bearer.health, 1)), an ordinary one $([math]::Round([double]$plain.health, 1))) and an ordinary zombie alone in event_bearer_beside_zombie.jpg: check it is 1.3x" }
+        V 'FAIL' "wave 5 spawned, but no zombie with the bearer's x3 health among $($zs.Count) (healths $($hs -join ' '))"
     }
 
     Run-Scene 'record' {
         # The LetsCam client mod records sc_a's view of the tier-2 fight (`/letscam start|stop`,
         # as in letscam/tools/bench-test.ps1), then `/letscam render auto sheet` makes the mp4 and its
         # contact sheet in $LcOut. record_mic = false is in the config set above (never a microphone).
-        # The client read that config at launch, so sc_a is restarted here first.
+        # The client read that config at launch, so sc_a is restarted here first: stopped, and its
+        # control socket gone (the game quits a moment after `quit`), before the new launch.
         Stop-Bot $script:Bot
+        $deadline = (Get-Date).AddSeconds(60)
+        while ((Get-Date) -lt $deadline) {
+            & $script:Ctl --socket $script:Bot.Socket --timeout 3 state 2>&1 | Out-Null
+            if ($LASTEXITCODE -ne 0) { break }
+            Start-Sleep -Seconds 1
+        }
+        Start-Sleep -Seconds 3
+        Remove-Item -LiteralPath $script:Bot.Socket -Force -ErrorAction SilentlyContinue
         $script:Bot = Start-Bot sc_a
         Set-Survivor
         $since = Get-Date
