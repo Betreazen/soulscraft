@@ -172,6 +172,9 @@ pub struct Tick {
     /// The marksman needs a spot in its kept distance: the server grounds [`post_candidates`],
     /// picks one ([`pick_post`]) and hands it to [`Brain::set_post`].
     pub wants_post: bool,
+    /// The walk ends on `to` itself (navigation reach 0), not within a block of it: the
+    /// marksman's cover.
+    pub exact_walk: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -351,6 +354,7 @@ impl Brain {
             shadow: None,
             wants_cover: false,
             wants_post: false,
+            exact_walk: false,
         };
         let decide = s.now >= self.next_decision;
         if decide {
@@ -361,15 +365,17 @@ impl Brain {
         }
         if self.run.is_some() {
             self.advance(mob, s, &mut out);
+        }
+        if self.run.is_none() {
+            self.mind(mob, s, decide, &mut out);
             if self.run.is_some() {
-                return out;
+                // An attack started this tick: its first tick is tick 0.
+                self.advance(mob, s, &mut out);
             }
         }
-        self.mind(mob, s, decide, &mut out);
-        if self.run.is_some() {
-            // An attack started this tick: its first tick is tick 0.
-            self.advance(mob, s, &mut out);
-        }
+        // A walk to the marksman's cover goes onto the spot itself: a path done within a block
+        // of it stops in sight (`marksman_reload_cover` on the bench).
+        out.exact_walk = matches!(out.order, Order::Walk { to, .. } if Some(to) == self.cover);
         out
     }
 
@@ -409,12 +415,25 @@ impl Brain {
         if let Some(p) = jump_phase(&run, &line, t) {
             phase = p;
         }
-        if phase != run.phase {
+        let entered = phase != run.phase;
+        if entered {
             run.phase = phase;
             out.events.push(Event::Phase { attack: run.idx, phase, t });
         }
         if t == 0 {
             self.set_clip(&a.clip, run.start);
+        }
+        // The reload starts on the phase change to recover, not on its exact tick: a tick the
+        // server skips (the mob in turret cover, an event steering it) would lose the cover ask.
+        if entered && phase == Phase::Recover && self.style == Style::Shooter && a.projectile.is_some() {
+            // The reload: its clip (the `hide` move's) all through, and cover asked for. Not there
+            // by the reload's end, it keeps going for one more reload's length.
+            if let Some(clip) = mob.move_clip("hide") {
+                self.set_clip(clip, s.now);
+            }
+            self.cover = None;
+            self.cover_until = s.now + 2 * u64::from(a.recover);
+            out.wants_cover = true;
         }
         let reach = reach_of(mob, a, self.style);
         match phase {
@@ -447,16 +466,6 @@ impl Brain {
                 }
             }
             Phase::Recover => {
-                if t == line.recover_start() && self.style == Style::Shooter && a.projectile.is_some() {
-                    // The reload: its clip (the `hide` move's) all through, and cover asked for.
-                    if let Some(clip) = mob.move_clip("hide") {
-                        self.set_clip(clip, s.now);
-                    }
-                    // Not there by the reload's end, it keeps going for one more reload's length.
-                    self.cover = None;
-                    self.cover_until = s.now + 2 * u64::from(a.recover);
-                    out.wants_cover = true;
-                }
                 if run.ends_at.is_none() && a.recover_if.as_deref() == Some("wall") && run.per_tick > 0.0 {
                     // The charge ran its length into nothing: a short window, not the wall's.
                     run.ends_at = Some(line.recover_start() + CHARGE_OPEN_RECOVER);

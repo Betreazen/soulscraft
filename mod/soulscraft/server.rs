@@ -1033,7 +1033,10 @@ fn drive(
         Order::Walk { to, speed } => {
             let moved = path.is_none_or(|(at, when)| geom::dist(at, to) > 1.5 || now - when >= REPATH_EVERY);
             if repath || moved {
-                game.native_mob_navigate(dim, m.id, to, 1, speed);
+                // A path is done within `reach` blocks of `to` (native_npcs.rs:132-145): a block for
+                // a walk up to a target, none onto the marksman's cover (`exact_walk`).
+                let reach = if tick.exact_walk { 0 } else { 1 };
+                game.native_mob_navigate(dim, m.id, to, reach, speed);
                 Some((to, now))
             } else {
                 path

@@ -391,6 +391,9 @@ fn marksman_reloads_behind_cover() {
     let sc = Scaled::at(&m.stats, 0.0);
     let next = b.tick(&m, &sc, &senses(u64::from(line.recover_start()) + 1, 11.0));
     assert_eq!(next.order, Order::Walk { to: spot, speed: crate::cover::COVER_SPEED });
+    // To the spot itself, not to within a block of it (the bench: a path done 1 block short left
+    // it in sight).
+    assert!(next.exact_walk, "the walk to cover is exact");
     assert_eq!(b.clip().name, "reload");
     let rest = run(&mut b, &m, 0.0, u64::from(line.recover_start()) + 2, u64::from(line.recover) + 2, |n| senses(n, 11.0));
     assert!(rest.iter().any(|t| t.events.iter().any(|e| matches!(e, Event::AttackEnd { .. }))));
@@ -402,6 +405,8 @@ fn marksman_reloads_behind_cover() {
     let going = run(&mut b, &m, 0.0, after, 20, |n| senses(n, 11.0));
     assert!(starts(&going).is_empty(), "no shot on the way to cover");
     assert!(going.iter().all(|t| t.order == Order::Walk { to: spot, speed: crate::cover::COVER_SPEED }), "{:?}", going[0].order);
+    assert!(going.iter().all(|t| t.exact_walk));
+    assert!(!out[r].exact_walk, "the step back without cover is an ordinary walk");
     let there = run(&mut b, &m, 0.0, after + 20, 25, |n| {
         let mut s = senses(n, 11.0);
         s.pos = spot;
@@ -419,6 +424,24 @@ fn marksman_reloads_behind_cover() {
     let again = starts(&stuck);
     assert!(!again.is_empty(), "shoots again after giving up");
     assert!(again[0].0 >= give_up && again[0].0 <= give_up + 20, "at {} (gives up at {give_up})", again[0].0);
+}
+
+/// The server may skip a mob's tick (turret cover, an event's steering): a reload whose first tick
+/// was skipped still shows its clip and asks for cover on the next one.
+#[test]
+fn marksman_asks_for_cover_after_a_skipped_tick() {
+    let m = mob("marksman");
+    let shot = m.attack_index("aimed_shot").unwrap();
+    let start = u64::from(Timeline::of(&m.attacks[shot]).recover_start());
+    let mut b = Brain::new(Style::Shooter, 4, 0);
+    b.force(shot);
+    let before = run(&mut b, &m, 0.0, 0, start, |n| senses(n, 11.0));
+    assert!(before.iter().all(|t| !t.wants_cover));
+    let sc = Scaled::at(&m.stats, 0.0);
+    let late = b.tick(&m, &sc, &senses(start + 1, 11.0));
+    assert!(late.wants_cover, "asked on the first reload tick it gets");
+    assert_eq!(b.clip().name, "reload");
+    assert!(!b.tick(&m, &sc, &senses(start + 2, 11.0)).wants_cover, "once");
 }
 
 #[test]
@@ -845,6 +868,7 @@ fn a_turn_held_too_long_lapses_and_a_dead_holder_lets_go() {
         shadow: None,
         wants_cover: false,
         wants_post: false,
+        exact_walk: false,
     };
     turns.note(5, 1, 100, &t, 46);
     assert!(turns.waits(5, 2, 120));
