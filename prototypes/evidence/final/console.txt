@@ -1,199 +1,36 @@
-final-version checks (0.7.0): each scene's section from its latest run (2026-11-17), see .superpowers/sdd/2026-11-16-final-version/bench-fix-report.md
+final-version checks (0.7.0), 2026-11-17T10:03:44
 
-######## revenant_hold, 2026-11-17T05:14:21
-== revenant hold: phase lines
-  soulscraft: phase mob=revenant id=587 attack=overhead phase=windup t=0 tick=37203
-  soulscraft: phase mob=revenant id=587 attack=overhead phase=hold t=10 tick=37213
-  soulscraft: phase mob=revenant id=587 attack=overhead phase=hit t=18 tick=37221
-  soulscraft: strike mob=revenant id=587 attack=overhead t=18 tick=37221 hit=false dmg=5.20 target=sc_a
-  soulscraft: phase mob=revenant id=587 attack=overhead phase=recover t=20 tick=37223
-  soulscraft: phase mob=revenant id=587 attack=overhead phase=end t=36 tick=37239
-  t=10 windup_end mob at -499.5,502.09 distance to the bot 4.59
-  t=14 hold_mid mob at -499.5,501.94 distance to the bot 4.44
-  t=18 hit mob at -499.5,501.73 distance to the bot 4.23
-== revenant shield bash
-  soulscraft: phase mob=revenant id=588 attack=shield_bash phase=windup t=0 tick=37309
-  soulscraft: phase mob=revenant id=588 attack=shield_bash phase=hit t=8 tick=37317
-  soulscraft: strike mob=revenant id=588 attack=shield_bash t=8 tick=37317 hit=true dmg=2.00 target=sc_a
-  soulscraft: phase mob=revenant id=588 attack=shield_bash phase=recover t=10 tick=37319
-  soulscraft: phase mob=revenant id=588 attack=shield_bash phase=end t=18 tick=37327
-  bot moved 7.51 blocks (survival, resistance on)
--> PASS: closed 0.37 blocks during the hold; the bash threw the bot 7.51 blocks
-
-######## stalker_flank, 2026-11-17T05:14:40
-== stalker watched (4 s)
-  kind=mode mob=stalker id=589 mode=engage tick=37543
-  kind=phase mob=stalker id=589 attack=double_slash phase=windup t=0 tick=37543
-  bearings from the bot: 9 10 11 14 18 22 26 31 35 40 46 53 62 69 76 86 104 135 164 -173 -153 -132 -112 -92 -72 -50 -26 -3 19 41 67 93 117 144 158 172 -164 -140 -119 -104 -87 (circled 345 degrees); strikes 0
-== stalker looked away from
-  kind=adopt mob=stalker id=590 p=0.00 size=0 fresh=true health=22.0 tick=37569
-  kind=mode mob=stalker id=590 mode=circle tick=37569
-  kind=mode mob=stalker id=590 mode=engage tick=37589
-  kind=phase mob=stalker id=590 attack=double_slash phase=windup t=0 tick=37609
-  kind=phase mob=stalker id=590 attack=double_slash phase=hit t=6 tick=37615
-  kind=strike mob=stalker id=590 attack=double_slash t=6 tick=37615 hit=true dmg=1.20 target=sc_a
-  kind=strike mob=stalker id=590 attack=double_slash t=9 tick=37618 hit=true dmg=1.20 target=sc_a
-  strike 46 ticks after adopt; stalker 180 degrees off the view axis (sees_me is true inside 60)
--> PASS: watched: no strike in 4 s (circled 345 degrees); looked away from: struck 46 ticks after adopt (< 100), 180 degrees off the view
-
-######## marksman_cover, 2026-11-17T05:17:36
-== marksman cover
-  soulscraft: adopt mob=marksman id=637 p=0.00 size=0 fresh=true health=20.0 tick=40333
-  soulscraft: phase mob=marksman id=637 attack=aimed_shot phase=windup t=0 tick=40333
-  soulscraft: phase mob=marksman id=637 attack=aimed_shot phase=hit t=16 tick=40349
-  soulscraft: strike mob=marksman id=637 attack=aimed_shot t=16 tick=40349 hit=false dmg=7.00 target=sc_a
-  soulscraft: phase mob=marksman id=637 attack=aimed_shot phase=recover t=18 tick=40351
-  soulscraft: reload_cover mob=marksman id=637 to=-494.5,101.0,504.5 tick=40351
-  soulscraft: phase mob=marksman id=637 attack=aimed_shot phase=end t=48 tick=40381
-  soulscraft: phase mob=marksman id=637 attack=aimed_shot phase=windup t=0 tick=40393
-  soulscraft: phase mob=marksman id=637 attack=aimed_shot phase=hit t=16 tick=40409
-  soulscraft: strike mob=marksman id=637 attack=aimed_shot t=16 tick=40409 hit=false dmg=7.00 target=sc_a
-  soulscraft: phase mob=marksman id=637 attack=aimed_shot phase=recover t=18 tick=40411
-  soulscraft: reload_cover mob=marksman id=637 to=-494.5,101.0,504.5 tick=40411
-  soulscraft: phase mob=marksman id=637 attack=aimed_shot phase=windup t=0 tick=40419
-  soulscraft: phase mob=marksman id=637 attack=aimed_shot phase=hit t=16 tick=40435
-  soulscraft: strike mob=marksman id=637 attack=aimed_shot t=16 tick=40435 hit=false dmg=7.00 target=sc_a
-  soulscraft: phase mob=marksman id=637 attack=aimed_shot phase=recover t=18 tick=40437
-  soulscraft: reload_cover mob=marksman id=637 to=-494.5,101.0,504.5 tick=40437
-  marksman at -494,62,101,504,62; behind the wall: True
--> PASS: marksman at -494.6,504.6 is behind the wall (0 cover log line(s))
-
-######## brute_wave, 2026-11-17T05:15:08
+######## brute_wave, 2026-11-17T10:04:15
 == brute standing
-  soulscraft: phase mob=brute id=593 attack=overhead_wave phase=windup t=0 tick=38103
-  soulscraft: phase mob=brute id=593 attack=overhead_wave phase=hit t=16 tick=38119
-  soulscraft: strike mob=brute id=593 attack=overhead_wave t=16 tick=38119 hit=true dmg=12.80 target=sc_a
-  soulscraft: phase mob=brute id=593 attack=overhead_wave phase=recover t=18 tick=38121
-  soulscraft: phase mob=brute id=593 attack=overhead_wave phase=end t=38 tick=38141
-  soulscraft: phase mob=brute id=593 attack=wide_swing phase=windup t=0 tick=38159
-  feet over the floor after the step: 0 0 0 0,47; health lost 4.36
+  soulscraft: phase mob=brute id=86 attack=overhead_wave phase=windup t=0 tick=6008
+  soulscraft: phase mob=brute id=86 attack=overhead_wave phase=hit t=16 tick=6024
+  soulscraft: strike mob=brute id=86 attack=overhead_wave t=16 tick=6024 hit=true dmg=12.80 target=sc_a
+  soulscraft: phase mob=brute id=86 attack=overhead_wave phase=recover t=18 tick=6026
+  soulscraft: phase mob=brute id=86 attack=overhead_wave phase=end t=38 tick=6046
+  soulscraft: phase mob=brute id=86 attack=overhead_wave phase=windup t=0 tick=6064
+  feet over the floor after the step: 0 0 0 0,47; health lost 2.92
 == brute jumping (space held at t 13, the blow 3 ticks later)
-  soulscraft: phase mob=brute id=594 attack=overhead_wave phase=windup t=0 tick=38263
-  soulscraft: phase mob=brute id=594 attack=overhead_wave phase=hit t=16 tick=38279
-  soulscraft: strike mob=brute id=594 attack=overhead_wave t=16 tick=38279 hit=true dmg=12.80 target=sc_a
-  soulscraft: phase mob=brute id=594 attack=overhead_wave phase=recover t=18 tick=38281
-  soulscraft: phase mob=brute id=594 attack=overhead_wave phase=end t=38 tick=38301
-  feet over the floor just after the step: 0,75 1,17 1,25 1,02; health lost 4.35
+  soulscraft: phase mob=brute id=99 attack=overhead_wave phase=windup t=0 tick=6164
+  soulscraft: phase mob=brute id=99 attack=overhead_wave phase=hit t=16 tick=6180
+  soulscraft: strike mob=brute id=99 attack=overhead_wave t=16 tick=6180 hit=false dmg=12.80 target=sc_a jumped=true
+  soulscraft: phase mob=brute id=99 attack=overhead_wave phase=recover t=18 tick=6182
+  soulscraft: phase mob=brute id=99 attack=overhead_wave phase=end t=38 tick=6202
+  soulscraft: phase mob=brute id=99 attack=overhead_wave phase=windup t=0 tick=6220
+  feet over the floor just after the step: 0,75 1,17 1,25 1,18; health lost -1
 == brute jumping (space held at t 12, the blow 4 ticks later)
-  soulscraft: phase mob=brute id=595 attack=overhead_wave phase=windup t=0 tick=38418
-  soulscraft: phase mob=brute id=595 attack=overhead_wave phase=hit t=16 tick=38434
-  soulscraft: strike mob=brute id=595 attack=overhead_wave t=16 tick=38434 hit=true dmg=12.80 target=sc_a
-  soulscraft: phase mob=brute id=595 attack=overhead_wave phase=recover t=18 tick=38436
-  soulscraft: phase mob=brute id=595 attack=overhead_wave phase=end t=38 tick=38456
-  feet over the floor just after the step: 0,75 1,17 1,17 0,79; health lost 4.35
--> FAIL: standing lost 4.36; no tick-timed jump dodged it (t13:-4.35 t12:-4.35): the hammer hits a jumping target (fixed in server.rs deal, needs the rebuilt bundle)
+  soulscraft: phase mob=brute id=100 attack=overhead_wave phase=windup t=0 tick=6319
+  soulscraft: phase mob=brute id=100 attack=overhead_wave phase=hit t=16 tick=6335
+  soulscraft: strike mob=brute id=100 attack=overhead_wave t=16 tick=6335 hit=false dmg=12.80 target=sc_a jumped=true
+  soulscraft: phase mob=brute id=100 attack=overhead_wave phase=recover t=18 tick=6337
+  soulscraft: phase mob=brute id=100 attack=overhead_wave phase=end t=38 tick=6357
+  soulscraft: phase mob=brute id=100 attack=overhead_wave phase=windup t=0 tick=6375
+  feet over the floor just after the step: 0,42 0,75 1,17 1,25; health lost 0
+-> PASS: standing lost 2.92; jumping t13:--1 jumped t12:-0 jumped (2 of 2 tick-timed jumps took nothing)
 
-######## shrike_turns, 2026-11-17T04:49:34
-== shrike dives (id from..to ticks)
-  id=135 8145..8161
-  id=135 8247..8263
-  id=135 8349..8365
-  id=135 8451..8467
-  id=135 8553..8569
-  id=136 8196..8212
-  id=136 8298..8314
-  id=136 8400..8416
-  id=136 8502..8518
-  overlaps: 0
-== shrike death
-  soulscraft: dead flyer falls mob=soulscraft:shrike id=135
-  soulscraft: death mob=shrike id=135 tick=8619
-  Y at the kill 108, at t6 102.5, at t16 105
--> PASS: 9 dives by 2 shrikes, none overlapping; fall: Y at the kill 108, at t6 102.5, at t16 105 (the falling shots are for the eye)
+######## summary
 
-######## bog_slime, 2026-11-17T05:31:36
-== bog slime jump (ground y 101, jump_velocity 0.8, vanilla apex 3.97)
-  soulscraft: phase mob=bog_slime id=1088 attack=high_jump phase=windup t=0 tick=55988
-  soulscraft: phase mob=bog_slime id=1088 attack=high_jump phase=hit t=12 tick=56000
-  soulscraft: phase mob=bog_slime id=1088 attack=high_jump phase=recover t=33 tick=56021
-  soulscraft: strike mob=bog_slime id=1088 attack=high_jump t=33 tick=56021 hit=true dmg=5.60 target=sc_a
-  height over the ground, tick by tick from the force: 0 0 0 0 0 0 0 0 0 0 0 0 0 0,8 1,51 2,12 2,64 3,07 3,42 3,68 3,86 3,96 3,97 3,91 3,77 3,55 3,26 2,9 2,46 1,96 1,39 0,75 0,04 0 0 0 0 0 0 0 0 0
-  apex 3.97 at step 23
-  slime from -499,5 101 500,20678857855; camera at -494,5 103 499,5 yaw 95.7105941772461 pitch 17.8689079284668
-== bog slime split
-  adopt size=4 fresh=true
-  adopt size=2 fresh=true
-  adopt size=2 fresh=true
-  adopt size=2 fresh=true
-  size-2 adopts: 3; server says: Test passed. Count: 3
--> PASS: apex 3.97 (vanilla 3.97 at 0.8); split into 3 size-2 slimes (server count 3); the smoke shadow is for the eye in bog_slime_midjump_*
+Scene      Status Reason
+-----      ------ ------
+brute_wave PASS   standing lost 2.92; jumping t13:--1 jumped t12:-0 jumped (2 of 2 tick-timed jumps took nothing)
 
-######## lurker_grab, 2026-11-17T05:18:50
-== lurker grab
-  soulscraft: phase mob=lurker id=674 attack=ambush phase=windup t=0 tick=41482
-  soulscraft: phase mob=lurker id=674 attack=ambush phase=hit t=10 tick=41492
-  soulscraft: phase mob=lurker id=674 attack=ambush phase=end t=12 tick=41494
-  soulscraft: mode mob=lurker id=674 mode=grab tick=41494
-  soulscraft: strike mob=lurker id=674 attack=ambush t=0 tick=41494 hit=true dmg=6.57 target=sc_a
-  soulscraft: strike mob=lurker id=674 attack=grab t=0 tick=41504 hit=true dmg=1.26 target=sc_a
-  soulscraft: strike mob=lurker id=674 attack=grab t=0 tick=41514 hit=true dmg=1.26 target=sc_a
-  soulscraft: mode mob=lurker id=674 mode=backoff tick=41524
-  soulscraft: mode mob=lurker id=674 mode=engage tick=41554
-  bot 0.8 blocks from the lurker at the grab
-  blow 1: lurker health 30.0f -> 29.06f
-  blow 2: lurker health 29.06f -> 28.119999f
-  blow 3: lurker health 28.119999f -> 27.179998f
-  backoff 30 ticks into the grab; distance 26 ticks after the third blow's step 2.67
--> PASS: grabbed (0.8 blocks off), three blows freed it 30 ticks into the grab (< 40); 2.67 blocks apart in its backoff
 
-######## altar_menu, 2026-11-17T04:50:45
-== altar menu
-  expected in the menu (event / horn):
-  Тестовый ивент первого среза / Гнилой горн
-  Ночь мертвецов / Горн мертвецов
-  Буря когтей / Горн бури
-  Последний рубеж / Горн бездны
-  bot screen reply:
-  {"buttons":[],"screen":"mod"}
--> SEE-SHOT: a screen opened (0 of 8 names readable by the bot); check altar_menu_four_events.jpg for four events with horns and no «До уровня»
-
-######## event_zone, 2026-11-17T05:32:59
-== event start
-  soulscraft: event start core=-500,101,506 event=grave_night level=2 power=0.17 banners=[weight,horde] waves=6 hp=300 tick=57316
-  bossbar list: There are 1 custom bossbar(s) active: [Волна 1 из 6 · Ночь мертвецов · враги близко · алтарь 300/300]
-  bossbar soulscraft:altar_7 players: Custom bossbar [Волна 1 из 6 · Ночь мертвецов · бой · алтарь 300/300] has 2 player(s) currently online: sc_a, sc_b
-  bot messages: {"actionbar":null,"chat":["Your game mode has been updated to Survival Mode","sc_b joined the game"],"order":"newest first","styled":[{"translate":"gameMode.changed","with":[{"translate":"gameMode.survival"}]},{"color":"yellow","translate":"multiplayer.player.joined","with":[{"click_event":{"action":"suggest_command","command":"/tell sc_b "},"hover_event":{"action":"show_entity","id":"minecraft:player","name":"sc_b","uuid":[1884182139,-710724752,-1928915606,-1538194930]},"insertion":"sc_b","text":"sc_b"}]}],"subtitle":null,"title":null}
-== event wave 2 skeleton lines
-  kind=vmode mob=minecraft:skeleton id=1136 mode=climb tick=58682
-  kind=vmode mob=minecraft:skeleton id=1139 mode=climb tick=58682
-  kind=vmode mob=minecraft:skeleton id=1136 mode=free tick=58762
-  kind=vmode mob=minecraft:skeleton id=1139 mode=free tick=58762
-  kind=vmode mob=minecraft:skeleton id=1136 mode=pause tick=58783
-  kind=vmode mob=minecraft:skeleton id=1139 mode=pause tick=58784
-  kind=vmode mob=minecraft:skeleton id=1136 mode=free tick=58803
-  kind=vmode mob=minecraft:skeleton id=1139 mode=free tick=58804
-  kind=vmode mob=minecraft:skeleton id=1138 mode=pause tick=58805
-  kind=vmode mob=minecraft:skeleton id=1138 mode=free tick=58825
-  kind=vmode mob=minecraft:skeleton id=1136 mode=climb tick=58880
-  kind=vmode mob=minecraft:skeleton id=1139 mode=climb tick=58880
-  kind=vmode mob=minecraft:skeleton id=1137 mode=pause tick=58910
-  kind=vmode mob=minecraft:skeleton id=1137 mode=free tick=58930
-  kind=vmode mob=minecraft:skeleton id=1139 mode=free tick=58954
-  kind=vmode mob=minecraft:skeleton id=1136 mode=free tick=58960
-  kind=vmode mob=minecraft:skeleton id=1138 mode=pause tick=58967
-  kind=event mob=1137 tick=58984
-  kind=vmode mob=minecraft:skeleton id=1138 mode=free tick=58987
-  kind=vmode mob=minecraft:skeleton id=1138 mode=retreat tick=59004
-  kind=vmode mob=minecraft:skeleton id=1139 mode=climb tick=59024
-  kind=vmode mob=minecraft:skeleton id=1138 mode=free tick=59032
-  kind=vmode mob=minecraft:skeleton id=1136 mode=pause tick=59041
-  kind=vmode mob=minecraft:skeleton id=1136 mode=free tick=59061
-  kind=event mob=1137 tick=59067
-  kind=vmode mob=minecraft:skeleton id=1137 mode=pause tick=59072
-  skeleton vadopt ids: 1136,1137,1138,1139
--> SEE-SHOT: event started, bar «Волна 1 из 6 · Ночь мертвецов» shown to sc_a (bossbar get players), wave 1 spawned, 26 skeleton behaviour line(s) in wave 2; the zone outline (rails, posts) is in event_zone_outline_a/b.jpg, the bar in event_bossbar.jpg
-
-######## event_bearer, 2026-11-17T05:47:00
-== banner-bearer
-  zombie healths: 13,4200000762939 20,4200000762939 20,4200000762939 20,4200000762939 20,4200000762939 20,4200000762939 20,4200000762939 20,4200000762939 20,4200000762939 20,4200000762939 20,4200000762939 20,4200000762939 20,4200000762939 20,4200000762939 61,2599983215332 (median 20.4200000762939)
-  bearer: health 61.2599983215332 at -492,3 101 503,5
-  pair after the others were killed: -497,5 101 503,2 and -494,9 101 505
-  entities dump in event_bearer_entities.json
--> SEE-SHOT: the bearer (health 61.3, an ordinary one 20.4) and an ordinary zombie alone in event_bearer_beside_zombie.jpg: check it is 1.3x
-
-######## record, 2026-11-17T05:24:10
-== record
-  source folder: F:\letscam\joint-dev\2026-11-17_05-24-20
-  mp4: letscam_2026-11-17_05-24-20.mp4 71.3 MB
-  contact sheets: 12
--> PASS: tier2_event_fight.mp4 (71.3 MB) and 12 contact sheet(s) copied
