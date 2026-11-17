@@ -574,7 +574,8 @@ impl Brain {
             return;
         }
         let up = s.now.saturating_sub(since);
-        if (up >= 3 && s.on_ground) || up >= LANDING_TIMEOUT {
+        // Fallen into water counts as down: a slime afloat is never on the ground.
+        if (up >= 3 && (s.on_ground || s.in_water)) || up >= LANDING_TIMEOUT {
             run.landed_jump = true;
             run.landed_at = Some((s.now - run.start) as u32);
             run.landed += 1;

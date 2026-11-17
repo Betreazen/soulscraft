@@ -659,6 +659,24 @@ fn slime_leaps_and_its_landing_hits_an_area() {
 }
 
 #[test]
+fn slime_landing_in_water_lands_there() {
+    // It leaps at 12 and falls into water at 20: never on the ground again, but landed, not left to
+    // the 40-tick timeout.
+    let m = mob("bog_slime");
+    let mut b = Brain::new(Style::Jumper, 1, 0);
+    let out = run(&mut b, &m, 0.0, 0, 40, |n| {
+        let mut s = senses(n, 1.5);
+        s.on_ground = n < 13;
+        s.in_water = n >= 20;
+        s
+    });
+    assert!(matches!(out[12].order, Order::Leap { .. }));
+    let s = strikes(&out);
+    assert_eq!(s.iter().map(|(i, _)| *i).collect::<Vec<_>>(), vec![20]);
+    assert!(s[0].1.hits_target);
+}
+
+#[test]
 fn slime_sticks_on_contact_at_most_once_a_second() {
     let mut b = Brain::new(Style::Jumper, 1, 0);
     assert!(b.contact(&senses(5, 1.0)));
