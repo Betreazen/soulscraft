@@ -1511,7 +1511,7 @@ fn send_notes(
 /// else the nearest player within 6 blocks (v1 may not know it: see horizon-mixin.toml).
 pub(super) fn on_incoming_damage(entity: i32, kind: &str, damage_type: &str, causing: i32, amount: &mut f32) {
     // A hit on a wave mob breaks its drain and may turn it on the participant (Г12).
-    crate::game::soulscraft_event::on_damage(entity, causing);
+    crate::game::soulscraft_event::on_damage(entity, causing, damage_type);
     note_grab_blow(entity, damage_type, causing);
     if kind != "soulscraft:revenant" || !matches!(damage_type, "minecraft:player_attack" | "minecraft:mob_attack" | "minecraft:arrow") {
         return;

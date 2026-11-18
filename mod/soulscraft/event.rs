@@ -164,8 +164,8 @@ pub(super) static EVENTS: LazyLock<Mutex<HashMap<(String, [i32; 3]), EventRun>>>
 static WAVE_IDS: LazyLock<Mutex<HashSet<u32>>> = LazyLock::new(Mutex::default);
 /// The wave mobs their vanilla group leads (soulscraft_vanilla adopts them).
 static LED: LazyLock<Mutex<HashSet<u32>>> = LazyLock::new(Mutex::default);
-/// Hits on wave mobs: (mob, attacker or 0).
-static HITS: Mutex<Vec<(u32, i32)>> = Mutex::new(Vec::new());
+/// Hits on wave mobs: (mob, attacker or 0, a blow: named attacker or a creature's damage type).
+static HITS: Mutex<Vec<(u32, i32, bool)>> = Mutex::new(Vec::new());
 static STEER: LazyLock<Mutex<HashMap<u32, Steering>>> = LazyLock::new(Mutex::default);
 /// What the runs did, for the self-test and the log.
 static RECORDS: Mutex<Vec<String>> = Mutex::new(Vec::new());
@@ -207,12 +207,14 @@ pub(super) fn steering(mob: u32) -> Option<Steering> {
     STEER.lock().unwrap_or_else(PoisonError::into_inner).get(&mob).copied()
 }
 
-/// The damage hook: a hit on a wave mob (its attacker when the engine names it).
-pub(super) fn on_damage(entity: i32, causing: i32) {
+/// The damage hook: a hit on a wave mob (its attacker when the engine names it, and whether it
+/// is anyone's blow at all: defense::is_blow).
+pub(super) fn on_damage(entity: i32, causing: i32, damage_type: &str) {
     if entity < 0 || !WAVE_IDS.lock().unwrap_or_else(PoisonError::into_inner).contains(&(entity as u32)) {
         return;
     }
-    HITS.lock().unwrap_or_else(PoisonError::into_inner).push((entity as u32, causing));
+    let blow = causing > 0 || defense::is_blow(damage_type);
+    HITS.lock().unwrap_or_else(PoisonError::into_inner).push((entity as u32, causing, blow));
 }
 
 pub(super) fn core_centre(core: [i32; 3]) -> V3 {
@@ -502,7 +504,7 @@ const SPARE_MAX_Y: i32 = 317;
 pub(super) fn tick(game: &mut Game<'_>, dim: &str, now: u64) {
     take_spared(game, dim, now);
     let keys: Vec<(String, [i32; 3])> = events().keys().filter(|k| k.0 == dim).cloned().collect();
-    let hits: Vec<(u32, i32)> = std::mem::take(&mut *HITS.lock().unwrap_or_else(PoisonError::into_inner));
+    let hits: Vec<(u32, i32, bool)> = std::mem::take(&mut *HITS.lock().unwrap_or_else(PoisonError::into_inner));
     for key in keys {
         let Some(mut r) = events().remove(&key) else { continue };
         tick_run(game, &mut r, now, &hits);
@@ -512,7 +514,7 @@ pub(super) fn tick(game: &mut Game<'_>, dim: &str, now: u64) {
     }
 }
 
-fn tick_run(game: &mut Game<'_>, r: &mut EventRun, now: u64, hits: &[(u32, i32)]) {
+fn tick_run(game: &mut Game<'_>, r: &mut EventRun, now: u64, hits: &[(u32, i32, bool)]) {
     let dim = r.dim.clone();
     // Participants: living players in the zone who have not died in this event, and stand-ins.
     let players = game.native_server_players();
@@ -541,11 +543,14 @@ fn tick_run(game: &mut Game<'_>, r: &mut EventRun, now: u64, hits: &[(u32, i32)]
     if r.dirty_at.is_some_and(|_| now >= r.built_at + r.flow.rebuild_min_ticks) {
         build_field(game, r, now);
     }
-    for (mob, by) in hits {
+    for (mob, by, blow) in hits {
         if let Some(w) = r.mobs.get_mut(mob) {
             let pos = w.pos;
             let from = if *by > 0 && parts.iter().any(|p| p.entity == *by as u32) {
                 Some(*by as u32)
+            } else if !*blow {
+                // Fire, a fall, a wall: nobody's blow, put on no participant.
+                None
             } else {
                 parts
                     .iter()

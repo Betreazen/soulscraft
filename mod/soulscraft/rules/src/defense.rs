@@ -229,6 +229,34 @@ pub fn on_hit(mind: &mut Mind, by: u32, now: u64) {
     mind.drain_start = None;
 }
 
+/// A damage type some creature deals. A hit of one of these whose attacker the engine does not
+/// name is put on the nearest participant; any other (the sun's fire, a fall, a wall, poison) is
+/// nobody's blow and turns the mob on no one: a burning zombie next to a walled-in player is not
+/// pulled to them (06-altar.md, round 10). It still breaks a drain, as any hit does.
+pub fn is_blow(damage_type: &str) -> bool {
+    matches!(
+        damage_type,
+        "minecraft:player_attack"
+            | "minecraft:mob_attack"
+            | "minecraft:mob_attack_no_aggro"
+            | "minecraft:arrow"
+            | "minecraft:trident"
+            | "minecraft:thrown"
+            | "minecraft:mob_projectile"
+            | "minecraft:fireball"
+            | "minecraft:wither_skull"
+            | "minecraft:sting"
+            | "minecraft:spit"
+            | "minecraft:wind_charge"
+            | "minecraft:player_explosion"
+            | "minecraft:fireworks"
+            | "minecraft:sonic_boom"
+            | "minecraft:indirect_magic"
+            | "minecraft:thorns"
+            | "minecraft:mace_smash"
+    )
+}
+
 /// Where a mob at the altar is in its drain.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Drain {
@@ -575,5 +603,16 @@ mod round10_tests {
         // A hit still turns it, wall or not.
         on_hit(&mut m, 4, 1);
         assert_eq!(choose(Role::Assault, &n, [0.0; 3], altar, true, &[walled], &mut m, 2), Goal::Player(4));
+    }
+
+    #[test]
+    fn only_a_blow_is_a_hit_when_the_attacker_is_unnamed() {
+        for t in ["minecraft:player_attack", "minecraft:mob_attack", "minecraft:arrow", "minecraft:trident", "minecraft:thrown"] {
+            assert!(is_blow(t), "{t}");
+        }
+        // The sun's fire, a fall, a wall: nobody's blow (a self-test flake, 2026-11-18).
+        for t in ["minecraft:on_fire", "minecraft:in_fire", "minecraft:lava", "minecraft:fall", "minecraft:in_wall", "minecraft:drown", "minecraft:magic", "minecraft:generic"] {
+            assert!(!is_blow(t), "{t}");
+        }
     }
 }

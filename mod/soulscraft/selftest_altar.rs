@@ -904,7 +904,9 @@ fn no_reinforcements(game: &mut Game<'_>, t: u64, c: &mut Case) -> Option<Result
 }
 
 /// Round 10: a participant within 6 blocks but sealed in a stone box (no sight, no way round)
-/// does not pull a zombie of the wave: it keeps going for the altar.
+/// does not pull a zombie of the wave: it keeps going for the altar. Nor does fire with no
+/// attacker once it is that close: a zombie burning in the sun was put on the walled participant
+/// (the flake of 2026-11-13/16/18, by day on the bench): it is burnt here on purpose.
 fn intercept_walled(game: &mut Game<'_>, now: u64, t: u64, c: &mut Case) -> Option<Result<(), String>> {
     if t == 1 {
         build(game, 1);
@@ -956,8 +958,20 @@ fn intercept_walled(game: &mut Game<'_>, now: u64, t: u64, c: &mut Case) -> Opti
             }
             if soulscraft_rules::geom::dist(gpos, zpos) <= 6.0 {
                 c.count += 1;
+                if c.note.is_empty() {
+                    if let Some(m) = game.mobs.iter_mut().find(|m| m.id == zid) {
+                        m.invulnerable = 0;
+                    }
+                    if !game.native_hurt_entity(DIM, zid, 0.5, "minecraft:on_fire", None) {
+                        return Some(Err("the fire on the zombie did not land".into()));
+                    }
+                    c.note = "burnt".into();
+                }
             }
             if now - c.since >= 40 {
+                if c.note.is_empty() {
+                    return Some(Err("the zombie never came within 6 blocks to be burnt".into()));
+                }
                 return Some(if c.count >= 10 { Ok(()) } else { Err(format!("within 6 blocks only {} ticks", c.count)) });
             }
         }
