@@ -317,14 +317,21 @@ try {
         $strike = $rowsB | Where-Object kind -eq 'strike' | Select-Object -First 1
         $ticks = if ($adopt -and $strike) { [int64]$strike.tick - [int64]$adopt.tick } else { $null }
         Note 'stalker looked away from' (@($rowsB | ForEach-Object { ($_.PSObject.Properties | ForEach-Object { "$($_.Name)=$($_.Value)" }) -join ' ' }) + "strike $ticks ticks after adopt; stalker $offAtStrike degrees off the view axis (sees_me is true inside 60)")
-        # Ring distance: the samples after the approach (the first second walks in from the spawn).
-        $ring = @($dists | Select-Object -Skip ([math]::Floor($dists.Count / 4)))
+        # Ring distance: the samples after it first came within 4.5 blocks (before that it walks in
+        # from the spawn).
+        $in = [array]::FindIndex([double[]]$dists, [Predicate[double]]{ param($x) $x -le 4.5 })
+        $ring = if ($in -ge 0) { @($dists | Select-Object -Skip $in) } else { @() }
         $far = if ($ring.Count) { ($ring | Measure-Object -Maximum).Maximum } else { 99 }
         if ($strikesA -lt 1) { return V 'FAIL' "watched for 4 s, it never came in to strike (flank_max_ticks $max)" }
         if ($far -gt 4.5) { return V 'FAIL' "watched, it circled as far as $far blocks, out of a sword's reach and a step" }
         if (-not $struck) { return V 'FAIL' 'never struck in 9 s with the bot looking away' }
-        if ($ticks -ge $max) { return V 'FAIL' "struck $ticks ticks after adopt, not before flank_max_ticks $max (a timeout, not an unseen strike)" }
-        V 'PASS' "watched: circled at most $far blocks off and struck $strikesA time(s) in 4 s; looked away from: struck $ticks ticks after adopt (< $max), $offAtStrike degrees off the view"
+        # Unseen, it stops circling before flank_max_ticks: from its first circle to its engage (the
+        # walk in from the spawn is no flank time). No circle at all: it went straight in, unseen.
+        $circle = $rowsB | Where-Object { $_.kind -eq 'mode' -and $_.mode -eq 'circle' } | Select-Object -First 1
+        $engage = if ($circle) { $rowsB | Where-Object { $_.kind -eq 'mode' -and $_.mode -eq 'engage' -and [int64]$_.tick -gt [int64]$circle.tick } | Select-Object -First 1 }
+        $flank = if ($circle -and $engage) { [int64]$engage.tick - [int64]$circle.tick } else { 0 }
+        if ($flank -ge $max) { return V 'FAIL' "unseen, it still circled $flank ticks (flank_max_ticks $max): a timeout, not an unseen strike" }
+        V 'PASS' "watched: circled at most $far blocks off and struck $strikesA time(s) in 4 s; looked away from: circled $flank ticks (< $max), struck $ticks ticks after adopt, $offAtStrike degrees off the view"
     }
 
     Run-Scene 'marksman_cover' {
