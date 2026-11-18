@@ -2,7 +2,8 @@
 # tasks 1-3), bots sc_a (the target) and sc_b (the camera, a spectator with the GUI hidden) on the
 # joint server. Scenes, each selectable with -Only:
 #   revenant_hold   the revenant steps to its target during `hold`; the shield bash knocks back
-#   stalker_flank   watched, it circles and waits; looked away from, it strikes before flank_max_ticks
+#   zombie_lunge    a vanilla zombie's lunge stepped tick by tick: no step over dash_max_blocks_per_tick
+#   stalker_flank   watched, it circles within reach and still strikes; looked away from, it strikes sooner
 #   marksman_cover  a 3x3 stone wall 5 blocks off: after a shot the marksman stands behind it
 #   brute_wave      overhead_wave on a standing bot (health lost) and a jumping one (none lost)
 #   shrike_turns    three shrikes on one bot: their dives never overlap; one killed, shot falling
@@ -235,9 +236,41 @@ try {
         V 'FAIL' "hold closed $([math]::Round($closed, 2)) blocks (need >= 0.15); bash moved the bot $([math]::Round($moved, 2)) (need >= 1)"
     }
 
+    Run-Scene 'zombie_lunge' {
+        # Playtest 2026-11-18: a vanilla zombie's lunge looked like a teleport. The world is frozen and
+        # stepped a tick at a time through the lunge; the zombie's step per tick must stay under
+        # dash_max_blocks_per_tick (0.4) plus slack, and the whole lunge must move it.
+        Set-Survivor
+        $cap = [double]$MobData.dash_max_blocks_per_tick
+        $lunge = $MobData.vanilla.groups.Where({ $_.id -eq 'zombie' })[0].attacks.Where({ $_.id -eq 'lunge' })[0]
+        $span = [int]$lunge.windup + [int]$lunge.hit + 2
+        C "tp sc_a $cx $cy $($cz - 3) 0 0" | Out-Null
+        C "summon minecraft:zombie $cx $cy $($cz + 3)" | Out-Null
+        Start-Sleep -Seconds 2
+        C 'tick freeze' | Out-Null
+        C 'sc force lunge' | Out-Null
+        $steps = @(); $prev = Get-MobPos 'minecraft:zombie'; $start = $prev
+        for ($i = 0; $i -lt $span; $i++) {
+            C 'tick step 1' | Out-Null
+            Start-Sleep -Milliseconds 120
+            $now = Get-MobPos 'minecraft:zombie'
+            if ($now -and $prev) { $steps += [math]::Round([math]::Sqrt([math]::Pow($now[0] - $prev[0], 2) + [math]::Pow($now[2] - $prev[2], 2)), 3) }
+            if ($i -eq [int]$lunge.windup + 2) { Take-Shot $script:Bot 'zombie_lunge_mid' }
+            $prev = $now
+        }
+        C 'tick unfreeze' | Out-Null
+        $moved = if ($start -and $prev) { [math]::Round([math]::Sqrt([math]::Pow($prev[0] - $start[0], 2) + [math]::Pow($prev[2] - $start[2], 2)), 2) } else { 0 }
+        $top = if ($steps.Count) { ($steps | Measure-Object -Maximum).Maximum } else { 0 }
+        Note 'zombie lunge, step per tick' ("steps: $($steps -join ' '); moved $moved blocks; cap $cap")
+        if ($steps.Count -lt $span - 2) { return V 'FAIL' "could not follow the zombie ($($steps.Count) samples)" }
+        if ($moved -lt 1.0) { return V 'FAIL' "the lunge moved the zombie only $moved blocks (was it forced? see console.txt)" }
+        if ($top -gt $cap + 0.1) { return V 'FAIL' "a step of $top blocks in one tick, over the cap ${cap}: still a jump" }
+        V 'PASS' "fastest step $top blocks a tick (cap $cap), the lunge moved it $moved blocks"
+    }
+
     Run-Scene 'stalker_flank' {
-        # Trial A: the bot keeps looking at the stalker for 4 s (80 ticks, under flank_max_ticks 100):
-        # no strike. Trial B: a fresh stalker, the bot looks away (`look`, re-aimed every 0.4 s so the
+        # Trial A (0.7.1, playtest 2026-11-18): the bot keeps looking at the stalker for 4 s; it circles
+        # within reach (<= 4.5 blocks) and still comes in to strike after flank_max_ticks (40). Trial B: a fresh stalker, the bot looks away (`look`, re-aimed every 0.4 s so the
         # stalker never gets into the view): it strikes before flank_max_ticks.
         Set-Survivor
         $bp = @($cx, $cy, ($cz - 3))
@@ -247,19 +280,20 @@ try {
         C 'sc spawn stalker 0 1' | Out-Null
         Start-Sleep -Seconds 1
         $markA = Mark
-        $bearings = @(); $t0 = Get-Date
+        $bearings = @(); $dists = @(); $t0 = Get-Date
         while (((Get-Date) - $t0).TotalSeconds -lt 4) {
             $m = Get-MobPos 'soulscraft:stalker'
             if ($m) {
                 Invoke-Bot $script:Bot "look-at $($m[0]) $($m[1] + 1) $($m[2])" | Out-Null
                 $bearings += [math]::Round((Bearing $bp $m), 0)
+                $dists += [math]::Round([math]::Sqrt([math]::Pow($m[0] - $bp[0], 2) + [math]::Pow($m[2] - $bp[2], 2)), 2)
             }
         }
         Take-Shot $script:Bot 'stalker_watched'
         $rowsA = @(Get-Rows $markA 'mode|strike|phase')
         $strikesA = @($rowsA | Where-Object kind -eq 'strike').Count
         $span = if ($bearings.Count) { ($bearings | Measure-Object -Maximum -Minimum | ForEach-Object { $_.Maximum - $_.Minimum }) } else { 0 }
-        Note 'stalker watched (4 s)' (@($rowsA | ForEach-Object { ($_.PSObject.Properties | ForEach-Object { "$($_.Name)=$($_.Value)" }) -join ' ' }) + "bearings from the bot: $($bearings -join ' ') (circled $span degrees); strikes $strikesA")
+        Note 'stalker watched (4 s)' (@($rowsA | ForEach-Object { ($_.PSObject.Properties | ForEach-Object { "$($_.Name)=$($_.Value)" }) -join ' ' }) + "bearings from the bot: $($bearings -join ' ') (circled $span degrees); distances $($dists -join ' '); strikes $strikesA")
         # B
         C 'sc clear' | Out-Null
         C "tp sc_a $cx $cy $($cz - 3) 0 0" | Out-Null
@@ -283,10 +317,14 @@ try {
         $strike = $rowsB | Where-Object kind -eq 'strike' | Select-Object -First 1
         $ticks = if ($adopt -and $strike) { [int64]$strike.tick - [int64]$adopt.tick } else { $null }
         Note 'stalker looked away from' (@($rowsB | ForEach-Object { ($_.PSObject.Properties | ForEach-Object { "$($_.Name)=$($_.Value)" }) -join ' ' }) + "strike $ticks ticks after adopt; stalker $offAtStrike degrees off the view axis (sees_me is true inside 60)")
-        if ($strikesA -gt 0) { return V 'FAIL' "struck $strikesA time(s) within 4 s while watched" }
+        # Ring distance: the samples after the approach (the first second walks in from the spawn).
+        $ring = @($dists | Select-Object -Skip ([math]::Floor($dists.Count / 4)))
+        $far = if ($ring.Count) { ($ring | Measure-Object -Maximum).Maximum } else { 99 }
+        if ($strikesA -lt 1) { return V 'FAIL' "watched for 4 s, it never came in to strike (flank_max_ticks $max)" }
+        if ($far -gt 4.5) { return V 'FAIL' "watched, it circled as far as $far blocks, out of a sword's reach and a step" }
         if (-not $struck) { return V 'FAIL' 'never struck in 9 s with the bot looking away' }
         if ($ticks -ge $max) { return V 'FAIL' "struck $ticks ticks after adopt, not before flank_max_ticks $max (a timeout, not an unseen strike)" }
-        V 'PASS' "watched: no strike in 4 s (circled $span degrees); looked away from: struck $ticks ticks after adopt (< $max), $offAtStrike degrees off the view"
+        V 'PASS' "watched: circled at most $far blocks off and struck $strikesA time(s) in 4 s; looked away from: struck $ticks ticks after adopt (< $max), $offAtStrike degrees off the view"
     }
 
     Run-Scene 'marksman_cover' {
