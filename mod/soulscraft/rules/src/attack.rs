@@ -226,12 +226,14 @@ mod tests {
     #[test]
     fn a_dash_strikes_once_while_it_runs() {
         let f = MobsFile::embedded();
-        let s = Strikes::of(f.mob("brute").unwrap().attack("charge").unwrap());
-        assert_eq!(s, Strikes::Dash { from: 14, to: 22 });
-        assert!(!s.strikes_on(13, 0));
-        assert!(s.strikes_on(14, 0));
-        assert!(s.strikes_on(21, 0));
-        assert!(!s.strikes_on(22, 0));
+        let a = f.mob("brute").unwrap().attack("charge").unwrap();
+        let (from, to) = (a.windup + a.hold, a.windup + a.hold + a.hit);
+        let s = Strikes::of(a);
+        assert_eq!(s, Strikes::Dash { from, to });
+        assert!(!s.strikes_on(from - 1, 0));
+        assert!(s.strikes_on(from, 0));
+        assert!(s.strikes_on(to - 1, 0));
+        assert!(!s.strikes_on(to, 0));
         assert!(!s.strikes_on(15, 1));
     }
 

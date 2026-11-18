@@ -243,7 +243,8 @@ fn stalker_lunge_dashes_and_lands_once_on_contact() {
     let m = mob("stalker");
     let mut b = Brain::new(Style::Skirmisher, 2, 0);
     b.force(m.attack_index("lunge").unwrap());
-    // The target is 5 blocks off; the dash closes in a block a tick from tick 12.
+    // The target is 5 blocks off; the dash closes in from tick 12 (here a block a tick, to land).
+    let lunge = m.attack("lunge").unwrap();
     let out = run(&mut b, &m, 0.0, 0, 40, |n| {
         let mut s = senses(n, 5.0);
         s.pos = [0.0, 0.0, if n >= 13 { (n - 12) as f64 } else { 0.0 }];
@@ -252,13 +253,13 @@ fn stalker_lunge_dashes_and_lands_once_on_contact() {
     match out[12].order {
         Order::Dash { dir, per_tick } => {
             assert!((dir[2] - 1.0).abs() < 1e-9);
-            assert!((per_tick - 1.0).abs() < 1e-9);
+            assert!((per_tick - lunge.dash_blocks.unwrap() / f64::from(lunge.hit)).abs() < 1e-9);
         }
         o => panic!("{o:?}"),
     }
     let s = strikes(&out);
     assert_eq!(s.len(), 1);
-    assert!(s[0].0 >= 13 && s[0].0 < 18);
+    assert!(s[0].0 >= 13 && s[0].0 < 12 + lunge.hit as usize);
 }
 
 #[test]
@@ -525,10 +526,12 @@ fn brute_charges_from_afar_and_is_stunned_by_a_wall() {
             })
             .unwrap()
     };
-    assert_eq!(end(&wall), 62, "the wall's full window");
+    let a = m.attack("charge").unwrap();
+    let ran = a.windup + a.hold + a.hit;
+    assert_eq!(end(&wall), ran + a.recover, "the wall's full window");
     let mut b = Brain::new(Style::Heavy, 9, 0);
     let open = run(&mut b, &m, 0.0, 0, 80, |n| senses(n, 10.0));
-    assert_eq!(end(&open), 22 + CHARGE_OPEN_RECOVER);
+    assert_eq!(end(&open), ran + CHARGE_OPEN_RECOVER);
 }
 
 #[test]
@@ -1047,4 +1050,27 @@ fn an_ambush_that_misses_grabs_nothing() {
     });
     assert_eq!(mode_at(&out, "grab"), None);
     assert!(out.iter().all(|t| t.hold.is_none()));
+}
+
+/// Playtest 2026-11-18: a watched stalker ran rings round the player out of a sword's reach and
+/// could not be hit. It circles within reach of a step and a swing, slower than its run, and gives
+/// up the flank inside two seconds.
+#[test]
+fn stalker_circles_within_reach_and_not_for_long() {
+    let m = mob("stalker");
+    let (_, hi) = m.param_range("circle_radius_blocks").unwrap();
+    assert!(hi <= 4.0, "circles at most 4 blocks off, not {hi}");
+    let max = m.param("flank_max_ticks").unwrap();
+    assert!(max <= 40.0, "flanks at most 2 s, not {max} ticks");
+    let mut b = Brain::new(Style::Skirmisher, 2, 0);
+    let out = run(&mut b, &m, 0.0, 0, 20, |n| facing_stalker(n, true));
+    let speed = out
+        .iter()
+        .find_map(|t| match t.order {
+            Order::Walk { speed, .. } => Some(speed),
+            _ => None,
+        })
+        .expect("a watched stalker walks its ring");
+    assert_eq!(Some(speed), m.param("circle_speed"), "the ring is walked at circle_speed");
+    assert!(speed < 1.0);
 }

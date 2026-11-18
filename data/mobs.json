@@ -3,6 +3,8 @@
   "version": 1,
   "source": "docs/design/04-bestiary.md, docs/design/03-hypotheses.md (Г6, Г7)",
   "tick_rate": 20,
+  "dash_max_blocks_per_tick": 0.4,
+  "dash_note": "плейтест 2026-11-18: рывок, который сервер ведёт по тикам быстрее 0,4 блока за тик (8 блоков в секунду), у клиента выглядит телепортом; гипотеза",
   "vanilla_zombie": { "health": 20, "damage": 3, "armor": 2, "speed": 0.23 },
   "effects": {
     "bleeding": { "id": "soulscraft:bleeding", "damage": 1.0, "period_ticks": 20, "stacking": "refresh", "note": "общее кровотечение для всех модов (integration.md, 4.1): урон damage × (уровень + 1) раз в period_ticks; повторное наложение заменяет длительность, уровень не складывается (refresh)", "assumed": ["damage", "period_ticks", "stacking"] }
@@ -78,34 +80,35 @@
       "question": "Удержишь ли его перед собой?",
       "height_px": 30,
       "look": "Худой охотник в капюшоне и плаще из шкур, лицо в тени, два серпа. Ростом 30 пикселей, сутулый, длинные руки. Силуэт: острый капюшон и два изогнутых клинка.",
-      "stats": { "health": 22, "damage": 2, "armor": 2, "speed": 0.32 },
+      "stats": { "health": 22, "damage": 2, "armor": 2, "speed": 0.27 },
       "hitbox": { "width": 0.6, "height": 1.95, "eye": 1.6 },
       "damage_note": "удар 2 за каждый серп",
       "attacks": [
         { "id": "double_slash", "name": "Двойной взмах", "clip": "attack_double", "windup": 6, "hold": 0, "hit": 4, "recover": 8, "damage": 0.6, "strikes_at": [0, 3], "effects": [{ "id": "bleed", "seconds": 3 }], "tell": "оба серпа расходятся в стороны" },
-        { "id": "lunge", "name": "Выпад-рывок", "clip": "attack_lunge", "windup": 12, "hold": 0, "hit": 6, "recover": 15, "damage": 1.2, "dash_blocks": 6, "tell": "приседает, серпы назад", "window_note": "после рывка 15 тиков: застрял и разворачивается", "cue": { "sound": "minecraft:entity.fox.screech", "pitch": 0.8 } }
+        { "id": "lunge", "name": "Выпад-рывок", "clip": "attack_lunge", "windup": 12, "hold": 0, "hit": 12, "recover": 15, "damage": 1.2, "dash_blocks": 4.8, "tell": "приседает, серпы назад", "window_note": "после рывка 15 тиков: застрял и разворачивается", "cue": { "sound": "minecraft:entity.fox.screech", "pitch": 0.8 } }
       ],
       "moves": [
         { "id": "backstep", "name": "Отскок", "clip": "backstep", "note": "прыжок назад после удара" },
         { "id": "flee", "name": "Бегство", "clip": "run", "note": "убегает при здоровье ниже 25% и возвращается через 10 секунд" }
       ],
       "params": {
-        "circle_radius_blocks": [4, 6],
+        "circle_radius_blocks": [3, 4],
+        "circle_speed": 0.8,
         "flee_below_health": 0.25,
         "return_after_ticks": 200,
         "lunge_more_often_if_player_at_wall": true,
-        "flank_max_ticks": 100,
+        "flank_max_ticks": 40,
         "flank_angle_degrees": 135
       },
       "note": "ловчий заходит на точку кольца в flank_angle_degrees от взгляда цели (больше 90°: сбоку и сзади) и бьёт, когда цель на него не смотрит (±60°), или через flank_max_ticks захода; звук выпада cue — ванильный id; всё это гипотезы (Г6)",
       "behavior": [
-        "Кружит на 4–6 блоках, заходит сбоку и сзади.",
+        "Кружит на 3–4 блоках, заходит сбоку и сзади, но не дольше 2 секунд.",
         "После удара отскакивает.",
         "Если игрок прижался спиной к стене, ловчий чаще делает выпад.",
         "Убегает при здоровье ниже 25% и возвращается через 10 секунд."
       ],
       "loot": [{ "item": "soulscraft:stalker_hood", "name": "Капюшон ловчего", "chance": 0.05 }],
-      "assumed": ["params.flee_below_health", "params.return_after_ticks", "attacks.*.hit", "attacks.double_slash.strikes_at", "params.flank_max_ticks", "params.flank_angle_degrees", "attacks.*.cue"]
+      "assumed": ["params.flee_below_health", "params.return_after_ticks", "attacks.*.hit", "attacks.double_slash.strikes_at", "params.flank_max_ticks", "params.flank_angle_degrees", "attacks.*.cue", "stats.speed", "params.circle_radius_blocks", "params.circle_speed", "attacks.lunge.dash_blocks"]
     },
     {
       "id": "marksman",
@@ -173,7 +176,7 @@
       "attacks": [
         { "id": "wide_swing", "name": "Широкий размах", "clip": "attack_swing", "windup": 12, "hold": 0, "hit": 2, "recover": 14, "damage": 1.0, "arc_degrees": 120, "tell": "молот отведён в сторону" },
         { "id": "overhead_wave", "name": "Удар сверху с волной", "clip": "attack_slam", "windup": 16, "hold": 0, "hit": 2, "recover": 20, "damage": 1.6, "wave": { "radius_blocks": 3, "damage": 0.5, "jumpable": true, "impact_ahead_blocks": 2, "jump_clear_blocks": 0.5 }, "cue": { "sound": "minecraft:entity.ravager.attack" }, "tell": "молот над головой, рык", "window_note": "20 тиков, молот застрял в земле" },
-        { "id": "charge", "name": "Таран", "clip": "attack_charge", "windup": 14, "hold": 0, "hit": 8, "recover": 40, "recover_if": "wall", "damage": 1.4, "dash_blocks": 8, "tell": "роет землю ногой, наклоняет рога", "window_note": "врезался в стену — оглушён 40 тиков" }
+        { "id": "charge", "name": "Таран", "clip": "attack_charge", "windup": 14, "hold": 0, "hit": 20, "recover": 40, "recover_if": "wall", "damage": 1.4, "dash_blocks": 8, "tell": "роет землю ногой, наклоняет рога", "window_note": "врезался в стену — оглушён 40 тиков" }
       ],
       "passives": [
         { "id": "rage", "name": "Ярость", "below_health": 0.3, "speed_mult": 1.2, "clip_ticks": 34, "cue": { "sound": "minecraft:entity.ravager.roar" }, "tell": "красные глаза" }
@@ -245,7 +248,7 @@
       "stats": { "health": 30, "damage": 5, "armor": 2, "water_only": true },
       "hitbox": { "width": 0.75, "height": 1.0, "eye": 0.6 },
       "attacks": [
-        { "id": "ambush", "name": "Бросок из засады", "clip": "attack_lunge", "windup": 10, "hold": 0, "hit": 6, "recover": 20, "damage": 1.3, "dash_blocks": 6, "cue": { "sound": "minecraft:entity.guardian.attack" }, "tell": "пасть раскрывается, приманка гаснет" },
+        { "id": "ambush", "name": "Бросок из засады", "clip": "attack_lunge", "windup": 10, "hold": 0, "hit": 15, "recover": 20, "damage": 1.3, "dash_blocks": 6, "cue": { "sound": "minecraft:entity.guardian.attack" }, "tell": "пасть раскрывается, приманка гаснет" },
         { "id": "grab", "name": "Хватка", "clip": "grab", "follows": "ambush", "windup": 0, "hold": 0, "hit": 0, "recover": 0, "damage": 0.25, "grab_max_ticks": 40, "pulls_down": true, "break_hits": 3, "grab_hit_every_ticks": 10, "pull_down_per_tick": 0.05, "mouth_ahead_blocks": 0.8, "tell": "игрок в пасти", "note": "после попадания броска цель держится у пасти до grab_max_ticks, при pulls_down опускаясь на pull_down_per_tick за тик; урон damage раз в grab_hit_every_ticks; break_hits ударов схваченной цели по удильщику освобождают (другой урон не в счёт), и он уходит" }
       ],
       "moves": [],
@@ -312,7 +315,7 @@
         "undead": ["minecraft:zombie", "minecraft:husk", "minecraft:drowned", "minecraft:zombie_villager"],
         "wave_role": "assault",
         "attacks": [
-          { "id": "lunge", "name": "Выпад", "windup": 10, "hold": 0, "hit": 4, "recover": 12, "damage": 1.0, "dash_blocks": 3, "tell": "замирает, руки вперёд, рык", "cue": { "sound": "minecraft:entity.{name}.ambient", "pitch": 0.7, "pose": "aggressive", "particle": "minecraft:angry_villager" } },
+          { "id": "lunge", "name": "Выпад", "windup": 10, "hold": 0, "hit": 6, "recover": 12, "damage": 1.0, "dash_blocks": 2.4, "tell": "замирает, руки вперёд, рык", "cue": { "sound": "minecraft:entity.{name}.ambient", "pitch": 0.7, "pose": "aggressive", "particle": "minecraft:angry_villager" } },
           { "id": "trident_throw", "name": "Бросок трезубца", "only": ["minecraft:drowned"], "windup": 14, "hold": 0, "hit": 2, "recover": 26, "damage": 1.0, "projectile": "trident", "tell": "поднимает трезубец над головой", "cue": { "sound": "minecraft:entity.drowned.ambient", "pitch": 0.8, "pose": "aggressive" } }
         ],
         "params": {
@@ -437,7 +440,7 @@
         "undead": ["minecraft:zoglin"],
         "wave_role": "assault",
         "attacks": [
-          { "id": "ram", "name": "Таран", "windup": 10, "hold": 0, "hit": 6, "recover": 20, "damage": 1.0, "dash_blocks": 5, "knockback": true, "recover_if": "miss", "tell": "роет землю копытом", "cue": { "sound": "minecraft:entity.{name}.angry", "particle": "minecraft:poof" } }
+          { "id": "ram", "name": "Таран", "windup": 10, "hold": 0, "hit": 10, "recover": 20, "damage": 1.0, "dash_blocks": 4, "knockback": true, "recover_if": "miss", "tell": "роет землю копытом", "cue": { "sound": "minecraft:entity.{name}.angry", "particle": "minecraft:poof" } }
         ],
         "params": { "ram_range_blocks": [2.5, 7], "ram_chance": 0.5, "recover_on_hit_ticks": 4 }
       },

@@ -44,6 +44,27 @@ pub struct MobsFile {
     /// The summoning horn a credited kill drops now and then (11-summons-rewards.md, Г18).
     #[serde(default)]
     pub horn_drop: crate::natural::HornDropDef,
+    /// The fastest a dash driven tick by tick may go, blocks a tick (playtest 2026-11-18: faster
+    /// reads as a teleport on the client). Leaps (the spider's pounce, the cube's hop) are free of it.
+    #[serde(default = "default_dash_cap")]
+    pub dash_max_blocks_per_tick: f64,
+}
+
+fn default_dash_cap() -> f64 {
+    0.4
+}
+
+/// A dash over `cap` blocks a tick is refused with what to change.
+fn check_dash(who: &str, a: &AttackDef, cap: f64) -> Result<(), String> {
+    let Some(blocks) = a.dash_blocks else { return Ok(()) };
+    let per = blocks / f64::from(a.hit.max(1));
+    if per > cap + 1e-9 {
+        return Err(format!(
+            "{who} {}: dash of {blocks} blocks in {} ticks is {per:.2} a tick, over dash_max_blocks_per_tick {cap} (the client sees a jump): lengthen hit or shorten the dash",
+            a.id, a.hit
+        ));
+    }
+    Ok(())
 }
 
 /// Room for a mob's box where it appears (owner's decision, round 9; crate::fit).
@@ -418,6 +439,17 @@ impl MobsFile {
             mob.check()?;
         }
         file.vanilla.check()?;
+        let cap = file.dash_max_blocks_per_tick;
+        for mob in &file.mobs {
+            for a in &mob.attacks {
+                check_dash(&mob.id, a, cap)?;
+            }
+        }
+        for g in file.vanilla.groups.iter().filter(|g| !matches!(g.behavior.as_str(), "pouncer" | "cube")) {
+            for a in &g.attacks {
+                check_dash(&g.id, &a.def, cap)?;
+            }
+        }
         Ok(file)
     }
 
@@ -753,6 +785,33 @@ mod tests {
         let text = EMBEDDED.replacen("\"strikes_at\": [0, 3]", "\"strikes_at\": [0, 9]", 1);
         assert_ne!(text, EMBEDDED, "the stalker's strikes_at was found");
         assert!(MobsFile::parse(&text).unwrap_err().contains("strike"));
+    }
+
+    /// Playtest 2026-11-18: a dash driven tick by tick faster than the cap reads as a teleport on
+    /// the client (positions reach it every few ticks). Every such dash, own or vanilla, keeps under
+    /// `dash_max_blocks_per_tick`; the spider's pounce and the cube's hop are leaps, so free of it.
+    #[test]
+    fn dashes_keep_under_the_speed_cap() {
+        let f = MobsFile::embedded();
+        let cap = f.dash_max_blocks_per_tick;
+        assert!(cap > 0.0 && cap <= 0.4, "cap {cap}");
+        let own = f.mobs.iter().flat_map(|m| m.attacks.iter().map(move |a| (m.id.as_str(), a)));
+        let vanilla = f
+            .vanilla
+            .groups
+            .iter()
+            .filter(|g| !matches!(g.behavior.as_str(), "pouncer" | "cube"))
+            .flat_map(|g| g.attacks.iter().map(move |a| (g.id.as_str(), &a.def)));
+        for (who, a) in own.chain(vanilla) {
+            if let Some(b) = a.dash_blocks {
+                let per = b / f64::from(a.hit.max(1));
+                assert!(per <= cap + 1e-9, "{who} {}: {b} blocks in {} ticks", a.id, a.hit);
+            }
+        }
+        let slow = EMBEDDED.replacen(&format!("\"dash_max_blocks_per_tick\": {cap}"), "\"dash_max_blocks_per_tick\": 0.1", 1);
+        assert_ne!(slow, EMBEDDED, "the cap is in the data");
+        let err = MobsFile::parse(&slow).unwrap_err();
+        assert!(err.contains("dash_max_blocks_per_tick"), "{err}");
     }
 }
 

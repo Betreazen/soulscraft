@@ -186,13 +186,16 @@ fn a_lunge_dashes_its_blocks_over_the_hit_phase() {
     let g = group("zombie");
     let mut b = VBrain::new(&g, "minecraft:zombie", 1, 0);
     b.force(0);
-    let ticks = run(&mut b, &g, 0, 16, |now| senses(now, 4.0));
-    let Order::Dash { dir, per_tick } = ticks[10].order else { panic!("{:?}", ticks[10].order) };
+    let a = &g.attacks[0].def;
+    let hit_start = (a.windup + a.hold) as usize;
+    let recover = hit_start + a.hit as usize;
+    let ticks = run(&mut b, &g, 0, recover as u64 + 2, |now| senses(now, 4.0));
+    let Order::Dash { dir, per_tick } = ticks[hit_start].order else { panic!("{:?}", ticks[hit_start].order) };
     assert_eq!(dir, [0.0, 0.0, 1.0]);
-    assert!((per_tick - 0.75).abs() < 1e-9);
+    assert!((per_tick - a.dash_blocks.unwrap() / f64::from(a.hit)).abs() < 1e-9);
     // Out of contact the whole dash: no blow, then the recovery stands.
     assert!(strike_ticks(&ticks).is_empty());
-    assert_eq!(ticks[14].order, Order::Stay);
+    assert_eq!(ticks[recover].order, Order::Stay);
 }
 
 #[test]

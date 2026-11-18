@@ -110,10 +110,10 @@ The launcher takes the [latest release](https://github.com/Betreazen/soulscraft/
 ### Dedicated server
 
 ```powershell
-git clone --branch v0.7.0 https://github.com/Betreazen/soulscraft
+git clone --branch v0.7.1 https://github.com/Betreazen/soulscraft
 horizon-launcher native-build soulscraft/mod/soulscraft `
-    --server-output C:\horizon-engines\soulscraft-0.7.0 --version <Horizon version> --trust-native-code
-horizon-server --dir <server folder> config set engine.path=C:\horizon-engines\soulscraft-0.7.0\horizon-engine.exe
+    --server-output C:\horizon-engines\soulscraft-0.7.1 --version <Horizon version> --trust-native-code
+horizon-server --dir <server folder> config set engine.path=C:\horizon-engines\soulscraft-0.7.1\horizon-engine.exe
 horizon-server --dir <server folder> restart
 ```
 

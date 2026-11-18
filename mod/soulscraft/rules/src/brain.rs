@@ -925,7 +925,9 @@ impl Brain {
             }
             Mode::Flee { .. } => Order::Walk { to: away(s.pos, tg.pos, 12.0), speed: 1.4 },
             Mode::Pause { .. } | Mode::Roar { .. } | Mode::Grab { .. } => Order::Stay,
-            Mode::Circle if self.style == Style::Skirmisher => Order::Walk { to: self.flank_point(mob, s, tg), speed: 1.0 },
+            Mode::Circle if self.style == Style::Skirmisher => {
+                Order::Walk { to: self.flank_point(mob, s, tg), speed: mob.param("circle_speed").unwrap_or(1.0) }
+            }
             Mode::Circle => {
                 let (lo, hi) = mob
                     .param_range("circle_radius_blocks")
