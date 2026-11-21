@@ -1,9 +1,10 @@
+// The pedestal's item, the core's ghost copies, heads and dioramas, and the book's figure.
 fn soulscraft_block_entity_submit(
-    game: &crate::game::Game<'_>,
+    game: &Game<'_>,
     pos: [i32; 3],
     block: &str,
-    entity: &horizon_client::containers::ModBlockEntity,
-    draw: &mut crate::game::native_block_entity_draw::BlockEntityDraw,
+    entity: &ModBlockEntity,
+    draw: &mut BlockEntityDraw,
 ) {
     if crate::game::soulscraft_book_client::draw_figure(game, entity, draw) {
         return;

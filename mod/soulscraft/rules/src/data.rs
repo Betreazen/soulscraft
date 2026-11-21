@@ -168,7 +168,7 @@ pub struct MobDef {
     #[serde(default)]
     pub wave_role: String,
     /// Undead (round 11): in `#minecraft:undead`, poison and regeneration do nothing, instant
-    /// harm heals. Not undead clears the zombie template's `flags.undead` (src/mixins/register_goals.rs).
+    /// harm heals. Not undead clears the zombie template's `flags.undead` (src/modules/goals.rs).
     pub undead: bool,
     /// The kin banners that call it more often (06-altar.md, «Модификаторы»): some of [`KINS`].
     /// `undead` is exactly the `undead` flag.
