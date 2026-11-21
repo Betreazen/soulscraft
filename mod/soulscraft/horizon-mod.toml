@@ -370,7 +370,7 @@ target = "horizon_client::game::spawner::Game<'_>::add_planned"
 kind = "RETURN"
 helper = "src/mixins/spawner_planned.rs"
 bindings = [
-  { name = "value", ty = "std::collections::HashMap<u32, u32>", value = "$value" },
+  { name = "value", ty = "HashMap<u32, u32>", value = "$value" },
 ]
 
 # Natural spawning's candidate chunks: an altar sector's chunks come again.
