@@ -1,12 +1,14 @@
 // The altar event's path map and the brute's breach (06-altar.md, «Путь к алтарю», «Пролом
-// громилы»; soulscraft_rules::flow): the zone's cells read from the world into a flow field, a
+// громилы»; soulscraft::rules::flow): the zone's cells read from the world into a flow field, a
 // look through it, and the brute breaking an opening in a wall on its way.
+#[allow(unused_imports)]
+use super::soulscraft_compat::*;
 use crate::game::Game;
 use crate::game::soulscraft_altar as altar_srv;
 use crate::game::soulscraft_event::{Breaching, EventRun, WaveMob, cell_of, centre_of, core_centre, halt, nav_to, record};
 use crate::game::soulscraft_server as server;
 use horizon_world::registry::BlockStateId;
-use soulscraft_rules::{
+use soulscraft::rules::{
     altar as ra,
     defense,
     flow::{Cell, Field, Grid},
@@ -94,7 +96,7 @@ pub(super) fn classify(game: &Game<'_>, id: BlockStateId, pos: [i32; 3], rules: 
     if ra::is_altar_block(name) {
         return Cell::Hard;
     }
-    let boxes = game.native_block_collision(pos);
+    let boxes = game.sc_block_collision(pos);
     if boxes.is_empty() {
         return Cell::Open;
     }
@@ -187,7 +189,7 @@ fn brute_timing() -> (u64, u64) {
     let s = server::state();
     let a = s.data.mob("brute").and_then(|m| m.attack("overhead_wave"));
     match a {
-        Some(a) => (u64::from(a.windup + a.hold), u64::from(soulscraft_rules::attack::Timeline::of(a).end()).max(2)),
+        Some(a) => (u64::from(a.windup + a.hold), u64::from(soulscraft::rules::attack::Timeline::of(a).end()).max(2)),
         None => (16, 38),
     }
 }

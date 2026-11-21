@@ -1,4 +1,4 @@
-// The vanilla changes in the world (07-vanilla-mobs.md; soulscraft_vanilla, soulscraft_rules::vanilla),
+// The vanilla changes in the world (07-vanilla-mobs.md; soulscraft_vanilla, soulscraft::rules::vanilla),
 // on the altar site's platform (soulscraft_selftest_altar::clear_site), against a still invulnerable
 // iron golem set as the mob's target (its vanilla target too):
 //   vanilla_adopt_p          zombies at P 0 and 1: Г2 on the vanilla base (20 → 38 health, 3 → 4.8
@@ -14,11 +14,13 @@
 //   vslow_skeleton_pause     three arrows, then the pause
 //   vslow_zombie_flank       three zombies on one target: two come round the sides
 //   vslow_witch_hides        a hurt witch walks behind a wall
+#[allow(unused_imports)]
+use super::soulscraft_compat::*;
 use crate::game::Game;
 use crate::game::soulscraft_selftest_altar::{at, centre, clear_site};
 use crate::game::soulscraft_vanilla as vanilla;
 use horizon_client::mobs::Who;
-use soulscraft_rules::{attack::Timeline, data::MobsFile, geom, vanilla::Behavior};
+use soulscraft::rules::{attack::Timeline, data::MobsFile, geom, vanilla::Behavior};
 use std::sync::{Mutex, PoisonError};
 
 const DIM: &str = "minecraft:overworld";
@@ -66,8 +68,8 @@ static CASE: Mutex<Option<Case>> = Mutex::new(None);
 
 fn summon(game: &mut Game<'_>, kind: &str, c: [i32; 3], extra: &str) -> Option<u32> {
     let snbt = format!("{{Rotation:[0f,0f],PersistenceRequired:1b{extra}}}");
-    let Ok((crate::mod_api::Tag::Compound(nbt), _)) = crate::mod_api::parse_snbt(&snbt) else { return None };
-    game.native_summon(DIM, kind, centre(at(c)), nbt)
+    let Ok((horizon_core::nbt::Tag::Compound(nbt), _)) = horizon_core::nbt::parse_snbt(&snbt) else { return None };
+    game.sc_summon(DIM, kind, centre(at(c)), nbt)
 }
 
 fn golem(game: &mut Game<'_>, c: [i32; 3]) -> Option<u32> {
@@ -75,7 +77,7 @@ fn golem(game: &mut Game<'_>, c: [i32; 3]) -> Option<u32> {
 }
 
 fn tags(game: &Game<'_>, id: u32) -> Vec<String> {
-    game.native_entity(id).and_then(|e| game.native_entity_tags(e)).unwrap_or_default()
+    game.sc_entity(id).and_then(|e| game.sc_entity_tags(e)).unwrap_or_default()
 }
 
 fn pos(game: &Game<'_>, id: u32) -> Option<[f64; 3]> {
@@ -93,7 +95,7 @@ fn aim(game: &mut Game<'_>, mob: u32, golem: u32) {
 pub(super) fn cleanup(game: &mut Game<'_>) {
     if let Some(c) = CASE.lock().unwrap_or_else(PoisonError::into_inner).take() {
         for id in c.mobs.iter().chain(c.golem.iter()) {
-            game.native_remove_mob(DIM, *id);
+            game.sc_remove_mob(DIM, *id);
             vanilla::state().targets.remove(id);
         }
     }
@@ -101,7 +103,7 @@ pub(super) fn cleanup(game: &mut Game<'_>) {
 }
 
 /// Where a mob of this move stands and where its golem stands (blocks south).
-fn layout(behavior: Behavior, attack: &soulscraft_rules::data::AttackDef) -> f64 {
+fn layout(behavior: Behavior, attack: &soulscraft::rules::data::AttackDef) -> f64 {
     match behavior {
         _ if attack.projectile.is_some() => 8.0,
         Behavior::Cube => 4.0,
@@ -214,7 +216,7 @@ fn arrange(game: &mut Game<'_>, name: &str, c: &mut Case) -> bool {
         }
         "vanilla_spawner_grows_only" => {
             let p = at([2, 0, 0]);
-            game.native_run_command(&format!("setblock {} {} {} minecraft:spawner", p[0], p[1], p[2]));
+            game.sc_run_command(&format!("setblock {} {} {} minecraft:spawner", p[0], p[1], p[2]));
             c.mobs = summon(game, "minecraft:skeleton", [0, 0, 0], ",NoAI:1b").into_iter().collect();
             !c.mobs.is_empty()
         }
@@ -244,7 +246,7 @@ fn arrange(game: &mut Game<'_>, name: &str, c: &mut Case) -> bool {
             c.golem = golem(game, [0, 0, 8]);
             // A wall 3 high, 5 wide, 3 blocks east: its far side is out of the golem's sight.
             let (a, b) = (at([3, 0, -2]), at([3, 2, 2]));
-            game.native_run_command(&format!("fill {} {} {} {} {} {} minecraft:stone", a[0], a[1], a[2], b[0], b[1], b[2]));
+            game.sc_run_command(&format!("fill {} {} {} {} {} {} minecraft:stone", a[0], a[1], a[2], b[0], b[1], b[2]));
             c.mobs = summon(game, "minecraft:witch", [0, 0, 0], &fresh("0.00")).into_iter().collect();
             c.golem.is_some() && !c.mobs.is_empty()
         }
@@ -292,8 +294,9 @@ fn adopt_p(game: &mut Game<'_>, c: &mut Case) -> Option<Result<(), String>> {
         let m = game.mobs.iter().find(|m| m.id == *id)?;
         let (max, dmg, hp) = (f64::from(m.attrs.max_health), f64::from(m.attrs.attack_damage), f64::from(m.health));
         let (base_h, base_d) = (base_value(m, Attr::MaxHealth), base_value(m, Attr::AttackDamage));
-        // Armour without what it wears (a zombie may spawn in a helmet): its type's 2 plus 6·P.
-        let armor = f64::from(horizon_client::mobs::armor::values(m).0) - f64::from(m.worn_armor().0).floor();
+        // Armour without what it wears (a zombie may spawn in a helmet): its type's 2 plus 6·P. 8f83e5c
+        // has no `Mob::worn_armor` (worn stacks are modifiers on the live map), so the base is read.
+        let armor = base_value(m, Attr::Armor);
         let xp: Vec<String> = tags(game, *id).into_iter().filter(|t| t.starts_with("pct.xp")).collect();
         let want = (base_h * (1.0 + 0.9 * p), base_d * (1.0 + 0.6 * p), 2.0 + 6.0 * p);
         let ok = (base_h - 20.0).abs() < 0.01

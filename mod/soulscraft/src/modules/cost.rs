@@ -4,6 +4,8 @@
 // The level hook runs once per loaded level and game tick, so the time is divided by server ticks
 // (distinct game times), not level ticks: with the Nether and the End loaded a per-level average
 // reads a third of what a server tick pays.
+#[allow(unused_imports)]
+use super::soulscraft_compat::*;
 use std::sync::{Mutex, PoisonError};
 
 /// The parts of the level tick timed on their own, in the order the tick runs them.

@@ -1,4 +1,4 @@
-// The survival slice in the world (docs/design/10-survival.md; soulscraft_rules::natural):
+// The survival slice in the world (docs/design/10-survival.md; soulscraft::rules::natural):
 // SoulsCraft's mobs in the overworld's natural spawn lists by biome (hypothesis Г14), the lurker's
 // own spawner in deep ocean water, and the soul shard a credited kill drops (Г15).
 //
@@ -23,16 +23,18 @@
 //   soulscraft: natural lurker at=x,y,z near=player tick=..
 //   soulscraft: shard drop mob=revenant count=1 at=x,y,z
 //   soulscraft: world drop mob=revenant item=soulscraft:grave_horn at=x,y,z
+#[allow(unused_imports)]
+use super::soulscraft_compat::*;
 use crate::game::Game;
 use horizon_client::biome::SpawnEntry;
-use soulscraft_rules::data::MobsFile;
-use soulscraft_rules::event::Rng;
+use soulscraft::rules::data::MobsFile;
+use soulscraft::rules::event::Rng;
 use std::sync::{LazyLock, Mutex, PoisonError};
 
 /// The data as built: spawn lists are asked often, no copy of the live data each time.
 static MOBS: LazyLock<MobsFile> = LazyLock::new(MobsFile::embedded);
 /// The head's world chances (data/trophies.json).
-static CHANCES: LazyLock<soulscraft_rules::event::TrophyChances> = LazyLock::new(soulscraft_rules::event::TrophyChances::embedded);
+static CHANCES: LazyLock<soulscraft::rules::event::TrophyChances> = LazyLock::new(soulscraft::rules::event::TrophyChances::embedded);
 static RNG: LazyLock<Mutex<Rng>> = LazyLock::new(|| Mutex::new(Rng::new(0x5EED_50_11)));
 /// Lists extended since the last read (the self-test and the cost line).
 static EXTENDED: Mutex<u64> = Mutex::new(0);
@@ -50,10 +52,10 @@ pub(super) fn on_potential_spawns(game: &Game<'_>, dimension: &str, category: &s
     if category != "monster" || dimension != "minecraft:overworld" {
         return;
     }
-    let Some(biome) = game.native_biome(pos) else { return };
+    let Some(biome) = game.sc_biome(pos) else { return };
     let listed: Vec<&str> = entries.iter().map(|e| e.entity.as_str()).collect();
     let best = best_power_at([f64::from(pos[0]) + 0.5, f64::from(pos[1]), f64::from(pos[2]) + 0.5]);
-    let extras = soulscraft_rules::natural::extras(&MOBS.natural, &MOBS, &biome, pos[1], &listed, best);
+    let extras = soulscraft::rules::natural::extras(&MOBS.natural, &MOBS, &biome, pos[1], &listed, best);
     if extras.is_empty() {
         return;
     }
@@ -67,7 +69,7 @@ pub(super) fn on_potential_spawns(game: &Game<'_>, dimension: &str, category: &s
 /// `natural.tier_gate_blocks` (None: nobody that near).
 pub(super) fn best_power_at(at: [f64; 3]) -> Option<f64> {
     let p = POWERS.lock().unwrap_or_else(PoisonError::into_inner);
-    p.1.or_else(|| soulscraft_rules::scale::best_power_near(at, &p.0, MOBS.natural.tier_gate_blocks))
+    p.1.or_else(|| soulscraft::rules::scale::best_power_near(at, &p.0, MOBS.natural.tier_gate_blocks))
 }
 
 /// Reads the overworld players' P and the override for the tier gate now (the level tick, and the
@@ -95,13 +97,13 @@ pub(super) fn on_level_tick(game: &mut Game<'_>, dim: &str, now: u64) {
         return;
     }
     let Some(def) = MOBS.mob(&l.mob) else { return };
-    let players = game.native_server_players();
+    let players = game.sc_server_players();
     for p in players.iter().filter(|p| p.dimension == dim && p.health > 0.0 && p.game_mode != 3) {
         if !l.due(now, roll()) {
             continue;
         }
         let at = p.position;
-        let Some(biome) = game.native_biome([at[0].floor() as i32, at[1].floor() as i32, at[2].floor() as i32]) else { continue };
+        let Some(biome) = game.sc_biome([at[0].floor() as i32, at[1].floor() as i32, at[2].floor() as i32]) else { continue };
         if !l.biome_ok(&biome) {
             continue;
         }
@@ -111,13 +113,13 @@ pub(super) fn on_level_tick(game: &mut Game<'_>, dim: &str, now: u64) {
         if !MOBS.natural.lurker_allowed(&MOBS, best_power_at(spot)) {
             continue;
         }
-        let near = game.mobs.iter().filter(|m| !m.removed && m.alive() && m.kind.id == def.key && soulscraft_rules::geom::dist([m.position.x, m.position.y, m.position.z], spot) <= l.near_blocks).count();
+        let near = game.mobs.iter().filter(|m| !m.removed && m.alive() && m.kind.id == def.key && soulscraft::rules::geom::dist([m.position.x, m.position.y, m.position.z], spot) <= l.near_blocks).count();
         if near >= l.near_cap {
             continue;
         }
         // No P tag: a natural mob takes the power of the players near it (Г5), as the others do.
-        let Ok((crate::mod_api::Tag::Compound(nbt), _)) = crate::mod_api::parse_snbt("{}") else { continue };
-        if game.native_summon(dim, &def.key, spot, nbt).is_some() {
+        let Ok((horizon_core::nbt::Tag::Compound(nbt), _)) = horizon_core::nbt::parse_snbt("{}") else { continue };
+        if game.sc_summon(dim, &def.key, spot, nbt).is_some() {
             log::info!("soulscraft: natural lurker at={:.0},{y},{:.0} near={} tick={now}", spot[0], spot[2], p.name);
         }
     }
@@ -126,19 +128,19 @@ pub(super) fn on_level_tick(game: &mut Game<'_>, dim: &str, now: u64) {
 /// The highest cell at or below `max_y` with water in it and in the cell above (the lurker's box
 /// is under 2 blocks tall); None where the column is not loaded or holds no such water.
 fn water_column(game: &Game<'_>, x: i32, z: i32, max_y: i32) -> Option<i32> {
-    let water = |y: i32| game.native_block([x, y, z]) == "minecraft:water";
+    let water = |y: i32| game.sc_block([x, y, z]) == "minecraft:water";
     (-60..=max_y).rev().find(|&y| water(y) && water(y + 1))
 }
 
 /// What credited kills drop in the world, from the book's deaths: (mob key, where). Shards, now
-/// and then a horn, the head, armour pieces (soulscraft_rules::natural::world_drops).
+/// and then a horn, the head, armour pieces (soulscraft::rules::natural::world_drops).
 pub(super) fn drop_loot(game: &mut Game<'_>, dim: &str, kills: &[(String, [f64; 3])]) {
     for (kind, at) in kills {
         let Some(def) = MOBS.mob(kind) else { continue };
-        for (item, n) in soulscraft_rules::natural::world_drops(&MOBS, &CHANCES, def, roll) {
+        for (item, n) in soulscraft::rules::natural::world_drops(&MOBS, &CHANCES, def, roll) {
             let snbt = format!("{{Item:{{id:\"{item}\",count:{n}}},PickupDelay:10}}");
-            let Ok((crate::mod_api::Tag::Compound(nbt), _)) = crate::mod_api::parse_snbt(&snbt) else { continue };
-            game.native_summon(dim, "minecraft:item", [at[0], at[1] + 0.3, at[2]], nbt);
+            let Ok((horizon_core::nbt::Tag::Compound(nbt), _)) = horizon_core::nbt::parse_snbt(&snbt) else { continue };
+            game.sc_summon(dim, "minecraft:item", [at[0], at[1] + 0.3, at[2]], nbt);
             if item == MOBS.soul_shard.item {
                 log::log!(crate::game::soulscraft_server::chatty(), "soulscraft: shard drop mob={} count={n} at={:.0},{:.0},{:.0}", def.id, at[0], at[1], at[2]);
             } else {

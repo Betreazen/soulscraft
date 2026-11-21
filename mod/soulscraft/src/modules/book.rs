@@ -1,31 +1,30 @@
-// The hunter's book on the server (docs/design/08-guide-book.md; soulscraft_rules::book): each
+// The hunter's book on the server (docs/design/08-guide-book.md; soulscraft::rules::book): each
 // player's progress (met, weighted kills, altar and event entries) in their persistent data under
 // `soulscraft:book`, beside the other mods' keys; kill credit; the action-bar line of a new stage;
 // the progress sent to the player's client at login, on each new entry and when the book opens.
 //
 // What it hears, and where (paths under SRC/crates/horizon-client/src):
-// - a mob's death: an injection at `Game::mob_death_canceled` (game/creatures.rs:1585, called from
-//   `mob_died` before `last_hurt_by_player` is cleared, :1626) — the named hook `living_death`
-//   sits behind `mods().is_empty()` there (:1586), so a bundle hears it only at the function;
+// - a mob's death: a mixin at `Game::mob_death_canceled` (game/native_hooks/living_death.rs:61,
+//   before `last_hurt_by_player` is cleared and the death is told);
 // - players' hits: each level tick, a mob of the book whose `last_damage` (mobs.rs:1543) changed,
-//   by `Who::Player` and the hit's player in `Game::last_hurt_by_player` (game.rs:2705);
+//   by `Who::Player` and the hit's player in `Game::last_hurt_by_player` (a `PlayerCredit`: the uuid);
 // - «Встречен»: the brain's target (soulscraft_server calls `saw` and `struck`), and for vanilla
 //   mobs their AI target every VANILLA_EVERY ticks: no scan of players × mobs;
-// - turret kills: RustCraft's `pct-machine kill <owner> <entity> <type>` report to
-//   Path-of-craft-tree runs through `native_perform_console_command` (game/native_server.rs:779),
-//   so this mod reads it there too (only sent while Path-of-craft-tree is in the build);
-// - spawners' mobs: `Game::add_planned`'s ids (game/spawner.rs:145), tagged `soulscraft.spawner`;
-// - the book's use: `native_use_item` (API 13, game.rs:6971, no mods() check).
+// - turret kills: RustCraft's `soulscraft-kill …` report, a command lib.rs registers at level 4,
+//   reaches `on_console` through soulscraft_tools::on_mod_command;
+// - spawners' mobs: `Game::add_planned`'s ids (game/mobs/spawner.rs:151), tagged `soulscraft.spawner`;
+// - the book's use: lib.rs's `HunterBook` ItemPart queues the player in `soulscraft::bridge`.
 //
 // Log lines: `soulscraft: book player=sc_a entry=revenant stage=Убит kills=1`,
 // `soulscraft: book credit mob=revenant id=12 players=[sc_a] weight=1 how=kill`.
+#[allow(unused_imports)]
+use super::soulscraft_compat::*;
 use crate::game::Game;
 use crate::game::soulscraft_altar as altar;
-use crate::mod_api::Tag;
+use horizon_core::nbt::Tag;
 use horizon_client::text::Text;
-use horizon_client::items::ItemStack;
 use horizon_client::mobs::{Mob, Who};
-use soulscraft_rules::{
+use soulscraft::rules::{
     altar::AltarFile,
     book::{self, BookFile, BookMsg, Catalog, Held, HitLog, MachineKill, Progress, Unlock},
     geom::{self, V3},
@@ -149,12 +148,12 @@ pub(super) fn on_mob_death(game: &Game<'_>, m: &Mob) {
     }
     let attacker = m.last_damage.and_then(|(d, _)| d.attacker);
     let killer = match attacker {
-        Some(Who::Player) => player_of(game, game.last_hurt_by_player.get(&m.id).copied().flatten()),
+        Some(Who::Player) => game.last_hurt_by_player.get(&m.id).map(|c| c.0),
         Some(Who::Mob(e)) => stand_in_of(e),
         None => None,
     };
     let spawner = book().spawner_ids.contains(&m.id)
-        || game.native_entity(m.id).and_then(|e| game.native_entity_tags(e)).is_some_and(|t| t.iter().any(|t| t == book::SPAWNER_TAG));
+        || game.sc_entity(m.id).and_then(|e| game.sc_entity_tags(e)).is_some_and(|t| t.iter().any(|t| t == book::SPAWNER_TAG));
     DEATHS_IN.lock().unwrap_or_else(PoisonError::into_inner).push(Death {
         id: m.id,
         kind,
@@ -164,16 +163,6 @@ pub(super) fn on_mob_death(game: &Game<'_>, m: &Mob) {
         tick: game.world.game_time.max(0) as u64,
         credited: Vec::new(),
     });
-}
-
-/// The player on connection `conn` (`last_hurt_by_player`'s value): a guest, or the acting one
-/// during their own turn (the hub is out of `lan` then).
-fn player_of(game: &Game<'_>, conn: Option<u32>) -> Option<u128> {
-    let conn = conn?;
-    if let Some(g) = game.lan.as_ref().and_then(|h| h.hub.guest(conn)) {
-        return Some(g.uuid);
-    }
-    game.native_acting_player().map(|p| p.uuid)
 }
 
 /// `Game::add_planned`'s ids: the mobs a spawner made.
@@ -204,17 +193,6 @@ pub(super) fn on_console(line: &str) -> bool {
         None => {}
     }
     own
-}
-
-/// `native_use_item`: the book opens.
-pub(super) fn on_use_item(game: &Game<'_>, stack: &ItemStack, claimed: &mut bool) {
-    if &*stack.item != book::ITEM {
-        return;
-    }
-    *claimed = true;
-    if let Some(p) = game.native_acting_player() {
-        book().opens.push(p.uuid);
-    }
 }
 
 /// soulscraft_server: a mob's brain chose `target` (entity, player, where) this tick.
@@ -277,7 +255,7 @@ pub(super) fn on_level_tick(game: &mut Game<'_>, dim: &str, now: u64) {
 
 /// Players online and not loaded yet are read; players gone are dropped (written already).
 fn logins(game: &mut Game<'_>, now: u64) {
-    let online = game.native_server_players();
+    let online = game.sc_server_players();
     let due: Vec<(u128, String)> = {
         let mut b = book();
         b.players.retain(|u, p| p.stand_in.is_some() || online.iter().any(|o| o.uuid == *u));
@@ -298,9 +276,9 @@ fn logins(game: &mut Game<'_>, now: u64) {
 /// Reads a player's book from their persistent data. An unreadable text is logged and left as it
 /// is: the player starts empty in memory, and the saved text is not written over.
 fn load(game: &mut Game<'_>, uuid: u128, name: &str, now: u64) {
-    let Some(data) = game.native_player_persistent_data(uuid) else { return };
+    let Some(data) = game.sc_player_persistent_data(uuid) else { return };
     let (progress, writable) = match &data {
-        Tag::Compound(c) => match c.get(&horizon_world::nbt::JavaString::from(book::KEY)) {
+        Tag::Compound(c) => match c.get(&horizon_core::nbt::JavaString::from(book::KEY)) {
             None => (Progress::default(), true),
             Some(Tag::String(s)) => match Progress::from_json(&s.to_string_lossy()) {
                 Ok(p) => (p, true),
@@ -338,8 +316,8 @@ fn load(game: &mut Game<'_>, uuid: u128, name: &str, now: u64) {
 fn tag_spawner_mobs(game: &mut Game<'_>) {
     let ids = std::mem::take(&mut book().untagged);
     for id in ids {
-        if let Some(e) = game.native_entity(id) {
-            game.native_entity_add_tag(e, book::SPAWNER_TAG);
+        if let Some(e) = game.sc_entity(id) {
+            game.sc_entity_add_tag(e, book::SPAWNER_TAG);
         }
     }
 }
@@ -356,7 +334,7 @@ fn sample_hits(game: &Game<'_>, dim: &str, now: u64) {
             continue;
         }
         let who = match d.attacker {
-            Some(Who::Player) => player_of(game, game.last_hurt_by_player.get(&m.id).copied().flatten()),
+            Some(Who::Player) => game.last_hurt_by_player.get(&m.id).map(|c| c.0),
             Some(Who::Mob(e)) => stand_in_in(players, e),
             None => None,
         };
@@ -379,7 +357,7 @@ fn sample_hits(game: &Game<'_>, dim: &str, now: u64) {
 /// Vanilla mobs of the book: their AI target, a player within 16 blocks.
 fn vanilla_met(game: &Game<'_>, dim: &str) {
     let players: Vec<(u128, i32, V3)> =
-        game.native_server_players().into_iter().filter(|p| p.dimension == dim).map(|p| (p.uuid, p.entity_id, p.position)).collect();
+        game.sc_server_players().into_iter().filter(|p| p.dimension == dim).map(|p| (p.uuid, p.entity_id, p.position)).collect();
     let mut b = book();
     let vanilla: HashSet<String> = b.catalog.entries.iter().filter(|(e, _)| e.vanilla).flat_map(|(e, _)| e.keys.iter().cloned()).collect();
     if vanilla.is_empty() {
@@ -403,7 +381,7 @@ fn vanilla_met(game: &Game<'_>, dim: &str) {
 
 /// Where each player (and stand-in) of `dim` stands now.
 fn positions(game: &Game<'_>, dim: &str) -> HashMap<u128, V3> {
-    let mut at: HashMap<u128, V3> = game.native_server_players().into_iter().filter(|p| p.dimension == dim).map(|p| (p.uuid, p.position)).collect();
+    let mut at: HashMap<u128, V3> = game.sc_server_players().into_iter().filter(|p| p.dimension == dim).map(|p| (p.uuid, p.position)).collect();
     let stand_ins: Vec<(u128, u32)> = book().players.iter().filter_map(|(u, p)| p.stand_in.map(|e| (*u, e))).collect();
     for (u, e) in stand_ins {
         if let Some(m) = game.mobs.iter().find(|m| m.id == e && !m.removed) {
@@ -478,7 +456,7 @@ fn reports(game: &Game<'_>, now: u64) {
     if pending.is_empty() {
         return;
     }
-    let owners: HashMap<u128, V3> = game.native_server_players().into_iter().map(|p| (p.uuid, p.position)).collect();
+    let owners: HashMap<u128, V3> = game.sc_server_players().into_iter().map(|p| (p.uuid, p.position)).collect();
     let mut b = book();
     let mut keep = Vec::new();
     for (k, first) in pending {
@@ -535,9 +513,9 @@ fn stand_in_pos(game: &Game<'_>, players: &HashMap<u128, Player>, uuid: u128) ->
 fn held_items(game: &Game<'_>) {
     let summon = altar::summon_items();
     let mut found: Vec<(u128, String)> = Vec::new();
-    for p in game.native_server_players() {
-        for slot in [horizon_client::mod_api::EquipmentSlot::MainHand, horizon_client::mod_api::EquipmentSlot::OffHand] {
-            if let Some(s) = game.native_player_equipment(p.uuid, slot) {
+    for p in game.sc_server_players() {
+        for slot in [mod_api::EquipmentSlot::MainHand, mod_api::EquipmentSlot::OffHand] {
+            if let Some(s) = game.sc_player_equipment(p.uuid, slot) {
                 found.push((p.uuid, s.item.to_string()));
             }
         }
@@ -618,7 +596,8 @@ fn flush(game: &mut Game<'_>, now: u64) {
                 note(p, file, lines, &u);
             }
         }
-        let opens: HashSet<u128> = std::mem::take(&mut b.opens).into_iter().collect();
+        // The book's right clicks (lib.rs `HunterBook`, queued in the bridge) and `/sc book … open`.
+        let opens: HashSet<u128> = std::mem::take(&mut b.opens).into_iter().chain(soulscraft::bridge::take_book_opens()).collect();
         let mut lines = Vec::new();
         let mut writes = Vec::new();
         let mut sends = Vec::new();
@@ -644,7 +623,7 @@ fn flush(game: &mut Game<'_>, now: u64) {
         (lines, writes, sends)
     };
     for (uuid, line) in lines {
-        game.native_action_bar(uuid, Text::literal(line));
+        game.sc_action_bar(uuid, Text::literal(line));
     }
     for (uuid, json) in writes {
         if write(game, uuid, &json) {
@@ -654,7 +633,7 @@ fn flush(game: &mut Game<'_>, now: u64) {
         }
     }
     for (uuid, msg) in sends {
-        if let Err(e) = game.native_net_send_to_player(uuid, book::CHANNEL, &book::encode(&msg)) {
+        if let Err(e) = game.sc_net_send_to_player(uuid, book::CHANNEL, &book::encode(&msg)) {
             log::warn!("soulscraft: book message to {uuid:032x} not sent: {e}");
         } else if msg.open {
             log::info!("soulscraft: book open player={uuid:032x} tick={now}");
@@ -664,11 +643,11 @@ fn flush(game: &mut Game<'_>, now: u64) {
 
 /// The book's key written into the player's shared compound; the other mods' keys stay.
 fn write(game: &mut Game<'_>, uuid: u128, json: &str) -> bool {
-    let Some(mut data) = game.native_player_persistent_data(uuid) else { return false };
+    let Some(mut data) = game.sc_player_persistent_data(uuid) else { return false };
     if !put(&mut data, json) {
         return false;
     }
-    game.native_set_player_persistent_data(uuid, data)
+    game.sc_set_player_persistent_data(uuid, data)
 }
 
 /// `json` under the book's key of a persistent-data compound (false for a tag that is not one).
@@ -681,7 +660,7 @@ pub(super) fn put(data: &mut Tag, json: &str) -> bool {
 /// The book's progress read from a persistent-data compound.
 pub(super) fn get(data: &Tag) -> Option<Result<Progress, String>> {
     let Tag::Compound(map) = data else { return None };
-    match map.get(&horizon_world::nbt::JavaString::from(book::KEY))? {
+    match map.get(&horizon_core::nbt::JavaString::from(book::KEY))? {
         Tag::String(s) => Some(Progress::from_json(&s.to_string_lossy())),
         _ => Some(Err("not a string".into())),
     }
@@ -794,16 +773,8 @@ pub(super) fn reset(name: &str) -> String {
 
 // ---- `/sc book` (operators: checks on a live server, the bots' round) ----
 
-/// The usage `native_register_commands` gets.
-pub(super) fn on_register_commands(commands: &mut Vec<crate::mod_api::NativeCommand>) {
-    commands.push(crate::mod_api::NativeCommand::op("sc book <player:word> [action:text]", 2));
-    // RustCraft's machine kills (`on_console`); level 4: only the console and the mods run it. The
-    // type has a colon, which a `word` does not take: the rest of the line is one `text`.
-    commands.push(crate::mod_api::NativeCommand::op(
-        &format!("{} <source:word> <owner:word> <entity:integer> <kind_and_block:text>", book::KILL_COMMAND),
-        4,
-    ));
-}
+// The usages (`sc book <player:word> [action:text]` and the machine kills' level-4 command) are
+// registered by lib.rs's `register_commands`.
 
 /// `/sc book <player> [reset | open | meet <mob> | kill <mob> [n]]`: the player's book, a reset,
 /// opening their window, or fixture meetings and kills (credited as real ones, action bar
@@ -834,7 +805,7 @@ pub(super) fn on_command(game: &mut Game<'_>, line: &str, ran: &mut bool) -> boo
         _ => "sc book <player> [reset | open | meet <mob> | kill <mob> [n]]".to_owned(),
     };
     log::info!("soulscraft: {reply}");
-    game.native_feedback(Text::literal(format!("[SoulsCraft] {reply}")));
+    game.sc_feedback(Text::literal(format!("[SoulsCraft] {reply}")));
     true
 }
 
@@ -854,11 +825,11 @@ fn fixture(name: &str, mob: &str, kills: Option<f64>) -> String {
 }
 
 /// A vanilla type's own numbers as the engine has them (its `MobType`: max health, attack damage,
-/// armour), for the book's pages of changed vanilla mobs (soulscraft_rules::book_page::VanillaStats)
+/// armour), for the book's pages of changed vanilla mobs (soulscraft::rules::book_page::VanillaStats)
 /// on the client, and for the self-test on the server.
-pub(super) fn engine_stats(game: &Game<'_>, kind: &str) -> Option<soulscraft_rules::data::Stats> {
+pub(super) fn engine_stats(game: &Game<'_>, kind: &str) -> Option<soulscraft::rules::data::Stats> {
     let t = game.res.mob_types().get(kind)?;
-    Some(soulscraft_rules::data::Stats {
+    Some(soulscraft::rules::data::Stats {
         health: f64::from(t.max_health),
         damage: f64::from(t.attack_damage),
         armor: f64::from(t.armor),

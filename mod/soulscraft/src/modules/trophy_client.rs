@@ -1,4 +1,4 @@
-// Trophies on the client (docs/design/09-trophies.md; soulscraft_rules::trophy): the block entities
+// Trophies on the client (docs/design/09-trophies.md; soulscraft::rules::trophy): the block entities
 // of the heads (`<mob>_head`, `<mob>_wall_head`) and of the dioramas (`<mob>_trophy`) draw the mob's
 // head, or its figure in the looping clip `trophy`, with the mob's own rig and texture
 // (soulscraft_client::draw_rig), from `assets/soulscraft/rigs/<mob>.trophy.json` in the content
@@ -7,16 +7,18 @@
 // the figure's yaw, its scale, then the model frame.
 //
 // Heads stand still: their frame is kept (`BlockEntityDraw::keep`, API 94,
-// native_block_entity_draw.rs:200-212) until the block changes. A diorama's figure breathes from
+// native_block_entity_draw.rs:515, `native_draw_keep`) until the block changes. A diorama's figure breathes from
 // `game_time` and `partial` each frame (native_block_entity_draw.rs:44-56, 427-440), so it is
 // never kept. Glowing cubes are drawn at full light (`draw.light = 0xF0F0`); the rest by the
 // light of the block's cell, which a diorama's own `light` raises (its block lets light through).
+#[allow(unused_imports)]
+use super::soulscraft_compat::*;
 use crate::game::Game;
 use crate::game::native_block_entity_draw::BlockEntityDraw;
 use crate::game::soulscraft_client as client;
-use horizon_client::containers::ModBlockEntity;
-use horizon_world::nbt::{JavaString, Tag};
-use soulscraft_rules::trophy::{self, Kind, TrophyFile};
+use mod_api::ModBlockEntity;
+use horizon_core::nbt::{JavaString, Tag};
+use soulscraft::rules::trophy::{self, Kind, TrophyFile};
 use std::collections::HashMap;
 use std::sync::{Arc, LazyLock, Mutex, PoisonError};
 
@@ -28,7 +30,7 @@ fn file(game: &Game<'_>, mob: &str) -> Option<Arc<TrophyFile>> {
         .entry(mob.to_owned())
         .or_insert_with(|| {
             let path = format!("assets/soulscraft/rigs/{mob}.trophy.json");
-            let bytes = game.native_client_resources().read(&path)?;
+            let bytes = game.sc_client_resources().read(&path)?;
             match TrophyFile::parse(&String::from_utf8_lossy(&bytes)) {
                 Ok(f) => {
                     log::info!("soulscraft: trophy {mob}: {} particle rows, light {}", f.diorama.particles.len(), f.diorama.light);
@@ -48,32 +50,32 @@ pub(super) fn draw_block_entity(game: &Game<'_>, pos: [i32; 3], block: &str, ent
     let Some(kind) = Kind::of(block) else { return false };
     let mob = kind.mob();
     let Some(f) = file(game, mob) else { return true };
-    let facing = game.native_block_property(pos, "facing").unwrap_or_else(|| "north".into());
-    let rotation = game.native_block_property(pos, "rotation").and_then(|r| r.parse().ok()).unwrap_or(0);
+    let facing = game.sc_block_property(pos, "facing").unwrap_or_else(|| "north".into());
+    let rotation = game.sc_block_property(pos, "rotation").and_then(|r| r.parse().ok()).unwrap_or(0);
     let (place, figure) = match kind {
         Kind::Head(_) => (f.head.floor, false),
         Kind::WallHead(_) => (f.head.wall, false),
         Kind::Diorama(_) => (trophy::Place { scale: f.diorama.scale, offset: f.diorama.offset, yaw: f.diorama.yaw }, true),
     };
     let seed = (pos[0] ^ pos[2].rotate_left(11) ^ pos[1].rotate_left(22)) as u32;
-    draw.push();
-    draw.translate([0.5, 0.0, 0.5]);
-    draw.rotate_about([0.0, 1.0, 0.0], trophy::turn(kind, rotation, &facing), [0.0; 3]);
-    draw.translate([place.offset[0] / 16.0, place.offset[1] / 16.0, place.offset[2] / 16.0]);
-    draw.rotate_about([0.0, 1.0, 0.0], place.yaw, [0.0; 3]);
-    draw.scale([place.scale; 3]);
+    game.native_draw_push(draw);
+    game.native_draw_translate(draw, [0.5, 0.0, 0.5]);
+    game.native_draw_rotate_about(draw, [0.0, 1.0, 0.0], trophy::turn(kind, rotation, &facing), [0.0; 3]);
+    game.native_draw_translate(draw, [place.offset[0] / 16.0, place.offset[1] / 16.0, place.offset[2] / 16.0]);
+    game.native_draw_rotate_about(draw, [0.0, 1.0, 0.0], place.yaw, [0.0; 3]);
+    game.native_draw_scale(draw, [place.scale; 3]);
     if figure {
-        let t = trophy::clip_tick(pos, draw.game_time, draw.partial, f.diorama.ticks);
+        let t = trophy::clip_tick(pos, game.native_draw_game_time(draw), game.native_draw_partial(draw), f.diorama.ticks);
         let flags: Vec<&str> = f.diorama.flags.iter().map(String::as_str).collect();
         client::draw_rig(game, mob, || client::load_rig(game, mob), &f.diorama.clip, t, &flags, draw, seed);
     } else {
         let key = format!("{mob}#head");
         let drawn = client::draw_rig(game, &key, || f.head_rig().map_err(|e| log::warn!("soulscraft: head {mob}: {e}")).ok(), "", 0.0, &[], draw, seed);
         if drawn {
-            draw.keep();
+            game.native_draw_keep(draw);
         }
     }
-    draw.pop();
+    game.native_draw_pop(draw);
     if let (Kind::Diorama(_), Some(plaque)) = (kind, f.diorama.plaque) {
         draw_plaque(game, mob, plaque_owner(entity), trophy::turn(kind, rotation, &facing), plaque, draw);
     }
@@ -104,7 +106,7 @@ fn plaque_owner(entity: &ModBlockEntity) -> Option<(String, f64)> {
 fn draw_plaque(game: &Game<'_>, mob: &str, owner: Option<(String, f64)>, turn: f32, plaque: trophy::PxBox, draw: &mut BlockEntityDraw) {
     let Some(name) = crate::game::soulscraft_book_client::mob_name(mob) else { return };
     let lines = trophy::plaque_lines(&name, owner.as_ref().map(|(who, k)| (who.as_str(), *k)));
-    let widths: Vec<f32> = lines.iter().map(|l| game.native_text_width(l)).collect();
+    let widths: Vec<f32> = lines.iter().map(|l| game.sc_text_width(l)).collect();
     let size = [(plaque.to[0] - plaque.from[0]) as f32, (plaque.to[1] - plaque.from[1]) as f32];
     let k = widths.iter().map(|w| trophy::plaque_scale(*w, size, lines.len())).fold(f32::INFINITY, f32::min);
     if !k.is_finite() {
@@ -115,17 +117,17 @@ fn draw_plaque(game: &Game<'_>, mob: &str, owner: Option<(String, f64)>, turn: f
         (plaque.from[1] + plaque.to[1]) as f32 / 2.0,
         plaque.from[2] as f32 - PLAQUE_LIFT,
     ];
-    draw.push();
-    draw.translate([0.5, 0.0, 0.5]);
-    draw.rotate_about([0.0, 1.0, 0.0], turn, [0.0; 3]);
-    draw.translate([centre[0] / 16.0 - 0.5, centre[1] / 16.0, centre[2] / 16.0 - 0.5]);
+    game.native_draw_push(draw);
+    game.native_draw_translate(draw, [0.5, 0.0, 0.5]);
+    game.native_draw_rotate_about(draw, [0.0, 1.0, 0.0], turn, [0.0; 3]);
+    game.native_draw_translate(draw, [centre[0] / 16.0 - 0.5, centre[1] / 16.0, centre[2] / 16.0 - 0.5]);
     // The text faces +z; the plaque faces north (−z), and its reader's right is −x.
-    draw.rotate_about([0.0, 1.0, 0.0], 180.0, [0.0; 3]);
-    draw.scale([k / 16.0, -k / 16.0, k / 16.0]);
+    game.native_draw_rotate_about(draw, [0.0, 1.0, 0.0], 180.0, [0.0; 3]);
+    game.native_draw_scale(draw, [k / 16.0, -k / 16.0, k / 16.0]);
     let top = -(lines.len() as f32) * 9.0 / 2.0;
     for (i, (line, w)) in lines.iter().zip(&widths).enumerate() {
         let text = horizon_client::text::Text::literal(line.clone());
-        game.native_draw_text(draw, &text, [-w / 2.0, top + i as f32 * 9.0 + 0.5], PLAQUE_INK, false, 0);
+        game.sc_draw_text(draw, &text, [-w / 2.0, top + i as f32 * 9.0 + 0.5], PLAQUE_INK, false, 0);
     }
-    draw.pop();
+    game.native_draw_pop(draw);
 }

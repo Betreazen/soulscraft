@@ -1,20 +1,23 @@
 // The altar on the client (06-altar.md): the summon item floating over the pedestal and the ghost
 // of the next ring as small turning copies (block entity drawing, `native_block_entity_submit`),
 // the ghost's outlines, the event's spawn points and the beams of drains and curses (world
-// primitives, `native_world_primitives`), and the altar's menu (a mod screen,
+// geometry, `submit_custom_geometry`), and the altar's menu (a mod screen,
 // `native_mod_screen_open`, drawn in `native_screen_render_post` as Path-of-craft-tree's tree
-// window is). Everything drawn comes from the server's last message (soulscraft_rules::view); the
+// window is). Everything drawn comes from the server's last message (soulscraft::rules::view); the
 // client sends back only the menu's buttons.
+#[allow(unused_imports)]
+use super::soulscraft_compat::*;
 use crate::game::Game;
 use crate::game::native_block_entity_draw::BlockEntityDraw;
-use crate::game::native_hooks::NativeScreenView;
+use mod_api::ScreenView;
 use horizon_assets::item_model::DisplayContext;
-use horizon_client::containers::ModBlockEntity;
+use mod_api::ModBlockEntity;
 use horizon_client::hud::HudBatch;
 use horizon_client::items::ItemStack;
-use horizon_client::world_primitives::WorldPrimitives;
-use horizon_world::nbt::{JavaString, Tag};
-use soulscraft_rules::{
+use horizon_client::world_geometry::WorldGeometry;
+use mod_api::{WorldDepth, WorldLine, WorldQuad};
+use horizon_core::nbt::{JavaString, Tag};
+use soulscraft::rules::{
     altar::{self as ra, AltarFile},
     view::{self, BeamKind, Button, Menu, Press, View},
 };
@@ -88,7 +91,7 @@ pub(super) fn on_tick(game: &mut Game<'_>) {
     if game.remote.is_none() {
         return;
     }
-    let open = game.native_mod_screen() == Some(SCREEN);
+    let open = game.sc_mod_screen() == Some(SCREEN);
     let (due, was, core, presses) = {
         let mut c = client();
         let due = std::mem::take(&mut c.open_due);
@@ -96,8 +99,8 @@ pub(super) fn on_tick(game: &mut Game<'_>) {
         c.was_open = open || due;
         (due, was, c.menu.as_ref().map(|m| m.core), std::mem::take(&mut c.presses))
     };
-    if due && !open && game.native_playing() {
-        game.native_mod_screen_open(SCREEN);
+    if due && !open && game.sc_playing() {
+        game.sc_mod_screen_open(SCREEN);
     }
     let mut presses = presses;
     if was && !open && !due && let Some(core) = core {
@@ -105,18 +108,18 @@ pub(super) fn on_tick(game: &mut Game<'_>) {
         client().menu = None;
     }
     for p in presses {
-        if let Err(e) = game.native_net_send_to_server(view::PRESS, &view::encode(&p)) {
+        if let Err(e) = game.sc_net_send_to_server(view::PRESS, &view::encode(&p)) {
             log::warn!("soulscraft: menu press not sent: {e}");
         }
     }
 }
 
-fn is_ours(game: &Game<'_>, screen: &NativeScreenView<'_>) -> bool {
-    screen.id == "mod" && game.native_mod_screen() == Some(SCREEN)
+fn is_ours(game: &Game<'_>, screen: &ScreenView<'_>) -> bool {
+    screen.id == "mod" && game.sc_mod_screen() == Some(SCREEN)
 }
 
 /// The panel and its three buttons, in GUI pixels: (panel, [boost on, boost off, ghost]).
-fn layout(screen: &NativeScreenView<'_>, lines: usize) -> ([f32; 4], [[f32; 4]; 3]) {
+fn layout(screen: &ScreenView<'_>, lines: usize) -> ([f32; 4], [[f32; 4]; 3]) {
     let [x, y, w, h] = screen.rect;
     let panel_w = panel_width(screen);
     let ph = 12.0 + lines as f32 * LINE + 8.0 + BUTTON_H + 10.0;
@@ -130,22 +133,22 @@ fn layout(screen: &NativeScreenView<'_>, lines: usize) -> ([f32; 4], [[f32; 4]; 
 
 /// The panel as wide as the screen allows, from PANEL_W up to PANEL_MAX_W, so a full altar's
 /// banner list wraps into few lines and the buttons stay on the screen.
-fn panel_width(screen: &NativeScreenView<'_>) -> f32 {
+fn panel_width(screen: &ScreenView<'_>) -> f32 {
     (screen.rect[2] - 16.0).clamp(PANEL_W, PANEL_MAX_W)
 }
 
 /// The menu's lines wrapped to the panel's text width (a long line, the spawn boost's, breaks).
 /// The horns are named from the language table (`item.soulscraft.<id>`), the crate's own words
 /// where it has no entry.
-fn wrapped(game: &Game<'_>, screen: &NativeScreenView<'_>, menu: &view::Menu) -> Vec<String> {
+fn wrapped(game: &Game<'_>, screen: &ScreenView<'_>, menu: &view::Menu) -> Vec<String> {
     let lines = view::menu_lines_named(menu, item_name);
-    view::wrap(&lines, panel_width(screen) - 16.0, |s| game.native_text_width(s))
+    view::wrap(&lines, panel_width(screen) - 16.0, |s| game.sc_text_width(s))
 }
 
 /// An item's name in the player's language, by its id.
 fn item_name(id: &str) -> String {
     let key = format!("item.{}", id.replacen(':', ".", 1));
-    horizon_client::lang::get_or(&key, &soulscraft_rules::book_page::piece_name(id))
+    horizon_client::lang::get_or(&key, &soulscraft::rules::book_page::piece_name(id))
 }
 
 fn inside(r: [f32; 4], at: [f32; 2]) -> bool {
@@ -153,32 +156,32 @@ fn inside(r: [f32; 4], at: [f32; 2]) -> bool {
 }
 
 /// `native_screen_render_post`: the menu as text lines and three buttons.
-pub(super) fn draw_screen(game: &Game<'_>, batch: &mut HudBatch, screen: &NativeScreenView<'_>) {
+pub(super) fn draw_screen(game: &Game<'_>, batch: &mut HudBatch, screen: &ScreenView<'_>) {
     if !is_ours(game, screen) {
         return;
     }
     let Some(menu) = client().menu.clone() else { return };
     let lines = wrapped(game, screen, &menu);
     let (panel, buttons) = layout(screen, lines.len() + 1);
-    game.native_fill(batch, panel, 0xE01A_1714);
-    game.native_fill(batch, [panel[0], panel[1], panel[2], 1.0], 0xFF9C_F5E4);
-    game.native_text(batch, "Алтарь призыва", [panel[0] + 8.0, panel[1] + 6.0], 0x9CF5E4, true);
+    game.sc_fill(batch, panel, 0xE01A_1714);
+    game.sc_fill(batch, [panel[0], panel[1], panel[2], 1.0], 0xFF9C_F5E4);
+    game.sc_text(batch, "Алтарь призыва", [panel[0] + 8.0, panel[1] + 6.0], 0x9CF5E4, true);
     for (i, l) in lines.iter().enumerate() {
         let color = if l == view::NO_SKY { 0xFF6060 } else { 0xE8E0D0 };
-        game.native_text(batch, l, [panel[0] + 8.0, panel[1] + 6.0 + LINE * (i as f32 + 1.0)], color, true);
+        game.sc_text(batch, l, [panel[0] + 8.0, panel[1] + 6.0 + LINE * (i as f32 + 1.0)], color, true);
     }
     let labels = [("Учащ. спавн: вкл", menu.boost), ("Учащ. спавн: выкл", !menu.boost), ("Показать призрак", false)];
     for (b, (label, active)) in buttons.iter().zip(labels) {
         let hover = inside(*b, screen.mouse);
         let fill = if active { 0xFF3C_6E5A } else if hover { 0xFF5A_5048 } else { 0xFF3A_3430 };
-        game.native_fill(batch, *b, fill);
-        let tw = game.native_text_width(label);
-        game.native_text(batch, label, [b[0] + (b[2] - tw) / 2.0, b[1] + 5.0], 0xFFFFFF, true);
+        game.sc_fill(batch, *b, fill);
+        let tw = game.sc_text_width(label);
+        game.sc_text(batch, label, [b[0] + (b[2] - tw) / 2.0, b[1] + 5.0], 0xFFFFFF, true);
     }
 }
 
 /// `native_screen_mouse_button_pressed_pre`: a button of the menu.
-pub(super) fn on_screen_press(game: &Game<'_>, screen: &NativeScreenView<'_>, button: i32, canceled: &mut bool) {
+pub(super) fn on_screen_press(game: &Game<'_>, screen: &ScreenView<'_>, button: i32, canceled: &mut bool) {
     if !is_ours(game, screen) || button != LEFT {
         return;
     }
@@ -199,7 +202,7 @@ fn ghost_shown(game: &Game<'_>, c: &AltarClient) -> bool {
     if c.ghost_until > now(game) {
         return true;
     }
-    game.native_held().is_some_and(|(item, _, _)| item.starts_with("soulscraft:altar_") || item.starts_with(ra::BANNER_PREFIX))
+    game.sc_held().is_some_and(|(item, _, _)| item.starts_with("soulscraft:altar_") || item.starts_with(ra::BANNER_PREFIX))
 }
 
 fn nbt_item(entity: &ModBlockEntity) -> Option<String> {
@@ -226,19 +229,19 @@ fn draw_pedestal_item(game: &Game<'_>, pos: [i32; 3], entity: &ModBlockEntity, d
         let mut c = client();
         c.file.get_or_insert_with(AltarFile::embedded).pedestal_item
     };
-    let t = draw.game_time as f64 + f64::from(draw.partial);
+    let t = game.native_draw_game_time(draw) as f64 + f64::from(game.native_draw_partial(draw));
     let phase = f64::from(pos[0] * 7 + pos[2] * 13);
     let bob = p.bob_px * (std::f64::consts::TAU * (t + phase) / p.bob_ticks.max(1.0)).sin();
     let angle = (30.0 + p.spin_deg_per_tick * (t + phase)) % 360.0;
-    draw.push();
-    draw.translate([0.5, ((p.height_px + bob) / 16.0) as f32, 0.5]);
-    draw.rotate_about([0.0, 1.0, 0.0], angle as f32, [0.0; 3]);
-    draw.scale([p.scale as f32; 3]);
-    let light = draw.light;
-    draw.light = FULL_LIGHT;
-    game.native_draw_item(draw, &ItemStack::new(&item, 1), DisplayContext::Fixed, None, pos[0] ^ pos[2]);
-    draw.light = light;
-    draw.pop();
+    game.native_draw_push(draw);
+    game.native_draw_translate(draw, [0.5, ((p.height_px + bob) / 16.0) as f32, 0.5]);
+    game.native_draw_rotate_about(draw, [0.0, 1.0, 0.0], angle as f32, [0.0; 3]);
+    game.native_draw_scale(draw, [p.scale as f32; 3]);
+    let light = game.native_draw_light(draw);
+    game.native_draw_set_light(draw, FULL_LIGHT);
+    game.sc_draw_item(draw, &ItemStack::new(&item, 1), DisplayContext::Fixed, None, pos[0] ^ pos[2]);
+    game.native_draw_set_light(draw, light);
+    game.native_draw_pop(draw);
 }
 
 /// The ghost's half-size turning copies of the blocks the next ring needs, drawn by the core's
@@ -254,95 +257,148 @@ fn draw_ghost_copies(game: &Game<'_>, core: [i32; 3], draw: &mut BlockEntityDraw
             _ => return,
         }
     };
-    let t = draw.game_time as f32 + draw.partial;
-    let light = draw.light;
-    draw.light = FULL_LIGHT;
+    let t = game.native_draw_game_time(draw) as f32 + game.native_draw_partial(draw);
+    let light = game.native_draw_light(draw);
+    game.native_draw_set_light(draw, FULL_LIGHT);
     for g in cells {
         if g.block == ra::SOCKET {
             continue;
         }
         let rel = [(g.pos[0] - core[0]) as f32, (g.pos[1] - core[1]) as f32, (g.pos[2] - core[2]) as f32];
-        draw.push();
-        draw.translate([rel[0] + 0.25, rel[1] + 0.25, rel[2] + 0.25]);
-        draw.rotate_about([0.0, 1.0, 0.0], (t * 2.0) % 360.0, [0.25, 0.0, 0.25]);
-        draw.scale([0.5; 3]);
+        game.native_draw_push(draw);
+        game.native_draw_translate(draw, [rel[0] + 0.25, rel[1] + 0.25, rel[2] + 0.25]);
+        game.native_draw_rotate_about(draw, [0.0, 1.0, 0.0], (t * 2.0) % 360.0, [0.25, 0.0, 0.25]);
+        game.native_draw_scale(draw, [0.5; 3]);
         let mut props: Vec<(&str, &str)> = Vec::new();
         if let Some(p) = g.part.as_deref() {
             props.push(("part", p));
         }
-        game.native_draw_block(draw, &g.block, &props);
-        draw.pop();
+        game.sc_draw_block(draw, &g.block, &props);
+        game.native_draw_pop(draw);
     }
-    draw.light = light;
+    game.native_draw_set_light(draw, light);
 }
 
-/// `native_block_entity_render_bounding_box`: the core's ghost reaches four blocks round it.
-pub(super) fn bounds(block: &str, bounds: &mut [f32; 6]) {
-    if block == ra::CORE {
-        *bounds = [-4.0, -1.0, -4.0, 5.0, 4.0, 5.0];
+/// One frame's world geometry: 8f83e5c's `submit_custom_geometry` takes lines and quads in batches
+/// (world_geometry.rs:234-282), ARGB, depth tested or through walls. The bundle era's
+/// `WorldPrimitives` shapes are made of them here.
+#[derive(Default)]
+struct Geo {
+    lines: Vec<WorldLine>,
+    quads: Vec<WorldQuad>,
+}
+
+impl Geo {
+    fn line(&mut self, from: [f64; 3], to: [f64; 3], color: u32, width: f32, depth: WorldDepth) {
+        self.lines.push(WorldLine::new(from, to, color, width, depth));
+    }
+
+    /// The twelve edges of the box from `lo` to `hi`.
+    fn box_outline(&mut self, lo: [f64; 3], hi: [f64; 3], color: u32, width: f32, depth: WorldDepth) {
+        let c = |x: bool, y: bool, z: bool| [if x { hi[0] } else { lo[0] }, if y { hi[1] } else { lo[1] }, if z { hi[2] } else { lo[2] }];
+        for (a, b) in [
+            ((false, false, false), (true, false, false)),
+            ((false, false, true), (true, false, true)),
+            ((false, true, false), (true, true, false)),
+            ((false, true, true), (true, true, true)),
+            ((false, false, false), (false, false, true)),
+            ((true, false, false), (true, false, true)),
+            ((false, true, false), (false, true, true)),
+            ((true, true, false), (true, true, true)),
+            ((false, false, false), (false, true, false)),
+            ((true, false, false), (true, true, false)),
+            ((false, false, true), (false, true, true)),
+            ((true, false, true), (true, true, true)),
+        ] {
+            self.line(c(a.0, a.1, a.2), c(b.0, b.1, b.2), color, width, depth);
+        }
+    }
+
+    /// A vertical beam `height` blocks up from `base`, as two crossed quads (the bundle era drew a
+    /// beacon beam's texture; world geometry quads are flat colour).
+    fn beam(&mut self, base: [f64; 3], height: u32, color: u32) {
+        const R: f64 = 0.2;
+        let top = base[1] + f64::from(height);
+        let [x, y, z] = base;
+        self.quads.push(WorldQuad::new([[x - R, y, z], [x + R, y, z], [x + R, top, z], [x - R, top, z]], color, WorldDepth::Tested));
+        self.quads.push(WorldQuad::new([[x, y, z - R], [x, y, z + R], [x, top, z + R], [x, top, z - R]], color, WorldDepth::Tested));
+    }
+
+    fn submit(self, draw: &mut WorldGeometry) {
+        if !self.lines.is_empty()
+            && let Err(e) = draw.lines(&self.lines)
+        {
+            log::debug!("soulscraft: altar lines not drawn: {e:?}");
+        }
+        if !self.quads.is_empty()
+            && let Err(e) = draw.quads(&self.quads)
+        {
+            log::debug!("soulscraft: altar beams not drawn: {e:?}");
+        }
     }
 }
 
 /// Each frame: the ghost's outlines, the coming wave's spawn points and the drain and curse beams.
-pub(super) fn primitives(game: &Game<'_>, p: &mut WorldPrimitives) {
-    let c = client();
-    let t = now(game);
-    let ghost = ghost_shown(game, &c);
-    for (core, (v, at)) in &c.views {
-        if t - at > STALE {
-            continue;
-        }
-        let top = [f64::from(core[0]) + 0.5, f64::from(core[1]) + 1.6, f64::from(core[2]) + 0.5];
-        if ghost {
-            for g in &v.ghost {
-                let color = if g.block == ra::SOCKET { 0xFFFF_A040 } else { 0xFF66_E0FF };
-                let lo = [f64::from(g.pos[0]) + 0.03, f64::from(g.pos[1]) + 0.03, f64::from(g.pos[2]) + 0.03];
-                let h = if g.block == ra::SLAB || g.block == ra::SOCKET { 0.5 } else { 1.0 };
-                p.box_outline(lo, [lo[0] + 0.94, lo[1] + h - 0.06, lo[2] + 0.94], color, 2.0);
+// TODO(port): the altar's health over the core («Алтарь hp/max») was world text; 8f83e5c's world
+// geometry draws none (the boss bar still shows it, soulscraft_event_ui).
+pub(super) fn primitives(game: &Game<'_>, _view: &mod_api::WorldRenderView, draw: &mut WorldGeometry) {
+    let mut p = Geo::default();
+    {
+        let c = client();
+        let t = now(game);
+        let ghost = ghost_shown(game, &c);
+        for (core, (v, at)) in &c.views {
+            if t - at > STALE {
+                continue;
             }
-            for w in &v.wrong {
-                let lo = [f64::from(w[0]), f64::from(w[1]), f64::from(w[2])];
-                p.box_outline(lo, [lo[0] + 1.0, lo[1] + 1.0, lo[2] + 1.0], 0xFFFF_3030, 3.0);
-            }
-        }
-        let Some(e) = &v.event else { continue };
-        if let Some(o) = &e.outline {
-            outline(p, o);
-        }
-        for s in &e.spawns {
-            let base = [f64::from(s[0]) + 0.5, f64::from(s[1]), f64::from(s[2]) + 0.5];
-            p.beam(base, 24, 0xFFFF_5030);
-            p.box_outline([base[0] - 0.5, base[1], base[2] - 0.5], [base[0] + 0.5, base[1] + 2.0, base[2] + 0.5], 0xFFFF_5030, 3.0)
-                .through_walls();
-        }
-        for b in &e.beams {
-            match b.kind {
-                BeamKind::Windup => {
-                    p.line(b.from, top, 0x90FF_FFFF, 1.5);
+            let top = [f64::from(core[0]) + 0.5, f64::from(core[1]) + 1.6, f64::from(core[2]) + 0.5];
+            if ghost {
+                for g in &v.ghost {
+                    let color = if g.block == ra::SOCKET { 0xFFFF_A040 } else { 0xFF66_E0FF };
+                    let lo = [f64::from(g.pos[0]) + 0.03, f64::from(g.pos[1]) + 0.03, f64::from(g.pos[2]) + 0.03];
+                    let h = if g.block == ra::SLAB || g.block == ra::SOCKET { 0.5 } else { 1.0 };
+                    p.box_outline(lo, [lo[0] + 0.94, lo[1] + h - 0.06, lo[2] + 0.94], color, 2.0, WorldDepth::Tested);
                 }
-                BeamKind::Drain => {
-                    p.line(b.from, top, 0xFF9C_F5E4, 4.0);
-                }
-                BeamKind::Curse => {
-                    p.line(b.from, top, 0xFFB0_40FF, 3.0).through_walls();
+                for w in &v.wrong {
+                    let lo = [f64::from(w[0]), f64::from(w[1]), f64::from(w[2])];
+                    p.box_outline(lo, [lo[0] + 1.0, lo[1] + 1.0, lo[2] + 1.0], 0xFFFF_3030, 3.0, WorldDepth::Tested);
                 }
             }
+            let Some(e) = &v.event else { continue };
+            if let Some(o) = &e.outline {
+                outline(&mut p, o);
+            }
+            for s in &e.spawns {
+                let base = [f64::from(s[0]) + 0.5, f64::from(s[1]), f64::from(s[2]) + 0.5];
+                p.beam(base, 24, 0xFFFF_5030);
+                p.box_outline(
+                    [base[0] - 0.5, base[1], base[2] - 0.5],
+                    [base[0] + 0.5, base[1] + 2.0, base[2] + 0.5],
+                    0xFFFF_5030,
+                    3.0,
+                    WorldDepth::ThroughWalls,
+                );
+            }
+            for b in &e.beams {
+                match b.kind {
+                    BeamKind::Windup => p.line(b.from, top, 0x90FF_FFFF, 1.5, WorldDepth::Tested),
+                    BeamKind::Drain => p.line(b.from, top, 0xFF9C_F5E4, 4.0, WorldDepth::Tested),
+                    BeamKind::Curse => p.line(b.from, top, 0xFFB0_40FF, 3.0, WorldDepth::ThroughWalls),
+                }
+            }
         }
-        let color = if e.losing && (t / 5) % 2 == 0 { 0xFFFF_4040 } else { 0xFFE8_E0D0 };
-        p.text([top[0], top[1] + 1.4, top[2]], format!("Алтарь {:.0}/{:.0}", e.hp.ceil(), e.max), color, 1.0)
-            .background()
-            .scale_with_distance();
     }
+    p.submit(draw);
 }
 
 /// The event zone's border for the first seconds of a run: a rail round it at the core's height
 /// and a short beam every `OUTLINE_STEP` blocks, as the spawn points are drawn.
-fn outline(p: &mut WorldPrimitives, o: &view::Outline) {
+fn outline(p: &mut Geo, o: &view::Outline) {
     let c = o.corners();
     for i in 0..4 {
         let (a, b) = (c[i], c[(i + 1) % 4]);
         for dy in [0.1, 2.0] {
-            p.line([a[0], a[1] + dy, a[2]], [b[0], b[1] + dy, b[2]], OUTLINE_COLOR, 2.0);
+            p.line([a[0], a[1] + dy, a[2]], [b[0], b[1] + dy, b[2]], OUTLINE_COLOR, 2.0, WorldDepth::Tested);
         }
     }
     for post in o.posts(OUTLINE_STEP) {

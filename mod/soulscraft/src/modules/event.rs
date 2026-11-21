@@ -1,5 +1,5 @@
 // The wave event on an altar, on the server (06-altar.md, «Ивент на алтаре» and «Оборона алтаря»;
-// the decisions are soulscraft_rules::{event, defense, flow}): the run's phases, the spawn points
+// the decisions are soulscraft::rules::{event, defense, flow}): the run's phases, the spawn points
 // shown before each wave, the participants in the 3 × 3-chunk zone, the altar's health, the path
 // map of the zone and the wave mobs driven along it, their drain, curse and the brute's breach,
 // the boss bar with its warning, the reward of a win and the walls put back at the end.
@@ -21,11 +21,13 @@
 //   soulscraft: event won|lost=altar|nobody|stopped core=.. wave=3 hp=.. altar_damage_by=assault:12.00
 //     walls_sealed=false modifiers=1,0,0   soulscraft: event reward items=[..]
 //   soulscraft: event restored blocks=4 kept=1
+#[allow(unused_imports)]
+use super::soulscraft_compat::*;
 use crate::game::Game;
 use crate::game::soulscraft_altar::{self as altar_srv, Altar};
 use crate::game::soulscraft_server as server;
 use horizon_client::mobs::Who;
-use soulscraft_rules::{
+use soulscraft::rules::{
     altar as ra,
     data::Stats,
     defense::{self, AltarHealth, Breaches, Drain, Goal, Harm, Mind, Numbers, Role},
@@ -68,7 +70,7 @@ pub(super) struct Overrides {
     pub curse_after_ticks: Option<u64>,
     pub grace_ticks: Option<u64>,
     pub power: Option<f64>,
-    /// The reward's random stream (a seeded run drops what soulscraft_rules::event::rewards rolls).
+    /// The reward's random stream (a seeded run drops what soulscraft::rules::event::rewards rolls).
     pub seed: Option<u64>,
     /// Mobs (iron golems) that stand in for players: participants, and targets of interception.
     pub stand_ins: Vec<u32>,
@@ -345,7 +347,7 @@ fn group_power(game: &mut Game<'_>, core: [i32; 3], flow: &Flow, parts: &[Part],
         if !flow.in_zone(core, m.position.x, m.position.z) {
             continue;
         }
-        let tags = game.native_entity(*id).and_then(|e| game.native_entity_tags(e)).unwrap_or_default();
+        let tags = game.sc_entity(*id).and_then(|e| game.sc_entity_tags(e)).unwrap_or_default();
         if let Some(p) = tags.iter().find_map(|t| t.strip_prefix(P_TAG)).and_then(|v| v.parse::<f64>().ok()) {
             tagged.push(p);
         }
@@ -437,7 +439,7 @@ fn take_spared(game: &mut Game<'_>, dim: &str, now: u64) {
     if spared.is_empty() {
         return;
     }
-    let players = game.native_server_players();
+    let players = game.sc_server_players();
     let mut keep = Vec::new();
     for uuid in spared {
         let found = {
@@ -453,15 +455,15 @@ fn take_spared(game: &mut Game<'_>, dim: &str, now: u64) {
             continue;
         };
         let Some(p) = players.iter().find(|p| p.uuid == uuid) else { continue };
-        game.native_set_player_status(uuid, Some(1024.0), None, None);
+        game.sc_set_player_status(uuid, Some(1024.0), None, None);
         let to = outside_zone(game, core, &flow, p.position);
-        game.native_teleport_player(uuid, dim, to, p.yaw, p.pitch);
+        game.sc_teleport_player(uuid, dim, to, p.yaw, p.pitch);
         for line in [
             format!("effect give {} minecraft:resistance 10 4 true", p.name),
             format!("effect give {} minecraft:regeneration 10 1 true", p.name),
             format!("title {} actionbar {{\"text\":\"Алтарь вынес вас из боя: смерть в ивенте не губит\",\"color\":\"gold\"}}", p.name),
         ] {
-            game.native_run_command(&line);
+            game.sc_run_command(&line);
         }
         record(format!("spared player={} to={:.0},{:.0},{:.0} tick={now}", p.name, to[0], to[1], to[2]));
         log::info!("soulscraft: event spared player={} to={:.0},{:.0},{:.0}", p.name, to[0], to[1], to[2]);
@@ -483,7 +485,7 @@ pub(super) fn outside_zone(game: &Game<'_>, core: [i32; 3], flow: &Flow, from: V
     // The zone is zone_chunks chunks across round the altar's chunk: half of it plus a margin.
     let reach = f64::from(flow.zone_chunks.max(1)) * 8.0 + 4.0;
     let (x, z) = ((c[0] + ux * reach).floor() as i32, (c[2] + uz * reach).floor() as i32);
-    let block = |y: i32| game.native_block([x, y, z]);
+    let block = |y: i32| game.sc_block([x, y, z]);
     let free = |y: i32| matches!(block(y).as_str(), "minecraft:air" | "minecraft:cave_air");
     let floor = |y: i32| {
         !free(y) && !matches!(block(y).as_str(), "minecraft:lava" | "minecraft:fire" | "minecraft:soul_fire") && free(y + 1) && free(y + 2)
@@ -517,7 +519,7 @@ pub(super) fn tick(game: &mut Game<'_>, dim: &str, now: u64) {
 fn tick_run(game: &mut Game<'_>, r: &mut EventRun, now: u64, hits: &[(u32, i32, bool)]) {
     let dim = r.dim.clone();
     // Participants: living players in the zone who have not died in this event, and stand-ins.
-    let players = game.native_server_players();
+    let players = game.sc_server_players();
     for p in &players {
         if p.health <= 0.0 && r.joined.contains_key(&p.uuid) && r.out.insert(p.uuid) {
             record(format!("out player={} tick={now}", p.name));
@@ -576,7 +578,7 @@ fn tick_run(game: &mut Game<'_>, r: &mut EventRun, now: u64, hits: &[(u32, i32, 
 }
 
 fn players_in_zone(game: &Game<'_>, dim: &str, core: [i32; 3], flow: &Flow, out: &BTreeSet<u128>) -> Vec<Part> {
-    game.native_server_players()
+    game.sc_server_players()
         .into_iter()
         .filter(|p| p.dimension == dim && p.health > 0.0 && p.game_mode != 3 && !out.contains(&p.uuid))
         .filter(|p| flow.in_zone(core, p.position[0], p.position[2]) && (p.position[1] - f64::from(core[1])).abs() <= 48.0)
@@ -674,7 +676,7 @@ fn led_fights(game: &Game<'_>, id: u32, pos: V3, parts: &[Part]) -> bool {
 fn let_go(game: &mut Game<'_>, dim: &str, id: u32, w: &mut WaveMob) {
     w.steer = None;
     if w.moving {
-        game.native_mob_stop(dim, id);
+        game.sc_mob_stop(dim, id);
         w.moving = false;
         w.nav = None;
     }
@@ -735,7 +737,7 @@ fn set_scale(game: &mut Game<'_>, id: u32, scale: f64) {
 pub(super) fn nav_to(game: &mut Game<'_>, dim: &str, id: u32, w: &mut WaveMob, to: [i32; 3], now: u64) {
     let due = w.nav.is_none_or(|(c, t)| c != to || now - t >= REPATH);
     if due {
-        let ok = game.native_mob_navigate(dim, id, centre_of(to), 1, 1.0);
+        let ok = game.sc_mob_navigate(dim, id, centre_of(to), 1, 1.0);
         if now % 100 < REPATH {
             log::debug!("soulscraft: event nav mob={id} at={:.1},{:.1},{:.1} to={},{},{} ok={ok} tick={now}", w.pos[0], w.pos[1], w.pos[2], to[0], to[1], to[2]);
         }
@@ -762,17 +764,17 @@ fn push(game: &mut Game<'_>, dim: &str, id: u32, from: V3, to: V3) {
         m.velocity.z = d[2] * STEP;
         m.needs_sync = true;
     }
-    game.native_mob_look_at(dim, id, [to[0], from[1] + 1.5, to[2]]);
+    game.sc_mob_look_at(dim, id, [to[0], from[1] + 1.5, to[2]]);
 }
 
 pub(super) fn halt(game: &mut Game<'_>, dim: &str, id: u32, w: &mut WaveMob, look: V3) {
     w.steer = None;
     if w.moving {
-        game.native_mob_stop(dim, id);
+        game.sc_mob_stop(dim, id);
         w.moving = false;
         w.nav = None;
     }
-    game.native_mob_look_at(dim, id, look);
+    game.sc_mob_look_at(dim, id, look);
 }
 
 /// A zombie after a participant: it walks to them and swings once a second in reach.
@@ -783,7 +785,7 @@ fn chase(game: &mut Game<'_>, dim: &str, id: u32, w: &mut WaveMob, p: &Part, pow
         halt(game, dim, id, w, geom::add(p.pos, [0.0, 1.5, 0.0]));
         if now >= w.swing {
             let dmg = Scaled::at(&ZOMBIE, power).damage;
-            game.native_hurt_entity(dim, p.entity, dmg as f32, "minecraft:mob_attack", Some(id));
+            game.sc_hurt_entity(dim, p.entity, dmg as f32, "minecraft:mob_attack", Some(id));
             w.swing = now + ZOMBIE_SWING;
         }
     } else {
@@ -894,7 +896,7 @@ fn telegraph(game: &mut Game<'_>, r: &mut EventRun, w: usize, now: u64) {
             .filter(|c| f.grid.headroom(*c, height))
             .collect();
         let seed = r.rng.next_u64();
-        points = soulscraft_rules::flow::pick_spread(&cells, r.core, count, seed);
+        points = soulscraft::rules::flow::pick_spread(&cells, r.core, count, seed);
     }
     if points.is_empty() {
         // No reachable ground in the band (a walled altar): the ring at the near edge.
@@ -962,8 +964,8 @@ fn spawn(game: &mut Game<'_>, r: &mut EventRun, w: usize, now: u64) {
 pub(super) fn spawn_one(game: &mut Game<'_>, dim: &str, m: &SpawnMob, at: V3, power: f64) -> Option<u32> {
     if let Some(short) = m.kind.strip_prefix("soulscraft:") {
         let id = crate::game::soulscraft_tools::summon(game, dim, short, at, power, 0)?;
-        if let Some(e) = game.native_entity(id) {
-            game.native_entity_add_tag(e, TAG_WAVE);
+        if let Some(e) = game.sc_entity(id) {
+            game.sc_entity_add_tag(e, TAG_WAVE);
         }
         return Some(id);
     }
@@ -982,14 +984,14 @@ pub(super) fn spawn_one(game: &mut Game<'_>, dim: &str, m: &SpawnMob, at: V3, po
 /// the event's P as its tag, which it takes as its own (vanilla.rs `adopt`: a tagged mob is not
 /// fresh, no spawner check). The event knows it by id (`WAVE_IDS`, `LED`). A summon with a
 /// compound skips vanilla's finalizeSpawn, so it gets the weapon that would give it
-/// (soulscraft_rules::event::vanilla_weapon); like the event's zombies it does not burn by day.
+/// (soulscraft::rules::event::vanilla_weapon); like the event's zombies it does not burn by day.
 fn summon_led(game: &mut Game<'_>, dim: &str, m: &SpawnMob, at: V3, power: f64) -> Option<u32> {
     let gear = rev::vanilla_weapon(&m.kind)
         .map(|w| format!("equipment:{{mainhand:{{id:\"{w}\",count:1}}}},drop_chances:{{mainhand:0f}},"))
         .unwrap_or_default();
     let snbt = format!("{{{gear}Tags:[\"{P_TAG}{power:.2}\"],PersistenceRequired:1b,CanPickUpLoot:0b}}");
-    let Ok((crate::mod_api::Tag::Compound(nbt), _)) = crate::mod_api::parse_snbt(&snbt) else { return None };
-    let id = game.native_summon(dim, &m.kind, at, nbt)?;
+    let Ok((horizon_core::nbt::Tag::Compound(nbt), _)) = horizon_core::nbt::parse_snbt(&snbt) else { return None };
+    let id = game.sc_summon(dim, &m.kind, at, nbt)?;
     if let Some(mob) = crate::game::soulscraft_find::mob_mut(game, id)
         && mob.kind.flags.burns_in_day
     {
@@ -1007,8 +1009,8 @@ fn summon_zombie(game: &mut Game<'_>, dim: &str, m: &SpawnMob, at: V3) -> Option
         gear = "equipment:{head:{id:\"minecraft:black_banner\",count:1}},drop_chances:{head:0f},".into();
     }
     let snbt = format!("{{{gear}Tags:[\"{TAG_WAVE}\"],PersistenceRequired:1b,CanPickUpLoot:0b}}");
-    let Ok((crate::mod_api::Tag::Compound(nbt), _)) = crate::mod_api::parse_snbt(&snbt) else { return None };
-    game.native_summon(dim, &m.kind, at, nbt)
+    let Ok((horizon_core::nbt::Tag::Compound(nbt), _)) = horizon_core::nbt::parse_snbt(&snbt) else { return None };
+    game.sc_summon(dim, &m.kind, at, nbt)
 }
 
 /// The end, won or lost: the reward of a win, the wave's mobs gone, the walls back, the
@@ -1042,7 +1044,7 @@ fn finish(game: &mut Game<'_>, r: &mut EventRun, won: bool, how: &str, now: u64)
     }
     let ids: Vec<u32> = r.mobs.keys().copied().collect();
     for id in ids {
-        game.native_remove_mob(&dim, id);
+        game.sc_remove_mob(&dim, id);
         gone(r, id);
     }
     restore(game, &dim, &mut r.breaches);
@@ -1057,7 +1059,7 @@ fn restore(game: &mut Game<'_>, dim: &str, b: &mut Breaches) {
     let back = b.take_restore();
     let mut put = 0;
     for x in &back {
-        let now_there = game.native_block(x.pos);
+        let now_there = game.sc_block(x.pos);
         if now_there == "minecraft:air" || now_there == "minecraft:cave_air" {
             if altar_srv::setblock(game, dim, x.pos, &x.state, "replace") {
                 put += 1;
@@ -1069,7 +1071,7 @@ fn restore(game: &mut Game<'_>, dim: &str, b: &mut Breaches) {
     }
 }
 
-/// The win's reward (09-trophies.md, data/trophies.json; soulscraft_rules::event::rewards with the
+/// The win's reward (09-trophies.md, data/trophies.json; soulscraft::rules::event::rewards with the
 /// banners the run started with), dropped over the core: heads, armour pieces, a diorama, and the
 /// event tier's shards and item (11-summons-rewards.md, Г19).
 fn reward(game: &mut Game<'_>, r: &mut EventRun, now: u64) {
@@ -1083,8 +1085,8 @@ fn reward(game: &mut Game<'_>, r: &mut EventRun, now: u64) {
         let c = core_centre(r.core);
         let at = [c[0], c[1] + 1.2, c[2]];
         let snbt = format!("{{Item:{{id:\"{item}\",count:{}}},PickupDelay:10}}", t.count());
-        if let Ok((crate::mod_api::Tag::Compound(nbt), _)) = crate::mod_api::parse_snbt(&snbt) {
-            game.native_summon(&r.dim, "minecraft:item", at, nbt);
+        if let Ok((horizon_core::nbt::Tag::Compound(nbt), _)) = horizon_core::nbt::parse_snbt(&snbt) {
+            game.sc_summon(&r.dim, "minecraft:item", at, nbt);
         }
         items.push(if t.count() > 1 { format!("{item}x{}", t.count()) } else { item });
     }

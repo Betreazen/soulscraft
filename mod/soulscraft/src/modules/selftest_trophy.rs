@@ -3,6 +3,8 @@
 // their block entities, the state a placed head or diorama takes, a wall head, the dioramas'
 // particles at their rate, the reward of a seeded win, the kin banners in a wave, and the spawn
 // boost's sector, its drift and its extra spawn list.
+#[allow(unused_imports)]
+use super::soulscraft_compat::*;
 use crate::game::Game;
 use crate::game::soulscraft_altar as altar;
 use crate::game::soulscraft_event::{self as event, Overrides};
@@ -10,7 +12,7 @@ use crate::game::soulscraft_selftest_altar::{Case, DIM, at, build, golem, has, i
 use crate::game::soulscraft_spawn_boost as boost;
 use crate::game::soulscraft_trophy as trophy;
 use horizon_client::biome::SpawnEntry;
-use soulscraft_rules::{
+use soulscraft::rules::{
     altar::{self as ra, AltarFile},
     event::{self as rev, Rng, SpawnMob, Trophy},
     trophy as rt,
@@ -57,7 +59,7 @@ pub(super) fn step(game: &mut Game<'_>, now: u64, t: u64, name: &str, c: &mut Ca
 }
 
 fn prop(game: &Game<'_>, c: [i32; 3], key: &str) -> Option<String> {
-    game.native_block_property(at(c), key)
+    game.sc_block_property(at(c), key)
 }
 
 /// Every mob's diorama, floor head and wall head placed: their states, their block entities and
@@ -82,14 +84,14 @@ fn blocks(game: &mut Game<'_>, t: u64) -> Option<Result<(), String>> {
             ([x, 0, -8], format!("soulscraft:{m}_head_stand"), "rotation", "5"),
             ([x, 0, -10], format!("soulscraft:{m}_head_mount"), "facing", "south"),
         ] {
-            let here = game.native_block(at(cell));
+            let here = game.sc_block(at(cell));
             if here != block {
                 return Some(Err(format!("{block}: the block at {cell:?} is {here}")));
             }
             if prop(game, cell, key).as_deref() != Some(want) {
                 return Some(Err(format!("{block}: {key} {:?}, wanted {want}", prop(game, cell, key))));
             }
-            let entity = game.native_mod_block_entity(at(cell)).map(|e| e.id.to_string());
+            let entity = game.sc_mod_block_entity(at(cell)).map(|e| e.id().to_string());
             if entity.as_deref() != Some(block.as_str()) {
                 return Some(Err(format!("{block}: block entity {entity:?}")));
             }
@@ -121,6 +123,8 @@ fn placement(game: &mut Game<'_>, t: u64) -> Option<Result<(), String>> {
     for (cell, key) in [([3, 0, -6], "rotation"), ([5, 0, -6], "facing")] {
         let p = at(cell);
         let state = game.world.block(p[0], p[1], p[2]);
+        // The engine's own path: `LevelAccess::before_state_for_placement` asks the native hook,
+        // which reaches lib.rs's `Placement` Part.
         let ctx = horizon_world::level::PlacementContext {
             pos: horizon_core::position::BlockPos::new(p[0], p[1], p[2]),
             hit_pos: horizon_core::position::BlockPos::new(p[0], p[1] - 1, p[2]),
@@ -130,12 +134,18 @@ fn placement(game: &mut Game<'_>, t: u64) -> Option<Result<(), String>> {
             yaw: 90.0,
             pitch: 30.0,
             sneaking: false,
-            item: game.native_block(p),
+            item: game.sc_block(p),
             replace_clicked: false,
         };
         let answer = game.with_level(|_, level, _| {
             let mut answer = None;
-            level.native_state_for_placement(level.dimension, state, &ctx, horizon_world::fluid::FluidState::EMPTY, &mut answer);
+            horizon_world::level::LevelAccess::before_state_for_placement(
+                &*level,
+                state,
+                &ctx,
+                horizon_world::fluid::FluidState::EMPTY,
+                &mut answer,
+            );
             answer
         });
         let Some(Some(chosen)) = answer else {
@@ -163,9 +173,9 @@ fn wall_head(game: &mut Game<'_>, t: u64) -> Option<Result<(), String>> {
         return None;
     }
     let cell = [5, 1, -6];
-    let block = game.native_block(at(cell));
+    let block = game.sc_block(at(cell));
     let facing = prop(game, cell, "facing");
-    let entity = game.native_mod_block_entity(at(cell)).is_some();
+    let entity = game.sc_mod_block_entity(at(cell)).is_some();
     Some(if block == "soulscraft:stalker_head_mount" && facing.as_deref() == Some("east") && entity {
         Ok(())
     } else {
@@ -190,14 +200,11 @@ fn owner(game: &mut Game<'_>, t: u64) -> Option<Result<(), String>> {
     let (owned, plain) = (at([7, 0, -6]), at([9, 0, -6]));
     let who = trophy::owner_uuid(game, owned);
     let kills = trophy::stored_kills(game, owned);
-    let tag = game.native_mod_block_entity(owned).and_then(|e| {
-        let mut tag = None;
-        trophy::on_update_tag(&e, &mut tag);
-        tag
-    });
+    // What lib.rs's `block_entity_update_tag` sends of a diorama: its owner and kills, copied.
+    let tag = game.sc_mod_block_entity(owned).map(|e| e.nbt.clone());
     let sent = tag.as_ref().is_some_and(|c| {
-        matches!(c.get(&horizon_world::nbt::JavaString::from(rt::OWNER_KEY)), Some(horizon_world::nbt::Tag::String(s)) if s.to_string_lossy() == "sc_selftest")
-            && c.get(&horizon_world::nbt::JavaString::from(rt::KILLS_KEY)).is_some()
+        matches!(c.get(&horizon_core::nbt::JavaString::from(rt::OWNER_KEY)), Some(horizon_core::nbt::Tag::String(s)) if s.to_string_lossy() == "sc_selftest")
+            && c.get(&horizon_core::nbt::JavaString::from(rt::KILLS_KEY)).is_some()
     });
     let unowned = trophy::owner_uuid(game, plain).is_none();
     Some(if who == Some(UUID) && kills == Some(0.0) && sent && unowned {
@@ -238,7 +245,7 @@ fn particles(game: &mut Game<'_>, t: u64, c: &mut Case) -> Option<Result<(), Str
 }
 
 /// A seeded win on a level-3 altar with two «harder» banners (weight, horde) of a wave with a
-/// revenant and a zombie: what drops over the core is exactly what soulscraft_rules::event::rewards
+/// revenant and a zombie: what drops over the core is exactly what soulscraft::rules::event::rewards
 /// rolls with that seed, and it has three heads and the revenant's diorama.
 fn seeded_win(game: &mut Game<'_>, now: u64, t: u64, c: &mut Case) -> Option<Result<(), String>> {
     if t == 1 {
@@ -306,7 +313,7 @@ fn seeded_win(game: &mut Game<'_>, now: u64, t: u64, c: &mut Case) -> Option<Res
         return Some(if heads == 3 && diorama { Ok(()) } else { Err(format!("roll {want:?}: heads {heads}, diorama {diorama}")) });
     }
     for id in event::wave_ids(DIM, crate::game::soulscraft_selftest_altar::CORE) {
-        game.native_kill_mob(DIM, id);
+        game.sc_kill_mob(DIM, id);
     }
     None
 }
@@ -347,10 +354,10 @@ fn kin_wave(game: &mut Game<'_>, now: u64, t: u64, c: &mut Case) -> Option<Resul
 /// tier gate's P there as the hook reads it. As in the hook, nothing where the chunk isn't loaded
 /// (no biome: `native_biome` gives None).
 fn natural_extras(game: &Game<'_>, pos: [i32; 3], listed: &[&str]) -> Vec<String> {
-    let mobs = soulscraft_rules::data::MobsFile::embedded();
-    let Some(biome) = game.native_biome(pos) else { return Vec::new() };
+    let mobs = soulscraft::rules::data::MobsFile::embedded();
+    let Some(biome) = game.sc_biome(pos) else { return Vec::new() };
     let best = crate::game::soulscraft_natural::best_power_at([f64::from(pos[0]) + 0.5, f64::from(pos[1]), f64::from(pos[2]) + 0.5]);
-    soulscraft_rules::natural::extras(&mobs.natural, &mobs, &biome, pos[1], listed, best).into_iter().map(|e| e.key).collect()
+    soulscraft::rules::natural::extras(&mobs.natural, &mobs, &biome, pos[1], listed, best).into_iter().map(|e| e.key).collect()
 }
 
 /// Sets `/sc p` (None: the players' own) and has the tier gate read it now; returns the old one.
@@ -383,20 +390,20 @@ fn natural_lists(game: &mut Game<'_>, t: u64) -> Option<Result<(), String>> {
         let pos = [site[0] + 24, y, site[2]];
         let want = natural_extras(game, pos, &["minecraft:zombie"]);
         if want.is_empty() {
-            why.push(format!("at y {y} in {:?}: the rules give nothing, the check proves nothing", game.native_biome(pos)));
+            why.push(format!("at y {y} in {:?}: the rules give nothing, the check proves nothing", game.sc_biome(pos)));
             continue;
         }
         let mut list = vec![SpawnEntry { entity: "minecraft:zombie".into(), weight: 95, min: 4, max: 4, constant: true }];
         boost::ask_engine(game, DIM, pos, &mut list);
         let got: Vec<String> = list.iter().skip(1).map(|e| e.entity.clone()).collect();
         if got != want {
-            why.push(format!("at y {y} in {:?}: {got:?}, the rules give {want:?}", game.native_biome(pos)));
+            why.push(format!("at y {y} in {:?}: {got:?}, the rules give {want:?}", game.sc_biome(pos)));
         }
     }
     // The other categories stay as they are.
     let mut creatures = vec![SpawnEntry { entity: "minecraft:cow".into(), weight: 10, min: 4, max: 4, constant: true }];
     let mut canceled = false;
-    game.native_potential_spawns(DIM, "creature", [site[0] + 24, site[1] + 2, site[2]], &mut creatures, &mut canceled);
+    game.sc_potential_spawns(DIM, "creature", [site[0] + 24, site[1] + 2, site[2]], &mut creatures, &mut canceled);
     if creatures.len() != 1 {
         why.push(format!("the creature list grew to {}", creatures.len()));
     }
@@ -424,7 +431,7 @@ fn natural_tier_gate(game: &mut Game<'_>, t: u64) -> Option<Result<(), String>> 
     set_p(game, old);
     let revenant = |l: &[String]| l.iter().any(|k| k == "soulscraft:revenant");
     Some(if !want.iter().any(|k| k == "soulscraft:revenant") {
-        Err(format!("in {:?} the rules give no revenant at P 0.3: the check proves nothing", game.native_biome(pos)))
+        Err(format!("in {:?} the rules give no revenant at P 0.3: the check proves nothing", game.sc_biome(pos)))
     } else if weak.iter().any(|k| k.starts_with("soulscraft:")) || !revenant(&strong) {
         Err(format!("P 0: {weak:?}; P 0.3: {strong:?}"))
     } else {
@@ -440,13 +447,13 @@ fn zombie_list_extras(game: &mut Game<'_>, pos: [i32; 3]) -> Vec<String> {
 }
 
 /// A seeded win of a tier-2 event (Ночь мертвецов) on a level-2 altar: its 8 shards, and the
-/// revenant's blade, the seed picked so that soulscraft_rules::event::rewards rolls it.
+/// revenant's blade, the seed picked so that soulscraft::rules::event::rewards rolls it.
 fn tier_item(game: &mut Game<'_>, now: u64, t: u64, c: &mut Case) -> Option<Result<(), String>> {
     const BLADE: &str = "soulscraft:revenant_blade";
     let kinds = vec!["minecraft:zombie".to_owned(), "soulscraft:revenant".to_owned()];
     let data = crate::game::soulscraft_server::state().data.clone();
     let chances = rev::TrophyChances::embedded();
-    let roll = |seed: u64| rev::rewards(&kinds, &data, &soulscraft_rules::altar::Effects::default(), 2, 2, &chances, &mut Rng::new(seed));
+    let roll = |seed: u64| rev::rewards(&kinds, &data, &soulscraft::rules::altar::Effects::default(), 2, 2, &chances, &mut Rng::new(seed));
     if t == 1 {
         build(game, 2);
         return None;
@@ -489,7 +496,7 @@ fn tier_item(game: &mut Game<'_>, now: u64, t: u64, c: &mut Case) -> Option<Resu
         return Some(if blades == 1 && shards == want { Ok(()) } else { Err(format!("seed {}: blades {blades}, shards {shards} of {want}", c.count)) });
     }
     for id in event::wave_ids(DIM, crate::game::soulscraft_selftest_altar::CORE) {
-        game.native_kill_mob(DIM, id);
+        game.sc_kill_mob(DIM, id);
     }
     None
 }
@@ -535,7 +542,7 @@ fn boost_sector(game: &mut Game<'_>, now: u64, t: u64, c: &mut Case) -> Option<R
         if lv != 2 {
             return Some(Err(format!("altar level {lv}")));
         }
-        let def = soulscraft_rules::boost::BoostDef::embedded();
+        let def = soulscraft::rules::boost::BoostDef::embedded();
         // A fresh world is younger than the drift: since may lie before tick 0.
         altar::set_since(game, DIM, core, now as i64 - (3 * def.drift_ticks) as i64);
         return None;
@@ -564,9 +571,6 @@ fn boost_sector(game: &mut Game<'_>, now: u64, t: u64, c: &mut Case) -> Option<R
     let extra = boost::extra_for(DIM, &[inside, outside, (inside.0 + 1, inside.1)]);
     if extra != [inside, (inside.0 + 1, inside.1)] {
         return Some(Err(format!("extra candidates {extra:?}")));
-    }
-    if !boost::spawn_hooks(DIM, false) {
-        return Some(Err("the spawn list hook stays off by an active sector".into()));
     }
     let base = || vec![SpawnEntry { entity: "minecraft:zombie".into(), weight: 95, min: 4, max: 4, constant: true }];
     let block = |ch: (i32, i32)| [ch.0 * 16 + 8, 70, ch.1 * 16 + 8];
@@ -610,7 +614,7 @@ fn chest_loot(game: &mut Game<'_>, t: u64, c: &mut Case) -> Option<Result<(), St
         for (table, _, spot) in CHEST_TABLES {
             let p = at(spot);
             for _ in 0..CHEST_ROLLS {
-                dropped += game.native_run_command_captured(&format!("loot spawn {} {} {} loot {table}", p[0], p[1] + 1, p[2])).result.max(0) as u32;
+                dropped += game.sc_run_command_captured(&format!("loot spawn {} {} {} loot {table}", p[0], p[1] + 1, p[2])).result.max(0) as u32;
             }
         }
         c.count = dropped;
@@ -623,7 +627,7 @@ fn chest_loot(game: &mut Game<'_>, t: u64, c: &mut Case) -> Option<Result<(), St
     for (table, horn, spot) in CHEST_TABLES {
         // Everything in a column over the spot, whatever floor caught it.
         let s = crate::game::soulscraft_selftest_altar::centre(at(spot));
-        let near = game.native_item_entities(DIM, [s[0] - 4.0, s[1] - 40.0, s[2] - 4.0], [s[0] + 4.0, s[1] + 6.0, s[2] + 4.0]);
+        let near = game.sc_item_entities(DIM, [s[0] - 4.0, s[1] - 40.0, s[2] - 4.0], [s[0] + 4.0, s[1] + 6.0, s[2] + 4.0]);
         let count = |item: &str| near.iter().filter(|e| &*e.stack.item == item).map(|e| e.stack.count).sum::<u32>();
         let horns: Vec<(&str, u32)> = HORNS.iter().map(|h| (*h, count(h))).collect();
         let shards = count(rev::SOUL_SHARD);
@@ -638,6 +642,6 @@ fn chest_loot(game: &mut Game<'_>, t: u64, c: &mut Case) -> Option<Result<(), St
         }
     }
     let p = at([-16, 1, 0]);
-    game.native_run_command(&format!("kill @e[type=minecraft:item,x={},y={},z={},distance=..48]", p[0], p[1], p[2]));
+    game.sc_run_command(&format!("kill @e[type=minecraft:item,x={},y={},z={},distance=..48]", p[0], p[1], p[2]));
     Some(if why.is_empty() { Ok(()) } else { Err(format!("{} items said dropped; {}", c.count, why.join("; "))) })
 }

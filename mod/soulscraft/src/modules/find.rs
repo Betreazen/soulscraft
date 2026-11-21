@@ -5,6 +5,8 @@
 // The index is rebuilt at the start of each level tick. A look-up trusts it only where the place
 // still holds that id; otherwise (a mob that joined since, a list reordered, another level's
 // index) it walks the list as before, so the answer is always the walk's.
+#[allow(unused_imports)]
+use super::soulscraft_compat::*;
 use crate::game::Game;
 use horizon_client::mobs::Mob;
 use std::cell::RefCell;

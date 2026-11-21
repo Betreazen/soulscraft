@@ -6,9 +6,11 @@
 //
 // Every scenario reads what the server half recorded (soulscraft_server's phase, mode and strike
 // records), so it checks the same code the game runs, at the ticks of data/mobs.json.
+#[allow(unused_imports)]
+use super::soulscraft_compat::*;
 use crate::game::Game;
 use crate::game::soulscraft_server as server;
-use soulscraft_rules::{
+use soulscraft::rules::{
     attack::{Phase, Timeline},
     data::MobsFile,
 };
@@ -175,7 +177,7 @@ pub(super) fn start(filter: Option<String>) {
 }
 
 fn run_cmd(game: &mut Game<'_>, line: &str) {
-    if !game.native_run_command(line) {
+    if !game.sc_run_command(line) {
         log::warn!("soulscraft: selftest command refused: {line}");
     }
 }
@@ -192,7 +194,7 @@ fn prepare(game: &mut Game<'_>) -> bool {
         run_cmd(game, &format!("forceload add {} {} {} {}", x - 12, z - 12, x + 12, z + 12));
         run_cmd(game, &format!("fill {} 100 {} {} 100 {} stone", x - 10, z - 10, x + 10, z + 10));
         // Refused when there is nothing to clear (vanilla's fill fails on no change): not logged.
-        game.native_run_command(&format!("fill {} 101 {} {} 106 {} air", x - 10, z - 10, x + 10, z + 10));
+        game.sc_run_command(&format!("fill {} 101 {} {} 106 {} air", x - 10, z - 10, x + 10, z + 10));
     }
     peaceful
 }
@@ -202,7 +204,7 @@ fn clean_area(game: &mut Game<'_>, peaceful: bool) {
     for c in [BASE, FAR] {
         let (x, z) = (c[0] as i32, c[2] as i32);
         // Leftovers only (each scenario removes its own mobs): no target is no failure.
-        game.native_run_command(&format!("kill @e[x={},y=95,z={},dx=24,dy=16,dz=24,type=!player]", x - 12, z - 12));
+        game.sc_run_command(&format!("kill @e[x={},y=95,z={},dx=24,dy=16,dz=24,type=!player]", x - 12, z - 12));
         run_cmd(game, &format!("fill {} 100 {} {} 106 {} air", x - 10, z - 10, x + 10, z + 10));
         run_cmd(game, &format!("forceload remove {} {} {} {}", x - 12, z - 12, x + 12, z + 12));
     }
@@ -245,7 +247,7 @@ pub(super) fn on_tick(game: &mut Game<'_>, dim: &str, now: u64) {
     if let Some(v) = verdict {
         let (sc, live) = run.current.take().unwrap();
         for id in [live.mob, live.golem, live.other].into_iter().flatten() {
-            game.native_remove_mob(dim, id);
+            game.sc_remove_mob(dim, id);
         }
         if let Some(saved) = live.saved {
             restore_reload_file(saved);
@@ -313,8 +315,8 @@ fn arrange(game: &mut Game<'_>, dim: &str, mob: &str, at: [f64; 3], p: f64, live
 }
 
 fn summon(game: &mut Game<'_>, dim: &str, kind: &str, at: [f64; 3], snbt: &str) -> Option<u32> {
-    let Ok((crate::mod_api::Tag::Compound(nbt), _)) = crate::mod_api::parse_snbt(snbt) else { return None };
-    game.native_summon(dim, kind, at, nbt)
+    let Ok((horizon_core::nbt::Tag::Compound(nbt), _)) = horizon_core::nbt::parse_snbt(snbt) else { return None };
+    game.sc_summon(dim, kind, at, nbt)
 }
 
 fn health(game: &Game<'_>, id: u32) -> Option<f64> {
@@ -364,7 +366,7 @@ fn step(game: &mut Game<'_>, dim: &str, now: u64, sc: &Scenario, live: &mut Live
             let want = if p > 0.0 { (57.0, 12.0, 6.4) } else { (30.0, 6.0, 4.0) };
             let kind_ok = m.kind.id == "soulscraft:revenant";
             // Path-of-craft-tree's experience tag (Г3): exactly one, ×1.00 at P 0 and ×1.45 at P 1.
-            let tags = game.native_entity(mob).and_then(|e| game.native_entity_tags(e)).unwrap_or_default();
+            let tags = game.sc_entity(mob).and_then(|e| game.sc_entity_tags(e)).unwrap_or_default();
             let xp: Vec<&String> = tags.iter().filter(|t| t.starts_with("pct.xp")).collect();
             let want_xp = if p > 0.0 { "pct.xp145" } else { "pct.xp100" };
             if xp.len() != 1 || xp[0] != want_xp {
@@ -394,7 +396,7 @@ fn step(game: &mut Game<'_>, dim: &str, now: u64, sc: &Scenario, live: &mut Live
             }
             if now == live.mark + 12 {
                 let to = [BASE[0], BASE[1], BASE[2] + 6.0];
-                game.native_teleport_mob(dim, live.golem?, to);
+                game.sc_teleport_mob(dim, live.golem?, to);
             }
             let rec = server::state().strikes.iter().rev().find(|r| r.mob == live.mob.unwrap_or(0)).cloned();
             let rec = rec?;
@@ -480,8 +482,8 @@ fn hitbox(game: &mut Game<'_>, dim: &str, live: &mut Live, mob: &str, size: u8, 
         return None;
     }
     let want = server::state().data.mob(mob)?.hitbox_at(size);
-    let e = game.native_entity(id)?;
-    let [lo, hi] = game.native_entity_bounding_box(e)?;
+    let e = game.sc_entity(id)?;
+    let [lo, hi] = game.sc_entity_bounding_box(e)?;
     let eye = game.mobs.iter().find(|m| m.id == id).map(|m| m.eye_height())?;
     let (w, d, h) = (hi[0] - lo[0], hi[2] - lo[2], hi[1] - lo[1]);
     log::info!("soulscraft: selftest hitbox mob={mob} size={size} box={w:.3}x{h:.3}x{d:.3} eye={eye:.3} want={want:?}");
@@ -491,9 +493,9 @@ fn hitbox(game: &mut Game<'_>, dim: &str, live: &mut Live, mob: &str, size: u8, 
     // PCT's experience tag at P 0 carries the size's share (scale::size_share): the full slime
     // and every other mob pct.xp100, a size-2 slime pct.xp25.
     let full = server::state().data.mob(mob)?.full_size();
-    let want_xp = format!("{}{}", soulscraft_rules::scale::XP_TAG_PREFIX, (100.0 * soulscraft_rules::scale::size_share(size, full)).round());
-    let tags = game.native_entity_tags(e).unwrap_or_default();
-    let xp: Vec<&String> = tags.iter().filter(|t| t.starts_with(soulscraft_rules::scale::XP_TAG_PREFIX)).collect();
+    let want_xp = format!("{}{}", soulscraft::rules::scale::XP_TAG_PREFIX, (100.0 * soulscraft::rules::scale::size_share(size, full)).round());
+    let tags = game.sc_entity_tags(e).unwrap_or_default();
+    let xp: Vec<&String> = tags.iter().filter(|t| t.starts_with(soulscraft::rules::scale::XP_TAG_PREFIX)).collect();
     Some(if xp.len() == 1 && *xp[0] == want_xp { Ok(()) } else { Err(format!("experience tags {xp:?}, wanted [{want_xp}]")) })
 }
 
@@ -526,7 +528,7 @@ fn timing(game: &mut Game<'_>, dim: &str, now: u64, live: &mut Live, mob: &str, 
     let strikes: Vec<_> = s.strikes.iter().filter(|r| r.mob == id && r.attack == attack && r.tick >= t0).cloned().collect();
     let first_blow = strikes.first().map(|r| (r.tick - t0) as u32);
     // A jump's window is the `recover` ticks after it lands (its blow); an ambush that bit ends on
-    // its blow, as the grab follows (soulscraft_rules::brain).
+    // its blow, as the grab follows (soulscraft::rules::brain).
     let grabbed = def.attacks.iter().any(|g| g.follows.as_deref() == Some(attack)) && first_blow.is_some_and(|b| b < line.recover_start());
     let (recover_at, end_at) = match first_blow {
         Some(land) if mob == "bog_slime" => (Some(land), land + line.recover),
@@ -548,7 +550,7 @@ fn timing(game: &mut Game<'_>, dim: &str, now: u64, live: &mut Live, mob: &str, 
         }
     }
     let end = (done.tick - t0) as u32;
-    let open_charge = a.recover_if.as_deref() == Some("wall") && end == line.recover_start() + soulscraft_rules::brain::CHARGE_OPEN_RECOVER;
+    let open_charge = a.recover_if.as_deref() == Some("wall") && end == line.recover_start() + soulscraft::rules::brain::CHARGE_OPEN_RECOVER;
     if end != end_at && !open_charge {
         problems.push(format!("end at {end} not {end_at}"));
     }
@@ -578,7 +580,7 @@ fn timing(game: &mut Game<'_>, dim: &str, now: u64, live: &mut Live, mob: &str, 
 }
 
 fn reload_path() -> Option<std::path::PathBuf> {
-    Game::native_config_dir().ok().map(|d| d.join(server::RELOAD_FILE))
+    Game::sc_config_dir().ok().map(|d| d.join(server::RELOAD_FILE))
 }
 
 fn restore_reload_file(saved: Option<String>) {
@@ -601,7 +603,7 @@ fn reload_scenario(game: &mut Game<'_>, dim: &str, now: u64, live: &mut Live, fi
     if first {
         let path = reload_path()?;
         live.saved = Some(std::fs::read_to_string(&path).ok());
-        let mut v: serde_json::Value = serde_json::from_str(soulscraft_rules::data::EMBEDDED).ok()?;
+        let mut v: serde_json::Value = serde_json::from_str(soulscraft::rules::data::EMBEDDED).ok()?;
         let attacks = v["mobs"].as_array_mut()?.iter_mut().find(|m| m["id"] == "revenant")?["attacks"].as_array_mut()?;
         let o = attacks.iter_mut().find(|a| a["id"] == "overhead")?;
         o["windup"] = serde_json::json!(14);
@@ -657,7 +659,7 @@ fn survive(game: &mut Game<'_>, dim: &str, now: u64, live: &mut Live) -> Option<
             if !server::state().mobs.contains_key(&id) {
                 return None;
             }
-            game.native_set_mob_health(dim, id, 40.0);
+            game.sc_set_mob_health(dim, id, 40.0);
             live.note = "hurt".into();
             None
         }
@@ -724,7 +726,7 @@ fn bleed(game: &mut Game<'_>, dim: &str, now: u64, live: &mut Live, first: bool)
 /// the next one (8), then stopped. The altar's rules (Г12) are not in this stub.
 fn waves(game: &mut Game<'_>, dim: &str, now: u64, live: &mut Live) -> Option<Result<(), String>> {
     use crate::game::soulscraft_tools::{wave, wave_state};
-    use soulscraft_rules::command::WaveAction;
+    use soulscraft::rules::command::WaveAction;
     let want = |n: usize| -> u32 {
         let s = server::state();
         s.data.events.first().and_then(|e| e.waves.get(n - 1)).map_or(0, |w| w.mobs.iter().map(|m| m.count).sum())
@@ -738,7 +740,7 @@ fn waves(game: &mut Game<'_>, dim: &str, now: u64, live: &mut Live) -> Option<Re
                 return Some(Err(format!("wave {n} with {} mobs, wanted 1 with {}", ids.len(), want(1))));
             }
             for id in ids {
-                game.native_kill_mob(dim, id);
+                game.sc_kill_mob(dim, id);
             }
             None
         }
@@ -814,7 +816,7 @@ fn duel_cleanup(game: &mut Game<'_>) {
     *DUEL.lock().unwrap_or_else(PoisonError::into_inner) = None;
     let (x, z) = (BASE[0] as i32, BASE[2] as i32);
     // Refused when there is nothing to clear (vanilla's fill fails on no change): not logged.
-    game.native_run_command(&format!("fill {} 101 {} {} 106 {} air", x - 10, z - 10, x + 10, z + 10));
+    game.sc_run_command(&format!("fill {} 101 {} {} 106 {} air", x - 10, z - 10, x + 10, z + 10));
 }
 
 /// A revenant at P 0 facing south at `at`, still (NoAI: the server's brain runs, the body stays) or not.
@@ -870,12 +872,12 @@ fn shield_bash_knocks(game: &mut Game<'_>, dim: &str, now: u64, live: &mut Live,
         "thrust" => {
             let rec = settled("thrust", live.mark)?;
             let from = DUEL.lock().unwrap_or_else(PoisonError::into_inner).as_ref()?.from?;
-            let plain = soulscraft_rules::geom::flat_dist(from, pos_of(game, sheep)?);
+            let plain = soulscraft::rules::geom::flat_dist(from, pos_of(game, sheep)?);
             if !rec.hit {
                 return Some(Err(format!("the thrust missed (the sheep moved {plain:.2})")));
             }
             DUEL.lock().unwrap_or_else(PoisonError::into_inner).as_mut()?.plain = plain;
-            game.native_teleport_mob(dim, sheep, from);
+            game.sc_teleport_mob(dim, sheep, from);
             if let Some(m) = crate::game::soulscraft_find::mob_mut(game, sheep) {
                 m.invulnerable = 0;
             }
@@ -893,7 +895,7 @@ fn shield_bash_knocks(game: &mut Game<'_>, dim: &str, now: u64, live: &mut Live,
             let Some(after) = health(game, sheep) else {
                 return Some(Err("the sheep is gone after the bash (killed by an axe-sized blow?)".into()));
             };
-            let moved = soulscraft_rules::geom::flat_dist(from?, pos_of(game, sheep)?);
+            let moved = soulscraft::rules::geom::flat_dist(from?, pos_of(game, sheep)?);
             let lost = live.golem_health - after;
             let blow = {
                 let s = server::state();
@@ -964,7 +966,7 @@ fn shield_test_hit(game: &mut Game<'_>, dim: &str, id: u32, dz: f64) -> bool {
         m.invulnerable = 0;
     }
     server::stand_in_player([BASE[0], BASE[1], BASE[2] + dz]);
-    game.native_hurt_entity(dim, id, SHIELD_TEST_BLOW, "minecraft:mob_attack", None)
+    game.sc_hurt_entity(dim, id, SHIELD_TEST_BLOW, "minecraft:mob_attack", None)
 }
 
 fn marksman_reload_cover(game: &mut Game<'_>, dim: &str, now: u64, live: &mut Live, first: bool) -> Option<Result<(), String>> {
@@ -1012,7 +1014,7 @@ const WAVE_RECOVER: u64 = 25;
 /// A still brute (NoAI: the brain runs, the body stays) swings `overhead_wave` at a still iron
 /// golem at its impact point twice: the golem on the platform loses health; then held a block up
 /// (no gravity, put back every tick), as a player mid-jump is over `jump_clear_blocks` 0.5, it
-/// loses none and the blow does not land (soulscraft_rules::attack::clears_wave).
+/// loses none and the blow does not land (soulscraft::rules::attack::clears_wave).
 fn brute_wave_spares_jumper(game: &mut Game<'_>, dim: &str, now: u64, live: &mut Live, first: bool) -> Option<Result<(), String>> {
     let up = [WAVE_GOLEM_AT[0], WAVE_GOLEM_AT[1] + 1.0, WAVE_GOLEM_AT[2]];
     if first {
@@ -1047,7 +1049,7 @@ fn brute_wave_spares_jumper(game: &mut Game<'_>, dim: &str, now: u64, live: &mut
             if !rec.hit || lost <= 0.0 {
                 return Some(Err(format!("the grounded golem was not hit (hit={}, lost {lost:.2})", rec.hit)));
             }
-            game.native_teleport_mob(dim, golem, up);
+            game.sc_teleport_mob(dim, golem, up);
             if let Some(g) = crate::game::soulscraft_find::mob_mut(game, golem) {
                 g.no_gravity = true;
                 g.velocity.x = 0.0;
@@ -1067,7 +1069,7 @@ fn brute_wave_spares_jumper(game: &mut Game<'_>, dim: &str, now: u64, live: &mut
         _ => {
             let Some(rec) = blow_since(live.mark) else {
                 // Held where a jump would have it until the blow falls.
-                game.native_teleport_mob(dim, golem, up);
+                game.sc_teleport_mob(dim, golem, up);
                 return None;
             };
             let y = pos_of(game, golem)?[1];
@@ -1106,7 +1108,7 @@ fn shrike_falls(game: &mut Game<'_>, dim: &str, now: u64, live: &mut Live, first
         }
         live.y0 = y?;
         live.low = live.y0;
-        if !game.native_kill_mob(dim, id) {
+        if !game.sc_kill_mob(dim, id) {
             return Some(Err("the shrike was not killed".into()));
         }
         live.mark = now;
@@ -1137,7 +1139,7 @@ fn slime_splits(game: &mut Game<'_>, dim: &str, now: u64, live: &mut Live, first
         if !server::state().mobs.contains_key(&id) {
             return None;
         }
-        if !game.native_kill_mob(dim, id) {
+        if !game.sc_kill_mob(dim, id) {
             return Some(Err("the slime was not killed".into()));
         }
         live.mark = now;
@@ -1152,12 +1154,12 @@ fn slime_splits(game: &mut Game<'_>, dim: &str, now: u64, live: &mut Live, first
         s.mobs
             .iter()
             .filter(|(c, t)| **c != id && t.alive && t.size == 2 && s.data.mobs[t.kind].id == "bog_slime")
-            .filter(|(_, t)| soulscraft_rules::geom::dist(t.pos, BASE) <= 4.0)
+            .filter(|(_, t)| soulscraft::rules::geom::dist(t.pos, BASE) <= 4.0)
             .map(|(c, _)| *c)
             .collect()
     };
     for c in &children {
-        game.native_remove_mob(dim, *c);
+        game.sc_remove_mob(dim, *c);
     }
     Some(if (2..=3).contains(&children.len()) {
         Ok(())
@@ -1208,7 +1210,7 @@ fn grab(game: &mut Game<'_>, dim: &str, now: u64, live: &mut Live, case: &str, f
         }
         _ => {
             let at = |id: u32| game.mobs.iter().find(|m| m.id == id && !m.removed).map(|m| [m.position.x, m.position.y, m.position.z]);
-            let d = soulscraft_rules::geom::dist(at(mob)?, at(golem)?);
+            let d = soulscraft::rules::geom::dist(at(mob)?, at(golem)?);
             if d > 1.5 {
                 return Some(Err(format!("the golem is {d:.2} blocks from the lurker {since} ticks into the grab")));
             }
@@ -1230,7 +1232,7 @@ fn kept_prey(game: &Game<'_>, live: &Live, golem: u32) -> Result<(), String> {
     let find = |id: u32| game.mobs.iter().find(|m| m.id == id && !m.removed);
     let g = find(golem).ok_or("the first golem is gone")?;
     let o = find(other).ok_or("the second golem is gone")?;
-    let moved = soulscraft_rules::geom::dist([o.position.x, o.position.y, o.position.z], OTHER_AT);
+    let moved = soulscraft::rules::geom::dist([o.position.x, o.position.y, o.position.z], OTHER_AT);
     let bitten = g.health < g.attrs.max_health;
     let spared = o.health >= o.attrs.max_health;
     if bitten && spared && moved < 0.5 {
@@ -1249,9 +1251,9 @@ fn grab_breaks(game: &mut Game<'_>, dim: &str, mob: u32, golem: u32, grabbed: u6
             m.invulnerable = 0;
         }
         let landed = if since == 2 {
-            game.native_hurt_entity(dim, mob, 1.0, "minecraft:magic", None)
+            game.sc_hurt_entity(dim, mob, 1.0, "minecraft:magic", None)
         } else {
-            game.native_hurt_entity(dim, mob, 1.0, "minecraft:mob_attack", Some(golem))
+            game.sc_hurt_entity(dim, mob, 1.0, "minecraft:mob_attack", Some(golem))
         };
         if !landed {
             return Some(Err(format!("the hit at +{since} on the lurker did not land")));

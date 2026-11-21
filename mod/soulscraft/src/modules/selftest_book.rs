@@ -4,12 +4,14 @@
 // targets and where they stand count as a player's, and their books live in memory. Kills are
 // real deaths (`native_hurt_entity` with the golem as the attacker), heard by the death injection
 // and credited in the level's tick, as a player's would be.
+#[allow(unused_imports)]
+use super::soulscraft_compat::*;
 use crate::game::Game;
 use crate::game::soulscraft_book as book;
 use crate::game::soulscraft_event as event;
 use crate::game::soulscraft_selftest_altar::{Case, DIM, at, build, centre, has, level, start};
 use crate::game::soulscraft_server as server;
-use soulscraft_rules::{
+use soulscraft::rules::{
     book::{self as rb, BookFile, Progress},
     defense::Role,
     event::SpawnMob,
@@ -67,12 +69,12 @@ fn stand_in(game: &mut Game<'_>, uuid: u128, name: &str, cell: [i32; 3]) -> Opti
 /// A mob of ours at site cell `cell`, P 0 and full health; `tags` added.
 fn mob(game: &mut Game<'_>, id: &str, cell: [i32; 3], tags: &str) -> Option<u32> {
     let snbt = format!("{{Rotation:[0f,0f],Tags:[\"soulscraft.p=0.00\",\"{}\"{tags}],PersistenceRequired:1b}}", server::TAG_FRESH);
-    let Ok((crate::mod_api::Tag::Compound(nbt), _)) = crate::mod_api::parse_snbt(&snbt) else { return None };
-    game.native_summon(DIM, &format!("soulscraft:{id}"), centre(at(cell)), nbt)
+    let Ok((horizon_core::nbt::Tag::Compound(nbt), _)) = horizon_core::nbt::parse_snbt(&snbt) else { return None };
+    game.sc_summon(DIM, &format!("soulscraft:{id}"), centre(at(cell)), nbt)
 }
 
 fn hit(game: &mut Game<'_>, mob: u32, by: Option<u32>, amount: f32) -> bool {
-    game.native_hurt_entity(DIM, mob, amount, "minecraft:mob_attack", by)
+    game.sc_hurt_entity(DIM, mob, amount, "minecraft:mob_attack", by)
 }
 
 fn stage_of(uuid: u128, id: &str) -> (usize, f64) {
@@ -188,7 +190,7 @@ fn spawner(game: &mut Game<'_>, t: u64, c: &mut Case) -> Option<Result<(), Strin
     }
     let ids: Vec<u32> = c.note.split(',').filter_map(|s| s.parse().ok()).collect();
     if t == 4 {
-        let tags = game.native_entity(ids[1]).and_then(|e| game.native_entity_tags(e)).unwrap_or_default();
+        let tags = game.sc_entity(ids[1]).and_then(|e| game.sc_entity_tags(e)).unwrap_or_default();
         if !tags.iter().any(|x| x == rb::SPAWNER_TAG) {
             return Some(Err(format!("the spawner's mob was not tagged: {tags:?}")));
         }
@@ -284,7 +286,7 @@ fn kill_command(game: &mut Game<'_>, t: u64, c: &mut Case) -> Option<Result<(), 
         return Some(Err("summon refused".into()));
     }
     if t == 3 {
-        if game.native_command_info(rb::KILL_COMMAND).is_none() {
+        if game.sc_command_info(rb::KILL_COMMAND).is_none() {
             return Some(Err(format!("{} is not registered", rb::KILL_COMMAND)));
         }
         let blocks: Vec<[i32; 3]> = ids
@@ -302,7 +304,7 @@ fn kill_command(game: &mut Game<'_>, t: u64, c: &mut Case) -> Option<Result<(), 
             let b = blocks[i];
             format!("{} {source} {owner:032x} {} soulscraft:revenant {} {} {}", rb::KILL_COMMAND, ids[i], b[0], b[1], b[2])
         };
-        let ran = [line("turret", A, 0), line("turret", B, 1), line("guard", A, 2)].map(|l| game.native_run_mod_command(&l));
+        let ran = [line("turret", A, 0), line("turret", B, 1), line("guard", A, 2)].map(|l| game.sc_run_mod_command(&l));
         if !ran.iter().all(|r| *r) {
             return Some(Err(format!("the console did not take the command: {ran:?}")));
         }
@@ -321,13 +323,13 @@ fn kill_command(game: &mut Game<'_>, t: u64, c: &mut Case) -> Option<Result<(), 
 fn vanilla_numbers(game: &Game<'_>) -> Result<(), String> {
     let file = BookFile::embedded();
     let catalog = rb::Catalog::embedded();
-    let trophies: serde_json::Value = serde_json::from_str(soulscraft_rules::event::TROPHIES).map_err(|e| e.to_string())?;
+    let trophies: serde_json::Value = serde_json::from_str(soulscraft::rules::event::TROPHIES).map_err(|e| e.to_string())?;
     let stats = |k: &str| book::engine_stats(game, k);
     let page_text = |id: &str, kills: f64| -> Result<String, String> {
         let (e, m) = catalog.get(id).ok_or(format!("no entry {id}"))?.clone();
         let mut p = Progress::default();
         p.kill(&file, &e, kills);
-        let page = soulscraft_rules::book_page::mob_page_with(&file, &catalog, &trophies, &e, &m, &p, &stats);
+        let page = soulscraft::rules::book_page::mob_page_with(&file, &catalog, &trophies, &e, &m, &p, &stats);
         Ok(page.lines.iter().map(|l| l.text.as_str()).collect::<Vec<_>>().join(" | "))
     };
     let killed = page_text("zombie", 1.0)?;
@@ -346,7 +348,7 @@ fn vanilla_numbers(game: &Game<'_>) -> Result<(), String> {
 /// The progress in a persistent-data compound beside another mod's key, read back (a relog or a
 /// restart reads the same compound); writing again replaces only the book's key.
 fn persist() -> Result<(), String> {
-    use crate::mod_api::Tag;
+    use horizon_core::nbt::Tag;
     let file = BookFile::embedded();
     let catalog = rb::Catalog::embedded();
     let mut p = Progress::default();
@@ -361,7 +363,7 @@ fn persist() -> Result<(), String> {
     }
     let back = book::get(&data).ok_or("no book key")??;
     let Tag::Compound(m) = &data else { return Err("not a compound".into()) };
-    let pct = matches!(m.get(&horizon_world::nbt::JavaString::from("pct:summary")), Some(Tag::String(s)) if s.to_string_lossy() == "{\"v\":1}");
+    let pct = matches!(m.get(&horizon_core::nbt::JavaString::from("pct:summary")), Some(Tag::String(s)) if s.to_string_lossy() == "{\"v\":1}");
     if back != p || !pct || m.len() != 2 {
         return Err(format!("read back {back:?}, pct kept {pct}, keys {}", m.len()));
     }
@@ -435,7 +437,7 @@ fn event_entries(game: &mut Game<'_>, now: u64, t: u64, c: &mut Case) -> Option<
         return (c.count > 40).then(|| Err(format!("won, but the book has {ev:?}")));
     }
     for x in event::wave_ids(DIM, crate::game::soulscraft_selftest_altar::CORE) {
-        game.native_kill_mob(DIM, x);
+        game.sc_kill_mob(DIM, x);
     }
     None
 }

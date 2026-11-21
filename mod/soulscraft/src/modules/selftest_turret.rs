@@ -13,9 +13,11 @@
 // zombie and takes no poison; the bleed module gives `soulscraft:bleeding`; a turret's kill (what
 // SoulsCraft can see of the owner's credit); the same kill in the owner's hunter's book, once; a mob
 // takes cover from an attack turret and not from a support one.
+#[allow(unused_imports)]
+use super::soulscraft_compat::*;
 use crate::game::Game;
 use crate::game::soulscraft_selftest_altar::{at, centre, clear_site};
-use soulscraft_rules::geom::{self, V3};
+use soulscraft::rules::geom::{self, V3};
 use std::collections::HashMap;
 use std::sync::{Mutex, PoisonError};
 
@@ -51,14 +53,14 @@ struct Case {
 static CASE: Mutex<Option<Case>> = Mutex::new(None);
 
 fn kit_present(game: &Game<'_>) -> bool {
-    game.native_command_info(KIT).is_some()
+    game.sc_command_info(KIT).is_some()
 }
 
 fn turret(game: &mut Game<'_>, c: [i32; 3], modules: &str) -> Option<[i32; 3]> {
     let p = at(c);
     let line = format!("{KIT} turret {} {} {} modules={modules} owner={OWNER}", p[0], p[1], p[2]);
     // A mod's console command: `native_run_command` reaches vanilla's only.
-    if !game.native_run_mod_command(&line) {
+    if !game.sc_run_mod_command(&line) {
         log::warn!("soulscraft: selftest command refused: {line}");
         return None;
     }
@@ -66,14 +68,14 @@ fn turret(game: &mut Game<'_>, c: [i32; 3], modules: &str) -> Option<[i32; 3]> {
 }
 
 fn remove_turret(game: &mut Game<'_>, p: [i32; 3]) {
-    game.native_run_command(&format!("setblock {} {} {} air", p[0], p[1], p[2]));
+    game.sc_run_command(&format!("setblock {} {} {} air", p[0], p[1], p[2]));
 }
 
 fn summon(game: &mut Game<'_>, kind: &str, c: [i32; 3], extra: &str) -> Option<u32> {
     let tags = if kind.starts_with("soulscraft:") { "Tags:[\"soulscraft.p=0.00\",\"soulscraft.fresh\"]," } else { "" };
     let snbt = format!("{{{tags}{extra}PersistenceRequired:1b}}");
-    let Ok((crate::mod_api::Tag::Compound(nbt), _)) = crate::mod_api::parse_snbt(&snbt) else { return None };
-    game.native_summon(DIM, kind, centre(at(c)), nbt)
+    let Ok((horizon_core::nbt::Tag::Compound(nbt), _)) = horizon_core::nbt::parse_snbt(&snbt) else { return None };
+    game.sc_summon(DIM, kind, centre(at(c)), nbt)
 }
 
 fn mob<'a>(game: &'a Game<'_>, id: u32) -> Option<&'a horizon_client::mobs::Mob> {
@@ -98,7 +100,7 @@ pub(super) fn cleanup(game: &mut Game<'_>) {
             remove_turret(game, p);
         }
         if let Some(m) = c.mob {
-            game.native_remove_mob(DIM, m);
+            game.sc_remove_mob(DIM, m);
         }
     }
     // A broken turret drops its modules: the clear kills every item on the site.
@@ -176,7 +178,7 @@ fn brute_half(game: &mut Game<'_>, t: u64, c: &mut Case) -> Option<Result<(), St
             note_effects(game, id, &mut seen);
             c.seen[0] = seen;
             if c.seen[0].contains_key("soulscraft:bleeding") && c.seen[0].contains_key("minecraft:slowness") {
-                game.native_remove_mob(DIM, id);
+                game.sc_remove_mob(DIM, id);
                 if let Some(p) = c.turret.take() {
                     remove_turret(game, p);
                 }
@@ -271,7 +273,7 @@ fn cover(game: &mut Game<'_>, t: u64, c: &mut Case, attack: bool) -> Option<Resu
     match t {
         1 => {
             let w = at([SPOT[0] + 2, SPOT[1], SPOT[2] - 2]);
-            game.native_run_command(&format!("fill {} {} {} {} {} {} stone", w[0], w[1], w[2], w[0], w[1] + 2, w[2] + 4));
+            game.sc_run_command(&format!("fill {} {} {} {} {} {} stone", w[0], w[1], w[2], w[0], w[1] + 2, w[2] + 4));
         }
         3 => {
             c.mob = summon(game, "soulscraft:revenant", SPOT, "");

@@ -1,7 +1,7 @@
 // The hunter's book on the client (08-guide-book.md): the window a right click on the book opens
 // (a mod screen of its own, `native_mod_screen_open("soulscraft_book")`, drawn in
 // `native_screen_render_post` as the altar's menu is), with the sections «Враги», «Алтарь»,
-// «Ивенты» made from the player's progress the server last sent (soulscraft_rules::book_page).
+// «Ивенты» made from the player's progress the server last sent (soulscraft::rules::book_page).
 //
 // The enemy's model (path А): the mob's rig with its clips, drawn in the window by
 // `native_draw_scene` (game/native_scene.rs:78-221, API scenes_in_screens). The scene is one
@@ -11,15 +11,16 @@
 // game time and the frame's partial tick, and the hook draws the rig there
 // (`soulscraft_client::draw_rig_with`) in the clip the page plays, black for a locked entry.
 // Under the model, each attack's phase strip (data/mobs.json) with a cursor that runs with the clip.
+#[allow(unused_imports)]
+use super::soulscraft_compat::*;
 use crate::game::Game;
 use crate::game::native_block_entity_draw::BlockEntityDraw;
-use crate::game::native_hooks::NativeScreenView;
+use mod_api::ScreenView;
 use crate::game::soulscraft_client as client;
-use horizon_client::containers::{ModBlockEntity, ModBlockEntityFields};
+use mod_api::{ModBlockEntity, ModelPart, SceneBlockEntity};
 use horizon_client::hud::HudBatch;
-use horizon_client::mod_api::{NativeSceneBlock, NativeSceneView};
 use serde_json::Value;
-use soulscraft_rules::{
+use soulscraft::rules::{
     altar::AltarFile,
     book::{self, BookFile, Catalog, Progress},
     book_page::{self, Page, Seg, Tone},
@@ -82,11 +83,14 @@ static DATA: LazyLock<Data> = LazyLock::new(|| Data {
     book: BookFile::embedded(),
     catalog: Catalog::embedded(),
     altar: AltarFile::embedded(),
-    trophies: serde_json::from_str(soulscraft_rules::event::TROPHIES).unwrap_or(Value::Null),
+    trophies: serde_json::from_str(soulscraft::rules::event::TROPHIES).unwrap_or(Value::Null),
 });
 static CLIENT: LazyLock<Mutex<BookClient>> = LazyLock::new(Mutex::default);
-static ENTITY: LazyLock<ModBlockEntity> = LazyLock::new(|| {
-    ModBlockEntity::new(ModBlockEntityFields { id: FIGURE.into(), ..ModBlockEntityFields::default() })
+/// The figure's block entity as the scene takes it: an id and empty fields (the scene makes a
+/// `ModBlockEntity` of it for `native_block_entity_submit`, modding/native_scene.rs:164-178).
+static ENTITY: LazyLock<SceneBlockEntity> = LazyLock::new(|| {
+    let id = mod_api::Identifier::parse(FIGURE).expect("the figure's id is an identifier");
+    SceneBlockEntity::new(id, Default::default())
 });
 
 /// The figure the scene draws now (apart from the window's state, locked while the scene draws).
@@ -130,14 +134,14 @@ pub(super) fn on_tick(game: &mut Game<'_>) {
     if game.remote.is_none() || !std::mem::take(&mut client_state().open_due) {
         return;
     }
-    if game.native_mod_screen() != Some(SCREEN) && game.native_playing() {
-        let opened = game.native_mod_screen_open(SCREEN);
+    if game.sc_mod_screen() != Some(SCREEN) && game.sc_playing() {
+        let opened = game.sc_mod_screen_open(SCREEN);
         log::info!("soulscraft: book window opened={opened}");
     }
 }
 
-fn is_ours(game: &Game<'_>, screen: &NativeScreenView<'_>) -> bool {
-    screen.id == "mod" && game.native_mod_screen() == Some(SCREEN)
+fn is_ours(game: &Game<'_>, screen: &ScreenView<'_>) -> bool {
+    screen.id == "mod" && game.sc_mod_screen() == Some(SCREEN)
 }
 
 fn inside(r: [f32; 4], at: [f32; 2]) -> bool {
@@ -156,7 +160,7 @@ struct Layout {
     down: [f32; 4],
 }
 
-fn layout(screen: &NativeScreenView<'_>, tab: usize) -> Layout {
+fn layout(screen: &ScreenView<'_>, tab: usize) -> Layout {
     let [x, y, w, h] = screen.rect;
     let pw = (w - 16.0).min(440.0);
     let ph = (h - 16.0).min(260.0);
@@ -243,19 +247,19 @@ fn seg_color(s: Seg) -> u32 {
 }
 
 /// `native_screen_render_post`: the book.
-pub(super) fn draw_screen(game: &Game<'_>, batch: &mut HudBatch, screen: &NativeScreenView<'_>) {
+pub(super) fn draw_screen(game: &Game<'_>, batch: &mut HudBatch, screen: &ScreenView<'_>) {
     if !is_ours(game, screen) {
         return;
     }
     let mut c = client_state();
     let l = layout(screen, c.tab);
-    game.native_fill(batch, l.panel, 0xF02A_2118);
-    game.native_fill(batch, [l.panel[0], l.panel[1], l.panel[2], 1.0], 0xFFE8_C878);
+    game.sc_fill(batch, l.panel, 0xF02A_2118);
+    game.sc_fill(batch, [l.panel[0], l.panel[1], l.panel[2], 1.0], 0xFFE8_C878);
     for (i, r) in l.tabs.iter().enumerate() {
         let fill = if i == c.tab { 0xFF5A_4630 } else if inside(*r, screen.mouse) { 0xFF46_3A2C } else { 0xFF34_2A20 };
-        game.native_fill(batch, *r, fill);
-        let tw = game.native_text_width(TABS[i]);
-        game.native_text(batch, TABS[i], [r[0] + (r[2] - tw) / 2.0, r[1] + 3.0], 0xFFFFFF, true);
+        game.sc_fill(batch, *r, fill);
+        let tw = game.sc_text_width(TABS[i]);
+        game.sc_text(batch, TABS[i], [r[0] + (r[2] - tw) / 2.0, r[1] + 3.0], 0xFFFFFF, true);
     }
     let page = page_of(game, &c);
     let scene = if c.tab == 0 {
@@ -283,29 +287,29 @@ fn list_rows(l: &Layout) -> usize {
     ((l.list[3] - 14.0) / ROW).max(1.0) as usize
 }
 
-fn draw_list(game: &Game<'_>, batch: &mut HudBatch, l: &Layout, c: &BookClient, screen: &NativeScreenView<'_>) {
+fn draw_list(game: &Game<'_>, batch: &mut HudBatch, l: &Layout, c: &BookClient, screen: &ScreenView<'_>) {
     let d = &*DATA;
     let p = c.progress.clone().unwrap_or_default();
-    game.native_fill(batch, l.list, 0x6018_120C);
+    game.sc_fill(batch, l.list, 0x6018_120C);
     let rows = list_rows(l);
     for (row, i) in (c.list_off..d.catalog.entries.len()).take(rows).enumerate() {
         let (e, _) = &d.catalog.entries[i];
         let stage = p.stage(&d.book, e);
         let r = [l.list[0], l.list[1] + row as f32 * ROW, l.list[2], ROW];
         if i == c.sel {
-            game.native_fill(batch, r, 0xFF4A_3A28);
+            game.sc_fill(batch, r, 0xFF4A_3A28);
         } else if inside(r, screen.mouse) {
-            game.native_fill(batch, r, 0x803A_2E22);
+            game.sc_fill(batch, r, 0x803A_2E22);
         }
-        game.native_fill(batch, [r[0] + 3.0, r[1] + 3.0, 4.0, 4.0], stage_color(stage));
+        game.sc_fill(batch, [r[0] + 3.0, r[1] + 3.0, 4.0, 4.0], stage_color(stage));
         let name = if stage == book::UNKNOWN { "???".to_owned() } else { fit(game, &e.name, r[2] - 12.0) };
-        game.native_text(batch, &name, [r[0] + 10.0, r[1] + 1.5], if stage == book::UNKNOWN { 0x8C8478 } else { 0xE8E0D0 }, true);
+        game.sc_text(batch, &name, [r[0] + 10.0, r[1] + 1.5], if stage == book::UNKNOWN { 0x8C8478 } else { 0xE8E0D0 }, true);
     }
     if d.catalog.entries.len() > rows {
         let (u, w) = list_arrows(l);
         for (r, s) in [(u, "▲"), (w, "▼")] {
-            game.native_fill(batch, r, 0xFF34_2A20);
-            game.native_text(batch, s, [r[0] + 4.0, r[1] + 2.0], 0xE8E0D0, true);
+            game.sc_fill(batch, r, 0xFF34_2A20);
+            game.sc_text(batch, s, [r[0] + 4.0, r[1] + 2.0], 0xE8E0D0, true);
         }
     }
 }
@@ -320,7 +324,7 @@ fn list_arrows(l: &Layout) -> ([f32; 4], [f32; 4]) {
 fn draw_enemy(game: &Game<'_>, batch: &mut HudBatch, l: &Layout, c: &mut BookClient, page: &Page) -> Option<(f32, f32)> {
     let d: &'static Data = &DATA;
     let (e, m) = d.catalog.entries.get(c.sel)?;
-    game.native_fill(batch, l.model, 0x60_0C0A08);
+    game.sc_fill(batch, l.model, 0x60_0C0A08);
     let now = game.world.game_time;
     if e.vanilla {
         draw_vanilla_enemy(game, batch, l, c, page, e, m, now)
@@ -353,8 +357,8 @@ fn draw_clip_buttons<'a>(game: &Game<'_>, batch: &mut HudBatch, l: &Layout, labe
         if r[1] + r[3] > l.clips[1] + l.clips[3] - 18.0 {
             break;
         }
-        game.native_fill(batch, r, if i == sel { 0xFF5A_4630 } else { 0xFF34_2A20 });
-        game.native_text(batch, label, [r[0] + 3.0, r[1] + 1.5], 0xE8E0D0, true);
+        game.sc_fill(batch, r, if i == sel { 0xFF5A_4630 } else { 0xFF34_2A20 });
+        game.sc_text(batch, label, [r[0] + 3.0, r[1] + 1.5], 0xE8E0D0, true);
     }
 }
 
@@ -388,8 +392,8 @@ fn draw_vanilla_enemy(game: &Game<'_>, batch: &mut HudBatch, l: &Layout, c: &mut
         c.figure = None;
         let at = [l.model[0] + l.model[2] / 2.0 - 16.0, l.model[1] + l.model[3] / 2.0 - 16.0];
         let egg = format!("{kind}_spawn_egg");
-        if page.silhouette || !game.native_item_model(batch, &egg, &egg, at, 32.0) {
-            game.native_text(batch, "?", [at[0] + 14.0, at[1] + 12.0], 0x8C8478, true);
+        if page.silhouette || !game.sc_item_model(batch, &egg, &egg, at, 32.0) {
+            game.sc_text(batch, "?", [at[0] + 14.0, at[1] + 12.0], 0x8C8478, true);
         }
         return None;
     }
@@ -415,7 +419,7 @@ fn draw_scene(game: &Game<'_>, batch: &mut HudBatch, rect: [f32; 4], (height, wi
     let span = height.max(width * 1.6).max(0.6);
     let view = NativeSceneView { center: [0.5, height / 2.0, 0.5], yaw: 160.0, pitch: 12.0, scale: rect[3] * 0.78 / span };
     let blocks = [NativeSceneBlock { pos: [0, 0, 0], state, entity: Some(&*ENTITY) }];
-    game.native_draw_scene(batch, [rect[0], rect[1], rect[0] + rect[2], rect[1] + rect[3]], &blocks, view);
+    game.sc_draw_scene(batch, [rect[0], rect[1], rect[0] + rect[2], rect[1] + rect[3]], &blocks, view);
 }
 
 /// The phase strip: windup, hold, hit, the player's window, with a cursor at `t`.
@@ -424,14 +428,14 @@ fn draw_strip(game: &Game<'_>, batch: &mut HudBatch, r: [f32; 4], s: &book_page:
     let mut x = r[0];
     for (seg, n) in &s.segs {
         let w = r[2] * *n as f32 / total;
-        game.native_fill(batch, [x, r[1], w.max(1.0), r[3]], seg_color(*seg));
+        game.sc_fill(batch, [x, r[1], w.max(1.0), r[3]], seg_color(*seg));
         x += w;
     }
     if t < total {
         let cx = r[0] + r[2] * t / total;
-        game.native_fill(batch, [cx - 0.5, r[1] - 2.0, 1.5, r[3] + 4.0], 0xFFFF_FFFF);
+        game.sc_fill(batch, [cx - 0.5, r[1] - 2.0, 1.5, r[3] + 4.0], 0xFFFF_FFFF);
         if let Some(seg) = s.seg_at(t as u32) {
-            game.native_text(batch, seg.label(), [r[0], r[1] + r[3] + 1.0], seg_color(seg) & 0xFF_FFFF, true);
+            game.sc_text(batch, seg.label(), [r[0], r[1] + r[3] + 1.0], seg_color(seg) & 0xFF_FFFF, true);
         }
     }
 }
@@ -441,14 +445,14 @@ fn draw_text(game: &Game<'_>, batch: &mut HudBatch, l: &Layout, c: &mut BookClie
     let lines = text_lines(game, l, c, page);
     let rows = (l.text[3] / LINE).max(1.0) as usize;
     c.scroll = c.scroll.min(lines.len().saturating_sub(rows));
-    game.native_text(batch, &fit(game, &page.title, l.text[2]), [l.text[0], l.text[1]], 0xE8C878, true);
+    game.sc_text(batch, &fit(game, &page.title, l.text[2]), [l.text[0], l.text[1]], 0xE8C878, true);
     for (i, (text, color)) in lines.iter().skip(c.scroll).take(rows.saturating_sub(1)).enumerate() {
-        game.native_text(batch, text, [l.text[0], l.text[1] + LINE * (i as f32 + 1.0)], *color, true);
+        game.sc_text(batch, text, [l.text[0], l.text[1] + LINE * (i as f32 + 1.0)], *color, true);
     }
     if lines.len() + 1 > rows {
         for (r, s) in [(l.up, "▲"), (l.down, "▼")] {
-            game.native_fill(batch, r, 0xFF34_2A20);
-            game.native_text(batch, s, [r[0] + 4.0, r[1] + 2.0], 0xE8E0D0, true);
+            game.sc_fill(batch, r, 0xFF34_2A20);
+            game.sc_text(batch, s, [r[0] + 4.0, r[1] + 2.0], 0xE8E0D0, true);
         }
     }
 }
@@ -467,7 +471,7 @@ fn text_lines(game: &Game<'_>, l: &Layout, c: &BookClient, page: &Page) -> Vec<(
         }
     }
     for line in lines {
-        for w in view::wrap(&[line.text], l.text[2], |s| game.native_text_width(s)) {
+        for w in view::wrap(&[line.text], l.text[2], |s| game.sc_text_width(s)) {
             out.push((w, tone_color(line.tone)));
         }
     }
@@ -475,7 +479,7 @@ fn text_lines(game: &Game<'_>, l: &Layout, c: &BookClient, page: &Page) -> Vec<(
 }
 
 /// `native_screen_mouse_button_pressed_pre`: tabs, entries, clips, scrolling.
-pub(super) fn on_screen_press(game: &Game<'_>, screen: &NativeScreenView<'_>, button: i32, canceled: &mut bool) {
+pub(super) fn on_screen_press(game: &Game<'_>, screen: &ScreenView<'_>, button: i32, canceled: &mut bool) {
     if !is_ours(game, screen) || button != LEFT {
         return;
     }
@@ -532,14 +536,14 @@ pub(super) fn on_screen_press(game: &Game<'_>, screen: &NativeScreenView<'_>, bu
 /// `native_block_entity_submit` for the book's figure (in the window's scene only). False for
 /// any other block entity.
 pub(super) fn draw_figure(game: &Game<'_>, entity: &ModBlockEntity, draw: &mut BlockEntityDraw) -> bool {
-    if entity.id != FIGURE {
+    if entity.id() != FIGURE {
         return false;
     }
     let Some(f) = shown().clone() else { return true };
-    let t = (draw.game_time - f.start) as f32 + draw.partial;
+    let t = (game.native_draw_game_time(draw) - f.start) as f32 + game.native_draw_partial(draw);
     let t = if f.period > 0.0 { t % f.period } else { t };
-    draw.push();
-    draw.translate([0.5, 0.0, 0.5]);
+    game.native_draw_push(draw);
+    game.native_draw_translate(draw, [0.5, 0.0, 0.5]);
     let (tint, items) = if f.silhouette { (0, false) } else { (0xFF_FFFF, true) };
     if f.mob.starts_with("minecraft:") {
         draw_vanilla_figure(game, &f, t, tint, draw);
@@ -547,7 +551,7 @@ pub(super) fn draw_figure(game: &Game<'_>, entity: &ModBlockEntity, draw: &mut B
         let flags: [&str; 0] = [];
         client::draw_rig_with(game, &f.mob, || client::load_rig(game, &f.mob), &f.clip, t, &flags, draw, 7, tint, items);
     }
-    draw.pop();
+    game.native_draw_pop(draw);
     true
 }
 
@@ -566,9 +570,9 @@ pub(super) fn draw_figure(game: &Game<'_>, entity: &ModBlockEntity, draw: &mut B
 
 /// A vanilla type's model tree and skin, made once.
 struct VanillaFigure {
-    tree: horizon_client::mobs::model_layers::ModelPart,
+    tree: ModelPart,
     /// A slime's outer cube, drawn over the inner one.
-    outer: Option<horizon_client::mobs::model_layers::ModelPart>,
+    outer: Option<ModelPart>,
     texture: String,
 }
 
@@ -594,11 +598,11 @@ fn vanilla_size(game: &Game<'_>, kind: &str) -> Option<(f32, f32)> {
 }
 
 fn make_vanilla(game: &Game<'_>, kind: &str) -> Option<VanillaFigure> {
-    use horizon_client::mobs::model_layers::ModelPart;
+    use horizon_client::mobs::model_layers::from_part;
     let t = game.res.mob_types().get(kind)?;
     let path = kind.trim_start_matches("minecraft:");
-    let outer = t.layers.get(&format!("{path}#outer")).filter(|_| path == "slime").map(|p| ModelPart::from_part(p));
-    Some(VanillaFigure { tree: ModelPart::from_part(&t.model), outer, texture: t.texture.clone() })
+    let outer = t.layers.get(&format!("{path}#outer")).filter(|_| path == "slime").map(|p| from_part(p));
+    Some(VanillaFigure { tree: from_part(&t.model), outer, texture: t.texture.clone() })
 }
 
 /// Draws the vanilla type `f.mob` in its pose at `t` ticks, from the draw's frame at the feet.
@@ -613,14 +617,14 @@ fn draw_vanilla_figure(game: &Game<'_>, f: &Figure, t: f32, tint: u32, draw: &mu
     }
     let Some(v) = all.get_mut(&f.mob).and_then(Option::as_mut) else { return };
     pose_vanilla(&mut v.tree, &f.clip, t, f.strip.as_ref());
-    draw.push();
-    draw.scale([1.0, -1.0, -1.0]);
-    draw.translate([0.0, -1.501, 0.0]);
-    let drawn = game.native_draw_model_part(draw, &v.tree, &v.texture, tint);
+    game.native_draw_push(draw);
+    game.native_draw_scale(draw, [1.0, -1.0, -1.0]);
+    game.native_draw_translate(draw, [0.0, -1.501, 0.0]);
+    let drawn = game.sc_draw_model_part(draw, &v.tree, &v.texture, tint);
     if let Some(outer) = &v.outer {
-        game.native_draw_model_part(draw, outer, &v.texture, tint);
+        game.sc_draw_model_part(draw, outer, &v.texture, tint);
     }
-    draw.pop();
+    game.native_draw_pop(draw);
     if !drawn {
         log::warn!("soulscraft: book: the skin {} of {} is not in the atlas", v.texture, f.mob);
         all.insert(f.mob.clone(), None);
@@ -630,7 +634,7 @@ fn draw_vanilla_figure(game: &Game<'_>, f: &Figure, t: f32, tint: u32, draw: &mu
 /// A hand-made pose on the model's top parts by their vanilla names: at rest the head looks round;
 /// a walk swings legs (and arms against them); an attack raises arms or lowers the head in its
 /// windup and hold, and strikes in its hit.
-fn pose_vanilla(tree: &mut horizon_client::mobs::model_layers::ModelPart, clip: &str, t: f32, strip: Option<&book_page::Strip>) {
+fn pose_vanilla(tree: &mut ModelPart, clip: &str, t: f32, strip: Option<&book_page::Strip>) {
     use book_page::Seg;
     tree.reset_all_poses();
     let swing = (t * 0.45).sin();
@@ -671,13 +675,13 @@ fn seg_progress(s: &book_page::Strip, t: f32) -> Option<(book_page::Seg, f32)> {
 
 /// `text` cut to `width` GUI pixels with «…» (a vanilla row's long name in the list and the title).
 fn fit(game: &Game<'_>, text: &str, width: f32) -> String {
-    if game.native_text_width(text) <= width {
+    if game.sc_text_width(text) <= width {
         return text.to_owned();
     }
     let mut out = String::new();
     for ch in text.chars() {
         out.push(ch);
-        if game.native_text_width(&format!("{out}…")) > width {
+        if game.sc_text_width(&format!("{out}…")) > width {
             out.pop();
             break;
         }

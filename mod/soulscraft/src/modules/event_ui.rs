@@ -1,10 +1,12 @@
 // What players see of a run of the altar's event (soulscraft_event): the boss bar with its
 // warning, titles to the zone, the view clients draw (spawn points, beams, the altar's health),
 // the menu's event lines, and the self-test's snapshot.
+#[allow(unused_imports)]
+use super::soulscraft_compat::*;
 use crate::game::Game;
 use crate::game::soulscraft_altar as altar_srv;
 use crate::game::soulscraft_event::{EventRun, core_centre, events};
-use soulscraft_rules::{
+use soulscraft::rules::{
     defense::Goal,
     event as rev,
     geom,

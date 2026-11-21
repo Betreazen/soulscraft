@@ -1,28 +1,30 @@
-// The summoning altar on the server (docs/design/06-altar.md; the rules are soulscraft_rules::altar):
+// The summoning altar on the server (docs/design/06-altar.md; the rules are soulscraft::rules::altar):
 // which cores stand where, their level, the tall pieces placed and broken together, the pedestal
 // and its summon item, the menu, and what clients are told to draw.
 //
 // Cheap by design: nothing scans the world each tick. `native_block_changed` (block_changed hook,
 // GameLevel::observe_block_changed, game.rs:1388-1392, every committed `Level.setBlock` of an
-// authoritative server, no `mods()` check) queues only changes to SoulsCraft's own blocks and to
+// authoritative server; the mixin is on its caller) queues only changes to SoulsCraft's own blocks and to
 // blocks inside a known altar's event zone. The level tick then fixes tall pieces, marks the
 // altar whose 9 × 9 × 4 cells or roof column changed, and evaluates only that altar: 324 cells and
 // one heightmap column. Cores are found when placed (the queue) and when their chunk loads (their
-// block entity ticks, `native_block_entity_tick`, and says where it is).
+// block entity ticks: lib.rs's BlockEntityPart queues it in `soulscraft::bridge`).
 //
 // What is saved: the pedestal's item and the core's spawn-boost switch and the event's broken
-// blocks are block entity data (`native_with_mod_block_entity`, sent to clients by
-// `native_block_entity_update_tag`); a level is worked out again whenever a core is seen.
+// blocks are block entity data (`native_with_mod_block_entity`, sent to clients by lib.rs's
+// `block_entity_update_tag`); a level is worked out again whenever a core is seen.
 //
 // Log lines:
 //   soulscraft: altar core=-700,101,700 level=2 built=2 sky=true banners=[weight] wrong=0
 //   soulscraft: altar tall=soulscraft:altar_pillar at=-698,102,698 placed parts=2
 //   soulscraft: pedestal at=-700,102,700 item=soulscraft:rotten_horn by=sc_a
+#[allow(unused_imports)]
+use super::soulscraft_compat::*;
 use crate::game::Game;
 use crate::game::soulscraft_event as event;
-use horizon_world::nbt::{Compound, JavaString, Tag};
+use horizon_core::nbt::{Compound, JavaString, Tag};
 use horizon_world::registry::BlockStateId;
-use soulscraft_rules::{
+use soulscraft::rules::{
     altar::{self, AltarFile, Report, Seen},
     data::MobsFile,
     view,
@@ -38,7 +40,7 @@ const ITEM_KEY: &str = "item";
 const BOOST_KEY: &str = "boost";
 /// The game time the core was first seen (the spawn boost's age; survives restarts).
 const SINCE_KEY: &str = "since";
-/// The core's book of broken blocks while an event runs (soulscraft_rules::defense::Breaches).
+/// The core's book of broken blocks while an event runs (soulscraft::rules::defense::Breaches).
 pub(super) const BREACHED_KEY: &str = "breached";
 /// Views go out this often (soulscraft_altar_ui::send_views).
 const VIEW_EVERY: u64 = 10;
@@ -119,8 +121,6 @@ static HUB: LazyLock<Mutex<Hub>> = LazyLock::new(|| {
 static CHANGES: Mutex<Vec<(&'static str, Change)>> = Mutex::new(Vec::new());
 /// The zones the hook watches: (dimension, min x, min z, max x, max z).
 static ZONES: Mutex<Vec<(&'static str, [i32; 4])>> = Mutex::new(Vec::new());
-/// Cores whose block entity ticked since the level's last tick.
-static TICKED: Mutex<Vec<[i32; 3]>> = Mutex::new(Vec::new());
 
 fn hub() -> MutexGuard<'static, Hub> {
     HUB.lock().unwrap_or_else(PoisonError::into_inner)
@@ -141,12 +141,8 @@ pub(super) fn altars_in(dim: &str) -> Vec<Altar> {
     hub().altars.values().filter(|a| a.dim == dim).cloned().collect()
 }
 
-fn dim_key(d: horizon_world::level::Dimension) -> &'static str {
-    match d {
-        horizon_world::level::Dimension::Overworld => "minecraft:overworld",
-        horizon_world::level::Dimension::Nether => "minecraft:the_nether",
-        horizon_world::level::Dimension::End => "minecraft:the_end",
-    }
+fn dim_key(d: horizon_core::dimension::Dimension) -> &'static str {
+    d.key().id()
 }
 
 fn static_dim(dim: &str) -> &'static str {
@@ -161,7 +157,7 @@ fn static_dim(dim: &str) -> &'static str {
 /// blocks or a watched zone. Name lookups are the level's fact table (an index).
 pub(super) fn on_block_changed(
     facts: &horizon_client::blocks::BlockFacts,
-    dimension: horizon_world::level::Dimension,
+    dimension: horizon_core::dimension::Dimension,
     pos: [i32; 3],
     old: BlockStateId,
     new: BlockStateId,
@@ -179,37 +175,8 @@ pub(super) fn on_block_changed(
     }
 }
 
-/// `native_block_entity` (API 15): the core and the pedestal have block entities.
-pub(super) fn on_block_entity(block: &str, entity: &mut Option<(String, Compound)>) {
-    if entity.is_none() && (block == altar::CORE || block == altar::PEDESTAL) {
-        *entity = Some((block.to_owned(), Compound::new()));
-    }
-}
-
-/// `native_block_entity_ticks`: the core ticks, so a loaded chunk tells where its core is.
-pub(super) fn on_block_entity_ticks(block: &str, ticks: &mut bool) {
-    if block == altar::CORE {
-        *ticks = true;
-    }
-}
-
-pub(super) fn on_block_entity_tick(pos: [i32; 3], entity: &horizon_client::containers::ModBlockEntity) {
-    if entity.id == altar::CORE {
-        TICKED.lock().unwrap_or_else(PoisonError::into_inner).push(pos);
-    }
-}
-
-/// `native_block_entity_update_tag` (API 45): clients get the pedestal's item and the core's
-/// switch, which is all they draw.
-pub(super) fn on_update_tag(entity: &horizon_client::containers::ModBlockEntity, tag: &mut Option<Compound>) {
-    if entity.id == altar::PEDESTAL || entity.id == altar::CORE {
-        let mut c = Compound::new();
-        if let Some(v) = entity.nbt.get(&JavaString::from(ITEM_KEY)) {
-            c.insert(JavaString::from(ITEM_KEY), v.clone());
-        }
-        *tag = Some(c);
-    }
-}
+// The core's and the pedestal's block entities, their ticks and their update tags are lib.rs's
+// (`SoulsBlockEntity`; its `ALTAR_ITEM_KEY` is [`ITEM_KEY`]).
 
 fn nbt_string(nbt: &Compound, key: &str) -> Option<String> {
     match nbt.get(&JavaString::from(key)) {
@@ -220,12 +187,12 @@ fn nbt_string(nbt: &Compound, key: &str) -> Option<String> {
 
 /// The item on the pedestal at `pos`, from its block entity.
 pub(super) fn pedestal_item(game: &Game<'_>, pos: [i32; 3]) -> Option<String> {
-    game.native_mod_block_entity(pos).and_then(|e| nbt_string(&e.nbt, ITEM_KEY))
+    game.sc_mod_block_entity(pos).and_then(|e| nbt_string(&e.nbt, ITEM_KEY))
 }
 
 /// Writes the pedestal's item and tells clients.
 pub(super) fn set_pedestal(game: &mut Game<'_>, dim: &str, pos: [i32; 3], item: Option<&str>) {
-    game.native_with_mod_block_entity(pos, |e| match item {
+    game.sc_with_mod_block_entity(pos, |e| match item {
         Some(i) => {
             e.nbt.insert(JavaString::from(ITEM_KEY), Tag::String(JavaString::from(i)));
         }
@@ -233,13 +200,13 @@ pub(super) fn set_pedestal(game: &mut Game<'_>, dim: &str, pos: [i32; 3], item: 
             e.nbt.remove(&JavaString::from(ITEM_KEY));
         }
     });
-    game.native_block_entity_sync(pos);
+    game.sc_block_entity_sync(pos);
     hub().pedestals.insert((dim.to_owned(), pos), item.map(str::to_owned));
 }
 
 /// The core's saved lines under `key` (the book of broken blocks).
 pub(super) fn core_lines(game: &Game<'_>, core: [i32; 3], key: &str) -> Vec<String> {
-    match game.native_mod_block_entity(core).and_then(|e| e.nbt.get(&JavaString::from(key)).cloned()) {
+    match game.sc_mod_block_entity(core).and_then(|e| e.nbt.get(&JavaString::from(key)).cloned()) {
         Some(Tag::List(list)) => list
             .iter()
             .filter_map(|t| if let Tag::String(s) = t { Some(s.to_string_lossy()) } else { None })
@@ -249,7 +216,7 @@ pub(super) fn core_lines(game: &Game<'_>, core: [i32; 3], key: &str) -> Vec<Stri
 }
 
 pub(super) fn set_core_lines(game: &mut Game<'_>, core: [i32; 3], key: &str, lines: &[String]) {
-    game.native_with_mod_block_entity(core, |e| {
+    game.sc_with_mod_block_entity(core, |e| {
         if lines.is_empty() {
             e.nbt.remove(&JavaString::from(key));
         } else {
@@ -261,7 +228,7 @@ pub(super) fn set_core_lines(game: &mut Game<'_>, core: [i32; 3], key: &str, lin
 
 fn read_boost(game: &Game<'_>, core: [i32; 3]) -> bool {
     !matches!(
-        game.native_mod_block_entity(core).and_then(|e| e.nbt.get(&JavaString::from(BOOST_KEY)).cloned()),
+        game.sc_mod_block_entity(core).and_then(|e| e.nbt.get(&JavaString::from(BOOST_KEY)).cloned()),
         Some(Tag::Byte(0))
     )
 }
@@ -280,10 +247,10 @@ pub(super) fn age(a: &Altar, now: u64) -> u64 {
 
 /// When the core was first seen: its block entity's `since`, written now the first time.
 fn read_since(game: &mut Game<'_>, core: [i32; 3], now: u64) -> i64 {
-    match game.native_mod_block_entity(core).and_then(|e| e.nbt.get(&JavaString::from(SINCE_KEY)).cloned()) {
+    match game.sc_mod_block_entity(core).and_then(|e| e.nbt.get(&JavaString::from(SINCE_KEY)).cloned()) {
         Some(Tag::Long(v)) => v,
         _ => {
-            game.native_with_mod_block_entity(core, |e| {
+            game.sc_with_mod_block_entity(core, |e| {
                 e.nbt.insert(JavaString::from(SINCE_KEY), Tag::Long(now as i64));
             });
             now as i64
@@ -293,7 +260,7 @@ fn read_since(game: &mut Game<'_>, core: [i32; 3], now: u64) -> i64 {
 
 /// Sets a known core's first-seen time (the self-test's way to age an altar).
 pub(super) fn set_since(game: &mut Game<'_>, dim: &str, core: [i32; 3], since: i64) {
-    game.native_with_mod_block_entity(core, |e| {
+    game.sc_with_mod_block_entity(core, |e| {
         e.nbt.insert(JavaString::from(SINCE_KEY), Tag::Long(since));
     });
     if let Some(a) = hub().altars.get_mut(&(dim.to_owned(), core)) {
@@ -334,7 +301,7 @@ fn replaceable(game: &Game<'_>, pos: [i32; 3]) -> bool {
 
 pub(super) fn run(game: &mut Game<'_>, dim: &str, line: &str) -> bool {
     let full = if dim == "minecraft:overworld" { line.to_owned() } else { format!("execute in {dim} run {line}") };
-    game.native_run_command(&full)
+    game.sc_run_command(&full)
 }
 
 pub(super) fn setblock(game: &mut Game<'_>, dim: &str, pos: [i32; 3], state: &str, mode: &str) -> bool {
@@ -348,15 +315,15 @@ pub(super) fn on_right_click_block(game: &mut Game<'_>, pos: [i32; 3], canceled:
     if *canceled {
         return;
     }
-    let block = game.native_block(pos);
+    let block = game.sc_block(pos);
     if block != altar::PEDESTAL && block != altar::CORE {
         return;
     }
-    let Some(player) = game.native_acting_player() else { return };
+    let Some(player) = game.sc_acting_player() else { return };
     if player.sneaking {
         return;
     }
-    let held = game.native_held().map(|h| h.0);
+    let held = game.sc_held().map(|h| h.0);
     let dim = player.dimension.clone();
     if block == altar::CORE {
         if held.is_none() {
@@ -376,13 +343,13 @@ pub(super) fn on_right_click_block(game: &mut Game<'_>, pos: [i32; 3], canceled:
     let items: Vec<String> = summon_items();
     match (on, held) {
         (None, Some(item)) if items.contains(&item) => {
-            if game.native_take_items(&item, 1) == 1 {
+            if game.sc_take_items(&item, 1) == 1 {
                 hub().pedestals.insert(key, Some(item.clone()));
                 hub().actions.push((dim, Action::Put { pos, item, by: player.name.clone() }));
             }
         }
         (Some(item), None) => {
-            if game.native_give_items(&item, 1) == 1 {
+            if game.sc_give_items(&item, 1) == 1 {
                 hub().pedestals.insert(key, None);
                 hub().actions.push((dim, Action::Take { pos }));
             }
@@ -399,11 +366,11 @@ pub(super) fn summon_items() -> Vec<String> {
 /// `native_destroy_block` (a player's hook): a creative player's break of a tall piece drops
 /// nothing (as a door).
 pub(super) fn on_destroy_block(game: &mut Game<'_>, pos: [i32; 3]) {
-    let Some(player) = game.native_acting_player() else { return };
+    let Some(player) = game.sc_acting_player() else { return };
     if player.game_mode != 1 {
         return;
     }
-    let block = game.native_block(pos);
+    let block = game.sc_block(pos);
     if !altar::tall_parts(&block).is_empty() {
         hub().creative.push((player.dimension.clone(), pos));
     }
@@ -475,7 +442,7 @@ pub(super) fn on_level_tick(game: &mut Game<'_>, dim: &str, now: u64) {
 }
 
 fn register_ticked(game: &mut Game<'_>, dim: &str, now: u64) {
-    let cores: Vec<[i32; 3]> = std::mem::take(&mut *TICKED.lock().unwrap_or_else(PoisonError::into_inner));
+    let cores: Vec<[i32; 3]> = soulscraft::bridge::take_cores_ticked();
     for core in cores {
         let known = {
             let mut h = hub();
@@ -487,7 +454,7 @@ fn register_ticked(game: &mut Game<'_>, dim: &str, now: u64) {
                 None => false,
             }
         };
-        if !known && game.native_block(core) == altar::CORE {
+        if !known && game.sc_block(core) == altar::CORE {
             register(game, dim, core, now);
         }
     }
@@ -507,8 +474,8 @@ fn register(game: &mut Game<'_>, dim: &str, core: [i32; 3], now: u64) {
 }
 
 fn update_zones() {
-    let flow = crate::game::soulscraft_server::state().data.events.first().map(soulscraft_rules::event::Flow::of);
-    let flow = flow.unwrap_or_else(|| soulscraft_rules::event::Flow::from_map(&Default::default()));
+    let flow = crate::game::soulscraft_server::state().data.events.first().map(soulscraft::rules::event::Flow::of);
+    let flow = flow.unwrap_or_else(|| soulscraft::rules::event::Flow::from_map(&Default::default()));
     let zones: Vec<(&'static str, [i32; 4])> = hub()
         .altars
         .values()
@@ -610,7 +577,7 @@ fn on_change(game: &mut Game<'_>, dim: &str, now: u64, c: &Change) {
 /// piece pops off as its item.
 fn settle_piece(game: &mut Game<'_>, dim: &str, pos: [i32; 3], block: &str) {
     let parts = altar::tall_parts(block);
-    let below = game.native_block([pos[0], pos[1] - 1, pos[2]]);
+    let below = game.sc_block([pos[0], pos[1] - 1, pos[2]]);
     let on_slab = if below == altar::SLAB || below == altar::SOCKET { "true" } else { "false" };
     let facing = if block.starts_with(altar::BANNER_PREFIX) {
         let core = hub()
@@ -624,7 +591,7 @@ fn settle_piece(game: &mut Game<'_>, dim: &str, pos: [i32; 3], block: &str) {
             });
         Some(match core {
             Some(c) => altar::facing_out(pos[0] - c[0], pos[2] - c[2]).to_owned(),
-            None => game.native_block_property(pos, "facing").unwrap_or_else(|| "north".into()),
+            None => game.sc_block_property(pos, "facing").unwrap_or_else(|| "north".into()),
         })
     } else {
         None
@@ -646,7 +613,7 @@ fn settle_piece(game: &mut Game<'_>, dim: &str, pos: [i32; 3], block: &str) {
         props.push(("facing", f));
     }
     for (k, v) in &props {
-        game.native_set_block_property_with(pos, k, v, 3);
+        game.sc_set_block_property_with(pos, k, v, 3);
     }
     for (i, part) in parts.iter().enumerate().skip(1) {
         let mut p = props.clone();
@@ -709,7 +676,7 @@ fn do_actions(game: &mut Game<'_>, dim: &str, now: u64) {
             }
             Action::OpenMenu { player, core } => {
                 if let Some(a) = altar(dim, core) {
-                    game.native_with_mod_block_entity(core, |e| {
+                    game.sc_with_mod_block_entity(core, |e| {
                         e.nbt.insert(JavaString::from(BOOST_KEY), Tag::Byte(i8::from(a.boost)));
                     });
                     hub().menus.insert(player, (dim.to_owned(), core));
@@ -760,8 +727,7 @@ pub(super) fn evaluate(game: &mut Game<'_>, dim: &str, core: [i32; 3], now: u64)
 /// Nothing over the core but its pedestal: the world-surface height of its column is at most
 /// two above it (round 5: the core needs the open sky).
 fn open_sky(game: &Game<'_>, dim: &str, core: [i32; 3]) -> bool {
-    use crate::game::native_world_edit::NativeHeightmap;
-    match game.native_surface_heights(dim, &[(core[0], core[2])], NativeHeightmap::WorldSurface) {
+    match game.sc_surface_heights(dim, &[(core[0], core[2])], NativeHeightmap::WorldSurface) {
         Ok(h) => h.first().copied().flatten().is_some_and(|top| top <= core[1] + 2),
         Err(_) => false,
     }
@@ -789,14 +755,14 @@ fn start_events(game: &mut Game<'_>, dim: &str, now: u64) {
 fn send_menu(game: &mut Game<'_>, dim: &str, player: u128, a: &Altar, now: u64) {
     let _ = dim;
     let bytes = view::encode(&menu_of(a, now));
-    if let Err(e) = game.native_net_send_to_player(player, view::MENU, &bytes) {
+    if let Err(e) = game.sc_net_send_to_player(player, view::MENU, &bytes) {
         log::warn!("soulscraft: menu not sent: {e}");
     }
 }
 
 fn refresh_menus(game: &mut Game<'_>, dim: &str, now: u64) {
     let open: Vec<(u128, [i32; 3])> = hub().menus.iter().filter(|(_, (d, _))| d == dim).map(|(p, (_, c))| (*p, *c)).collect();
-    let online: Vec<u128> = game.native_server_players().iter().map(|p| p.uuid).collect();
+    let online: Vec<u128> = game.sc_server_players().iter().map(|p| p.uuid).collect();
     for (player, core) in open {
         match altar(dim, core) {
             Some(a) if online.contains(&player) => send_menu(game, dim, player, &a, now),
@@ -812,15 +778,15 @@ pub(super) fn light_braziers(game: &mut Game<'_>, core: [i32; 3], lit: bool) {
     let r = 3;
     for [x, z] in [[-r, -r], [r, -r], [-r, r], [r, r]] {
         let pos = [core[0] + x, core[1] + 1, core[2] + z];
-        if game.native_block(pos) == altar::BRAZIER {
-            game.native_set_block_property_with(pos, "lit", if lit { "true" } else { "false" }, 3);
+        if game.sc_block(pos) == altar::BRAZIER {
+            game.sc_set_block_property_with(pos, "lit", if lit { "true" } else { "false" }, 3);
         }
     }
 }
 
 /// The altar's level after a fresh look (the self-test).
 pub(super) fn level_now(game: &mut Game<'_>, dim: &str, core: [i32; 3], now: u64) -> Option<(u32, u32, bool, Vec<String>)> {
-    if !hub().altars.contains_key(&(dim.to_owned(), core)) && game.native_block(core) == altar::CORE {
+    if !hub().altars.contains_key(&(dim.to_owned(), core)) && game.sc_block(core) == altar::CORE {
         register(game, dim, core, now);
     }
     evaluate(game, dim, core, now).map(|a| (a.level, a.report.built, a.sky, a.banner_ids()))

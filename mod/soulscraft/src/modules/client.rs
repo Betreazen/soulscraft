@@ -1,29 +1,29 @@
 // SoulsCraft's client half: each SoulsCraft mob is drawn from its rig (assets/rigs/<mob>.rig.json,
 // shipped in the content mod as assets/soulscraft/rigs/ and read with `native_client_resources`,
 // game/native_block_sprites.rs:75, horizon-client-render/src/client_resources.rs:38) instead of
-// the zombie model (`native_mob_submit` with `drawn`, game/native_mob_draw.rs:101-118).
+// the zombie model (`render_living_pre`, its `canceled` set: game/modding/native_mob_draw.rs:166-203).
 //
 // The rig becomes one `ModelPart` tree per mob type, built with vanilla's builders
 // (mobs/model_layers.rs: MeshDefinition, CubeListBuilder, LayerDefinition::bake_root) and drawn by
 // `native_draw_model_part` (game/native_block_entity_draw.rs:727) in the model's frame
 // (`scale(1, -1, -1)`, `translate(0, -1.501, 0)`, native_block_entity_draw.rs:716-726). Each
-// frame every part takes its pose from the clip the server named (soulscraft_rules::wire), at
-// `game_time - start + partial` ticks, interpolated by soulscraft_rules::rig. Cubes marked `glow`
+// frame every part takes its pose from the clip the server named (soulscraft::rules::wire), at
+// `game_time - start + partial` ticks, interpolated by soulscraft::rules::rig. Cubes marked `glow`
 // are children of their part, drawn in a second pass at full light (`draw.light = 0xF0F0`,
 // native_block_entity_draw.rs:51-56). The weapon is drawn at its socket: the parts' chain to the
 // socket's parent, its offset and turns, then `native_draw_item` with the socket's display context
 // (native_block_entity_draw.rs:776-797, which applies the item model's `display` transform).
+#[allow(unused_imports)]
+use super::soulscraft_compat::*;
 use crate::game::Game;
 use crate::game::native_block_entity_draw::BlockEntityDraw;
-use crate::game::native_mob_draw::NativeMobRender;
+use crate::game::native_mob_draw::MobRender;
 use horizon_assets::item_model::DisplayContext;
 use horizon_client::items::ItemStack;
-use horizon_client::mobs::model_layers::{
-    CubeDeformation, CubeListBuilder, LayerDefinition, MeshDefinition, ModelPart, PartPose,
-};
-use horizon_client::world_primitives::WorldPrimitives;
+use horizon_client::world_geometry::WorldGeometry;
+use mod_api::{CubeDeformation, CubeListBuilder, LayerDefinition, MeshDefinition, ModelPart, PartPose};
 use horizon_core::geometry::Direction;
-use soulscraft_rules::{
+use soulscraft::rules::{
     rig::{Pose, Rig},
     wire,
 };
@@ -200,7 +200,7 @@ fn part_mut<'a>(tree: &'a mut ModelPart, path: &[String]) -> Option<&'a mut Mode
 /// The mob's rig from the content mod's resources.
 pub(super) fn load_rig(game: &Game<'_>, id: &str) -> Option<Rig> {
     let path = format!("assets/soulscraft/rigs/{id}.rig.json");
-    let Some(bytes) = game.native_client_resources().read(&path) else {
+    let Some(bytes) = game.sc_client_resources().read(&path) else {
         log::warn!("soulscraft: no {path} in the resources (is the content mod on?)");
         return None;
     };
@@ -259,12 +259,12 @@ pub(super) fn draw_rig_with(
     }
     let Some(model) = c.models.get_mut(key).and_then(Option::as_mut) else { return false };
     let poses = model.rig.sample(clip, t);
-    draw.push();
-    draw.scale([1.0, -1.0, -1.0]);
-    draw.translate([0.0, -1.501, 0.0]);
+    game.native_draw_push(draw);
+    game.native_draw_scale(draw, [1.0, -1.0, -1.0]);
+    game.native_draw_translate(draw, [0.0, -1.501, 0.0]);
     pose_tree(model, &poses, flags);
     paint(game, model, &poses, flags, tint, draw, seed, items);
-    draw.pop();
+    game.native_draw_pop(draw);
     true
 }
 
@@ -287,13 +287,13 @@ pub(super) fn clips_of(game: &Game<'_>, id: &str) -> Vec<(String, f32, bool)> {
 fn paint(game: &Game<'_>, model: &mut Model, poses: &[Pose], flags: &[&str], tint: u32, draw: &mut BlockEntityDraw, seed: u32, items: bool) {
     let sprite = model.rig.texture.sprite.clone();
     show_glow(model, false);
-    game.native_draw_model_part(draw, &model.tree, &sprite, tint);
+    game.sc_draw_model_part(draw, &model.tree, &sprite, tint);
     if !model.glows.is_empty() {
         show_glow(model, true);
-        let light = draw.light;
-        draw.light = FULL_LIGHT;
-        game.native_draw_model_part(draw, &model.tree, &sprite, tint);
-        draw.light = light;
+        let light = game.native_draw_light(draw);
+        game.native_draw_set_light(draw, FULL_LIGHT);
+        game.sc_draw_model_part(draw, &model.tree, &sprite, tint);
+        game.native_draw_set_light(draw, light);
         show_glow(model, false);
     }
     if items {
@@ -302,7 +302,7 @@ fn paint(game: &Game<'_>, model: &mut Model, poses: &[Pose], flags: &[&str], tin
 }
 
 /// The clip a mob shows when the server names none: its walk or idle, by how it moves.
-fn locomotion(rig: &Rig, id: &str, mob: &NativeMobRender<'_>) -> (String, f32) {
+fn locomotion(rig: &Rig, id: &str, mob: &MobRender<'_>) -> (String, f32) {
     let moving = mob.walk_speed > 0.05;
     let pick = |names: &[&str]| names.iter().find(|n| rig.has_clip(n)).map(|n| (*n).to_owned());
     let clip = match (id, moving) {
@@ -318,7 +318,7 @@ fn locomotion(rig: &Rig, id: &str, mob: &NativeMobRender<'_>) -> (String, f32) {
     (clip, t)
 }
 
-pub(super) fn draw_mob(game: &Game<'_>, mob: &NativeMobRender<'_>, draw: &mut BlockEntityDraw, drawn: &mut bool) {
+pub(super) fn draw_mob(game: &Game<'_>, mob: &MobRender<'_>, draw: &mut BlockEntityDraw, drawn: &mut bool) {
     if *drawn {
         return;
     }
@@ -330,7 +330,7 @@ pub(super) fn draw_mob(game: &Game<'_>, mob: &NativeMobRender<'_>, draw: &mut Bl
     }
     let shown = c.shown.get(&mob.id).cloned().unwrap_or_default();
     let Some(model) = c.models.get_mut(id).and_then(Option::as_mut) else { return };
-    let now = draw.game_time as f32 + mob.partial;
+    let now = game.native_draw_game_time(draw) as f32 + mob.partial;
     let (clip, t) = if mob.death_time > 0 && model.rig.has_clip("death") {
         ("death".to_owned(), mob.death_time as f32 + mob.partial)
     } else {
@@ -349,18 +349,18 @@ pub(super) fn draw_mob(game: &Game<'_>, mob: &NativeMobRender<'_>, draw: &mut Bl
     let poses = model.rig.sample(&clip, t);
     let flags: Vec<&str> = if shown.flags & wire::RAGE != 0 { vec!["rage"] } else { vec![] };
     *drawn = true;
-    draw.push();
+    game.native_draw_push(draw);
     if shown.size > 0 && shown.size < 4 {
         // The bog slime's smaller sizes: the size-4 model scaled at its feet.
         let k = f32::from(shown.size) / 4.0;
-        draw.scale([k, k, k]);
+        game.native_draw_scale(draw, [k, k, k]);
     }
-    draw.scale([1.0, -1.0, -1.0]);
-    draw.translate([0.0, -1.501, 0.0]);
+    game.native_draw_scale(draw, [1.0, -1.0, -1.0]);
+    game.native_draw_translate(draw, [0.0, -1.501, 0.0]);
     pose_tree(model, &poses, &flags);
     let tint = if mob.hurt_time > 0 { HURT_TINT } else { 0xFF_FFFF };
     paint(game, model, &poses, &flags, tint, draw, mob.id, true);
-    draw.pop();
+    game.native_draw_pop(draw);
 }
 
 fn pose_tree(model: &mut Model, poses: &[Pose], flags: &[&str]) {
@@ -391,13 +391,13 @@ fn show_glow(model: &mut Model, on: bool) {
 
 /// `ModelPart.translateAndRotate` for one pose, on the draw's stack (native_block_entity_draw.rs:
 /// 842-856: to the place in blocks, then Z, Y, X, then the scale).
-fn part_transform(draw: &mut BlockEntityDraw, p: &Pose) {
-    draw.translate([p.pos[0] / 16.0, p.pos[1] / 16.0, p.pos[2] / 16.0]);
-    draw.rotate_about([0.0, 0.0, 1.0], p.rot[2].to_degrees(), [0.0; 3]);
-    draw.rotate_about([0.0, 1.0, 0.0], p.rot[1].to_degrees(), [0.0; 3]);
-    draw.rotate_about([1.0, 0.0, 0.0], p.rot[0].to_degrees(), [0.0; 3]);
+fn part_transform(game: &Game<'_>, draw: &mut BlockEntityDraw, p: &Pose) {
+    game.native_draw_translate(draw, [p.pos[0] / 16.0, p.pos[1] / 16.0, p.pos[2] / 16.0]);
+    game.native_draw_rotate_about(draw, [0.0, 0.0, 1.0], p.rot[2].to_degrees(), [0.0; 3]);
+    game.native_draw_rotate_about(draw, [0.0, 1.0, 0.0], p.rot[1].to_degrees(), [0.0; 3]);
+    game.native_draw_rotate_about(draw, [1.0, 0.0, 0.0], p.rot[0].to_degrees(), [0.0; 3]);
     if p.scale != [1.0; 3] {
-        draw.scale(p.scale);
+        game.native_draw_scale(draw, p.scale);
     }
 }
 
@@ -407,34 +407,42 @@ fn draw_items(game: &Game<'_>, model: &Model, poses: &[Pose], flags: &[&str], dr
         if !model.rig.visible(*parent, flags) {
             continue;
         }
-        draw.push();
+        game.native_draw_push(draw);
         for j in model.rig.chain(*parent) {
-            part_transform(draw, &poses[j]);
+            part_transform(game, draw, &poses[j]);
         }
-        draw.translate([socket.offset[0] / 16.0, socket.offset[1] / 16.0, socket.offset[2] / 16.0]);
+        game.native_draw_translate(draw, [socket.offset[0] / 16.0, socket.offset[1] / 16.0, socket.offset[2] / 16.0]);
         for (axis, degrees) in &socket.rotate {
             let a = match axis.as_str() {
                 "x" => [1.0, 0.0, 0.0],
                 "y" => [0.0, 1.0, 0.0],
                 _ => [0.0, 0.0, 1.0],
             };
-            draw.rotate_about(a, *degrees, [0.0; 3]);
+            game.native_draw_rotate_about(draw, a, *degrees, [0.0; 3]);
         }
         // The seed vanilla's hand layer gives: id + 2 for the right hand, + 1 for the left
         // (game/mob_blocks.rs:478-497).
         let seed = mob as i32 + if *ctx == DisplayContext::ThirdPersonLeftHand { 1 } else { 2 };
-        game.native_draw_item(draw, stack, *ctx, None, seed);
-        draw.pop();
+        game.sc_draw_item(draw, stack, *ctx, None, seed);
+        game.native_draw_pop(draw);
     }
 }
 
-/// `/sc debug on`: the server sends each mob's phase as a label; it floats over the mob, coloured
-/// by phase (windup yellow, hold orange, hit red, recover green), seen through walls.
-pub(super) fn debug_labels(game: &Game<'_>, primitives: &mut WorldPrimitives) {
+/// `/sc debug on`: the server sends each mob's phase as a label; over the mob, coloured by phase
+/// (windup yellow, hold orange, hit red, recover green), seen through walls.
+///
+/// 8f83e5c's world geometry (`submit_custom_geometry`: lines and quads, world_geometry.rs:234-282)
+/// draws no text, and the old `WorldPrimitives` text is no longer fed by mods. So each labelled
+/// mob gets a post over its head in its phase's colour, through walls (`/sc log on` prints the
+/// phases' text on the server).
+// TODO(port): the label's text over the mob; a name-tag style text needs a game text path in the
+// world (`name_tag_quads` is the game's own) or one drawn in render_living_pre's draw.
+pub(super) fn debug_labels(game: &Game<'_>, _view: &mod_api::WorldRenderView, draw: &mut WorldGeometry) {
     let c = client();
     if c.shown.values().all(|s| s.flags & wire::DEBUG == 0) {
         return;
     }
+    let mut posts = Vec::new();
     // SoulsCraft's mobs and the vanilla mobs the server labels (07-vanilla-mobs.md).
     for m in game.mobs.iter().filter(|m| !m.removed && c.shown.contains_key(&m.id)) {
         let Some(s) = c.shown.get(&m.id) else { continue };
@@ -448,7 +456,13 @@ pub(super) fn debug_labels(game: &Game<'_>, primitives: &mut WorldPrimitives) {
             Some("recover") => 0xFF40_E060,
             _ => 0xFFE0_E0E0,
         };
-        let at = [m.position.x, m.position.y + m.kind.height + 0.7, m.position.z];
-        primitives.text(at, s.label.clone(), color, 1.0).through_walls().background();
+        let top = m.position.y + m.kind.height;
+        let from = [m.position.x, top + 0.3, m.position.z];
+        let to = [m.position.x, top + 1.0, m.position.z];
+        posts.push(mod_api::WorldLine::new(from, to, color, 4.0, mod_api::WorldDepth::ThroughWalls));
+    }
+    drop(c);
+    if !posts.is_empty() {
+        let _ = draw.lines(&posts);
     }
 }

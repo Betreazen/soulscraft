@@ -1,5 +1,5 @@
 // The approved vanilla changes on the server (docs/design/07-vanilla-mobs.md; the decisions are
-// soulscraft_rules::vanilla). Every mob of a changed vanilla type (data/mobs.json `vanilla.groups`)
+// soulscraft::rules::vanilla). Every mob of a changed vanilla type (data/mobs.json `vanilla.groups`)
 // is adopted the first time the level tick sees it:
 //   - its P (Г1, Г5: the players near, or its tag `soulscraft.p=`), kept as that tag;
 //   - Г2's growth as attribute modifiers `soulscraft:power` on its own vanilla base (health, damage,
@@ -20,12 +20,13 @@
 //   soulscraft: vadopt mob=minecraft:zombie id=12 group=zombie p=0.40 spawner=false health=27.2 tick=..
 //   soulscraft: vphase mob=minecraft:zombie id=12 attack=lunge phase=hit t=10 tick=..
 //   soulscraft: vstrike mob=minecraft:zombie id=12 attack=lunge t=10 tick=.. hit=true target=sc_a
+#[allow(unused_imports)]
+use super::soulscraft_compat::*;
 use crate::game::Game;
-use crate::mod_api::NativeServerPlayer;
 use horizon_client::mobs::finalize::{self, Attr, Op};
 use horizon_client::mobs::goals::{Cx, Goal, JUMP, LOOK, MOVE};
 use horizon_client::mobs::{Mob, Who};
-use soulscraft_rules::{
+use soulscraft::rules::{
     attack::Phase,
     brain::{Event, Order, Strike},
     cover::{self, Threat},
@@ -262,8 +263,8 @@ fn is_wave(id: u32, tags: &[String]) -> bool {
 }
 
 fn adopt(game: &mut Game<'_>, dim: &str, now: u64, m: &Seen, g: &VanillaDef, players: &[&NativeServerPlayer]) {
-    let entity = game.native_entity(m.id);
-    let tags = entity.and_then(|e| game.native_entity_tags(e)).unwrap_or_default();
+    let entity = game.sc_entity(m.id);
+    let tags = entity.and_then(|e| game.sc_entity_tags(e)).unwrap_or_default();
     if is_wave(m.id, &tags) {
         state().skipped.insert(m.id);
         return;
@@ -273,7 +274,7 @@ fn adopt(game: &mut Game<'_>, dim: &str, now: u64, m: &Seen, g: &VanillaDef, pla
     let marked = tags.iter().any(|t| t == TAG_FRESH);
     let fresh = tagged.is_none() || marked;
     if marked && let Some(e) = entity {
-        game.native_entity_remove_tag(e, TAG_FRESH);
+        game.sc_entity_remove_tag(e, TAG_FRESH);
     }
     let p = match tagged {
         Some(p) => scale::clamp_p(p),
@@ -281,7 +282,7 @@ fn adopt(game: &mut Game<'_>, dim: &str, now: u64, m: &Seen, g: &VanillaDef, pla
             let near: Vec<_> = players.iter().map(|p| (p.position, p.uuid)).collect();
             let p = crate::game::soulscraft_power::power_here(game, m.pos, &near);
             if let Some(e) = entity {
-                game.native_entity_add_tag(e, &format!("{TAG_P}{p:.2}"));
+                game.sc_entity_add_tag(e, &format!("{TAG_P}{p:.2}"));
             }
             p
         }
@@ -290,7 +291,7 @@ fn adopt(game: &mut Game<'_>, dim: &str, now: u64, m: &Seen, g: &VanillaDef, pla
         let radius = crate::game::soulscraft_server::state().data.vanilla.spawner_radius_blocks;
         let near = spawner_near(game, m.pos, radius);
         if near && let Some(e) = entity {
-            game.native_entity_add_tag(e, TAG_SPAWNER);
+            game.sc_entity_add_tag(e, TAG_SPAWNER);
         }
         near
     } else {
@@ -340,7 +341,7 @@ fn spawner_near(game: &Game<'_>, at: V3, radius: i32) -> bool {
     for dy in -2..=2 {
         for dx in -radius..=radius {
             for dz in -radius..=radius {
-                let b = game.native_block([c[0] + dx, c[1] + dy, c[2] + dz]);
+                let b = game.sc_block([c[0] + dx, c[1] + dy, c[2] + dz]);
                 if b.ends_with("spawner") && b.contains("minecraft:") {
                     return true;
                 }
@@ -478,7 +479,7 @@ fn tick_mob(
             size: m.size,
             answer: v.answer.take(),
         };
-        (sense, Scaled::at(&soulscraft_rules::data::Stats::default(), v.p).decide_every)
+        (sense, Scaled::at(&soulscraft::rules::data::Stats::default(), v.p).decide_every)
     };
     let mut sense = sense;
     if let Some(t) = target
@@ -546,7 +547,7 @@ fn hold(game: &mut Game<'_>, dim: &str, id: u32, tick: &VTick) {
     }
     if tick.control && was & MOVE == 0 {
         // Taken over: vanilla's path ends now (its goals stop on their next tick).
-        game.native_mob_stop(dim, id);
+        game.sc_mob_stop(dim, id);
         if let Some(v) = state().mobs.get_mut(&id) {
             v.path = None;
         }
@@ -576,7 +577,7 @@ fn drive(game: &mut Game<'_>, dim: &str, now: u64, m: &Seen, tick: &VTick, slide
         return;
     }
     if let Some(at) = tick.look_at {
-        game.native_mob_look_at(dim, m.id, at);
+        game.sc_mob_look_at(dim, m.id, at);
     }
     let path = state().mobs.get(&m.id).and_then(|v| v.path);
     let path = match tick.order {
@@ -586,8 +587,8 @@ fn drive(game: &mut Game<'_>, dim: &str, now: u64, m: &Seen, tick: &VTick, slide
         }
         Order::Walk { to, speed } => {
             let stale = path.is_none_or(|(at, when)| geom::dist(at, to) > 1.5 || now - when >= REPATH_EVERY);
-            if stale || !game.native_mob_navigating(dim, m.id) {
-                game.native_mob_navigate(dim, m.id, to, 0, speed);
+            if stale || !game.sc_mob_navigating(dim, m.id) {
+                game.sc_mob_navigate(dim, m.id, to, 0, speed);
                 Some((to, now))
             } else {
                 path
@@ -610,7 +611,7 @@ fn drive(game: &mut Game<'_>, dim: &str, now: u64, m: &Seen, tick: &VTick, slide
 /// goal tick). Each tick, because vanilla's goals of the mob may still be ticking this one. `slide`
 /// also stops what is left of a cube's own hop along the ground and in the air.
 fn stand(game: &mut Game<'_>, dim: &str, id: u32, slide: bool) {
-    game.native_mob_stop(dim, id);
+    game.sc_mob_stop(dim, id);
     let Some(m) = crate::game::soulscraft_find::mob_mut(game, id) else { return };
     m.ai.mov.operation = horizon_client::mobs::control::Operation::Wait;
     m.ai.zza = 0.0;
@@ -663,7 +664,7 @@ fn deal(game: &mut Game<'_>, dim: &str, now: u64, m: &Seen, g: &VanillaDef, stri
     }
     if let Some(radius) = strike.area {
         let near: Vec<u32> = game
-            .native_server_players()
+            .sc_server_players()
             .into_iter()
             .filter(|p| p.dimension == dim && p.health > 0.0 && geom::dist(p.position, m.pos) <= radius)
             .map(|p| p.entity_id as u32)
@@ -703,7 +704,7 @@ fn blow(game: &mut Game<'_>, dim: &str, mob: u32, target: u32, mult: f64, series
     if let Some(m) = game.mobs.get_mut(i) {
         m.swing();
     }
-    let ok = game.native_mob_attack(dim, mob, target);
+    let ok = game.sc_mob_attack(dim, mob, target);
     if let Some(m) = crate::game::soulscraft_find::mob_mut(game, mob) {
         m.attrs.attack_damage = was;
     }
@@ -734,11 +735,11 @@ fn throw(game: &mut Game<'_>, dim: &str, m: &Seen, tg: &Target, kind: &str, dama
         "trident" => format!("{{{motion},pickup:0b}}"),
         _ => format!("{{{motion},damage:{:.4}d,pickup:0b}}", damage / speed),
     };
-    let nbt = match crate::mod_api::parse_snbt(&snbt) {
-        Ok((crate::mod_api::Tag::Compound(c), _)) => c,
+    let nbt = match horizon_core::nbt::parse_snbt(&snbt) {
+        Ok((horizon_core::nbt::Tag::Compound(c), _)) => c,
         _ => return false,
     };
-    if game.native_summon(dim, entity, from, nbt).is_some() {
+    if game.sc_summon(dim, entity, from, nbt).is_some() {
         return true;
     }
     // The engine gives no id back for a projectile (`native_summon` finds its root among mobs and a
@@ -747,7 +748,7 @@ fn throw(game: &mut Game<'_>, dim: &str, m: &Seen, tg: &Target, kind: &str, dama
         "execute in {dim} if entity @e[type={entity},x={:.2},y={:.2},z={:.2},distance=..2.5]",
         from[0], from[1], from[2]
     );
-    game.native_run_command_captured(&probe).result > 0
+    game.sc_run_command_captured(&probe).result > 0
 }
 
 /// Vanilla's witch picks by the target (`Witch.performRangedAttack`); without the target's effects
@@ -765,7 +766,7 @@ fn potion_for(d: f64) -> &'static str {
 /// The mind's question: a standing spot above the target (skeletons) or one the target cannot see
 /// (cover), the nearest of those within the group's search radius.
 fn find_spot(game: &Game<'_>, m: &Seen, g: &VanillaDef, t: &Target, want: Want) -> Option<V3> {
-    let boxes = |c: [i32; 3]| game.native_block_collision(c);
+    let boxes = |c: [i32; 3]| game.sc_block_collision(c);
     let base = [m.pos[0].floor() + 0.5, m.pos[1].floor(), m.pos[2].floor() + 0.5];
     let (k, ys): (i32, Vec<f64>) = match want {
         Want::HighSpot => {
@@ -857,10 +858,10 @@ fn forget_gone(dim: &str, now: u64) {
 /// `/sc debug on`: the labels of vanilla mobs (no clip: vanilla draws them).
 fn send_labels(game: &mut Game<'_>, dim: &str, now: u64, notes: Vec<wire::Note>) {
     let messages = wire::encode(&wire::Batch { now: now as i64, notes });
-    let everyone: Vec<u128> = game.native_server_players().into_iter().filter(|p| p.dimension == dim).map(|p| p.uuid).collect();
+    let everyone: Vec<u128> = game.sc_server_players().into_iter().filter(|p| p.dimension == dim).map(|p| p.uuid).collect();
     for uuid in everyone {
         for bytes in &messages {
-            let _ = game.native_net_send_to_player(uuid, wire::STATE, bytes);
+            let _ = game.sc_net_send_to_player(uuid, wire::STATE, bytes);
         }
     }
 }

@@ -8,10 +8,12 @@
 // The site and the event's test timing are constants here, for other mods' scenarios (RustCraft's
 // turrets against a wave, `rustcraft_testkit turret`): a wave of `TEST_WAVE` zombies telegraphed
 // `TEST_TELEGRAPH` ticks, rests of `TEST_REST`, the stand-in participant at `STAND_IN`.
+#[allow(unused_imports)]
+use super::soulscraft_compat::*;
 use crate::game::Game;
 use crate::game::soulscraft_altar as altar;
 use crate::game::soulscraft_event::{self as event, Overrides};
-use soulscraft_rules::{
+use soulscraft::rules::{
     altar::{self as ra, AltarFile},
     defense::{Goal, Role},
     event::SpawnMob,
@@ -86,14 +88,14 @@ pub(super) fn centre(c: [i32; 3]) -> V3 {
 }
 
 fn cmd(game: &mut Game<'_>, line: &str) {
-    if !game.native_run_command(line) {
+    if !game.sc_run_command(line) {
         log::warn!("soulscraft: selftest command refused: {line}");
     }
 }
 
 pub(super) fn set(game: &mut Game<'_>, c: [i32; 3], state: &str) {
     let p = at(c);
-    game.native_run_command(&format!("setblock {} {} {} {state}", p[0], p[1], p[2]));
+    game.sc_run_command(&format!("setblock {} {} {} {state}", p[0], p[1], p[2]));
 }
 
 /// The event zone (3 × 3 chunks round the core's chunk) loaded for the self-test.
@@ -110,7 +112,7 @@ pub(super) fn forceload(game: &mut Game<'_>, on: bool) {
     if on {
         cmd(game, &line);
     } else {
-        game.native_run_command(&line);
+        game.sc_run_command(&line);
     }
 }
 
@@ -118,7 +120,7 @@ pub(super) fn forceload(game: &mut Game<'_>, on: bool) {
 pub(super) fn clear_site(game: &mut Game<'_>) {
     let (x0, z0, x1, z1) = (CORE[0] - PLATFORM, CORE[2] - PLATFORM, CORE[0] + PLATFORM, CORE[2] + PLATFORM);
     let y = CORE[1];
-    game.native_run_command(&format!(
+    game.sc_run_command(&format!(
         "kill @e[x={},y={},z={},dx={},dy=24,dz={},type=!player]",
         x0 - 8,
         y - 6,
@@ -126,8 +128,8 @@ pub(super) fn clear_site(game: &mut Game<'_>) {
         2 * PLATFORM + 16,
         2 * PLATFORM + 16
     ));
-    game.native_run_command(&format!("fill {x0} {y} {z0} {x1} {} {z1} air", y + CLEAR_UP));
-    game.native_run_command(&format!("fill {x0} {} {z0} {x1} {} {z1} stone", y - 1, y - 1));
+    game.sc_run_command(&format!("fill {x0} {y} {z0} {x1} {} {z1} air", y + CLEAR_UP));
+    game.sc_run_command(&format!("fill {x0} {} {z0} {x1} {} {z1} stone", y - 1, y - 1));
 }
 
 fn site_ready(game: &mut Game<'_>) {
@@ -141,7 +143,7 @@ pub(super) fn cleanup(game: &mut Game<'_>, now: u64) {
     if let Some(c) = CASE.lock().unwrap_or_else(PoisonError::into_inner).take()
         && let Some(g) = c.golem
     {
-        game.native_remove_mob(DIM, g);
+        game.sc_remove_mob(DIM, g);
     }
     clear_site(game);
     altar::forget_all(DIM);
@@ -166,7 +168,7 @@ pub(super) fn level(game: &mut Game<'_>, now: u64) -> Option<(u32, u32, bool, Ve
 
 pub(super) fn items_near(game: &Game<'_>, c: [i32; 3], item: &str, r: f64) -> u32 {
     let p = centre(at(c));
-    game.native_item_entities(DIM, [p[0] - r, p[1] - 2.0, p[2] - r], [p[0] + r, p[1] + 4.0, p[2] + r])
+    game.sc_item_entities(DIM, [p[0] - r, p[1] - 2.0, p[2] - r], [p[0] + r, p[1] + 4.0, p[2] + r])
         .iter()
         .filter(|e| &*e.stack.item == item)
         .map(|e| e.stack.count)
@@ -174,12 +176,12 @@ pub(super) fn items_near(game: &Game<'_>, c: [i32; 3], item: &str, r: f64) -> u3
 }
 
 pub(super) fn golem(game: &mut Game<'_>, c: [i32; 3]) -> Option<u32> {
-    let Ok((crate::mod_api::Tag::Compound(nbt), _)) =
-        crate::mod_api::parse_snbt("{NoAI:1b,Invulnerable:1b,PersistenceRequired:1b}")
+    let Ok((horizon_core::nbt::Tag::Compound(nbt), _)) =
+        horizon_core::nbt::parse_snbt("{NoAI:1b,Invulnerable:1b,PersistenceRequired:1b}")
     else {
         return None;
     };
-    game.native_summon(DIM, "minecraft:iron_golem", centre(at(c)), nbt)
+    game.sc_summon(DIM, "minecraft:iron_golem", centre(at(c)), nbt)
 }
 
 fn zombies(n: usize) -> Vec<SpawnMob> {
@@ -263,10 +265,10 @@ fn levels(game: &mut Game<'_>, now: u64, t: u64, c: &mut Case) -> Option<Result<
         }
         if k == 2 {
             let corner = at([2, 2, 2]);
-            let part = game.native_block_property(corner, "part");
-            let on_slab = game.native_block_property(at([2, 1, 2]), "on_slab");
-            let facing = game.native_block_property(at([-2, 1, 0]), "facing");
-            let top = game.native_block(at([-2, 2, 0]));
+            let part = game.sc_block_property(corner, "part");
+            let on_slab = game.sc_block_property(at([2, 1, 2]), "on_slab");
+            let facing = game.sc_block_property(at([-2, 1, 0]), "facing");
+            let top = game.sc_block(at([-2, 2, 0]));
             if part.as_deref() != Some("top") || on_slab.as_deref() != Some("true") {
                 return Some(Err(format!("pillar top {part:?}, bottom on_slab {on_slab:?}")));
             }
@@ -275,7 +277,7 @@ fn levels(game: &mut Game<'_>, now: u64, t: u64, c: &mut Case) -> Option<Result<
             }
         }
         if k == 4 {
-            let top = game.native_block_property(at([4, 3, 4]), "part");
+            let top = game.sc_block_property(at([4, 3, 4]), "part");
             return Some(if top.as_deref() == Some("top") { Ok(()) } else { Err(format!("obelisk top {top:?}")) });
         }
     }
@@ -299,7 +301,7 @@ fn break_drops(game: &mut Game<'_>, now: u64, t: u64, c: &mut Case) -> Option<Re
             let (lv, ..) = level(game, now)?;
             let slabs = items_near(game, [1, 0, -2], "soulscraft:altar_slab", 2.0);
             let pillars = items_near(game, [2, 1, 2], "soulscraft:altar_pillar", 2.5);
-            let bottom = game.native_block(at([2, 1, 2]));
+            let bottom = game.sc_block(at([2, 1, 2]));
             c.note = format!("level {lv}, slabs {slabs}, pillars {pillars}, bottom {bottom}");
             return Some(if lv == 1 && slabs == 1 && pillars == 1 && bottom == "minecraft:air" { Ok(()) } else { Err(c.note.clone()) });
         }
@@ -404,14 +406,14 @@ fn waves_win(game: &mut Game<'_>, now: u64, t: u64, c: &mut Case) -> Option<Resu
             return None;
         }
         for id in &ids {
-            let tags = game.native_entity(*id).and_then(|e| game.native_entity_tags(e)).unwrap_or_default();
+            let tags = game.sc_entity(*id).and_then(|e| game.sc_entity_tags(e)).unwrap_or_default();
             let xp: Vec<&String> = tags.iter().filter(|t| t.starts_with("pct.xp")).collect();
             if xp.len() != 1 || xp[0] != "pct.xp100" {
                 return Some(Err(format!("zombie {id} experience tags {xp:?}")));
             }
         }
         for id in ids {
-            game.native_kill_mob(DIM, id);
+            game.sc_kill_mob(DIM, id);
             c.count += 1;
         }
         c.phase += 1;
@@ -509,11 +511,11 @@ fn rebuild(game: &mut Game<'_>, now: u64, t: u64, c: &mut Case) -> Option<Result
             c.probe.push([s.open_from.map_or(-1, |d| d as i32), 0, 0]);
             // A wall across the way from the east, 9 wide, 3 high, put up over 3 ticks.
             let p = at([6, 0, -4]);
-            game.native_run_command(&format!("fill {} {} {} {} {} {} cobblestone", p[0], p[1], p[2], p[0], p[1] + 2, p[2] + 2));
+            game.sc_run_command(&format!("fill {} {} {} {} {} {} cobblestone", p[0], p[1], p[2], p[0], p[1] + 2, p[2] + 2));
         }
         7 | 8 => {
             let p = at([6, 0, if t == 7 { -1 } else { 2 }]);
-            game.native_run_command(&format!("fill {} {} {} {} {} {} cobblestone", p[0], p[1], p[2], p[0], p[1] + 2, p[2] + 2));
+            game.sc_run_command(&format!("fill {} {} {} {} {} {} cobblestone", p[0], p[1], p[2], p[0], p[1] + 2, p[2] + 2));
         }
         9..=60 => {
             let s = event::snapshot(DIM, CORE, Some(probe))?;
@@ -567,7 +569,7 @@ fn intercept(game: &mut Game<'_>, now: u64, t: u64, c: &mut Case) -> Option<Resu
             if goal != Goal::Altar {
                 return Some(Err(format!("before anyone came near: {goal:?}")));
             }
-            game.native_teleport_mob("minecraft:overworld", g, toward(zpos, 3.0));
+            game.sc_teleport_mob("minecraft:overworld", g, toward(zpos, 3.0));
             c.phase = 1;
             c.since = now;
         }
@@ -576,7 +578,7 @@ fn intercept(game: &mut Game<'_>, now: u64, t: u64, c: &mut Case) -> Option<Resu
                 return Some(Err(format!("a participant 3 blocks off: {goal:?}")));
             }
             let far = toward(zpos, 17.5);
-            game.native_teleport_mob("minecraft:overworld", g, far);
+            game.sc_teleport_mob("minecraft:overworld", g, far);
             c.phase = 2;
             c.since = now;
         }
@@ -584,8 +586,8 @@ fn intercept(game: &mut Game<'_>, now: u64, t: u64, c: &mut Case) -> Option<Resu
             if goal != Goal::Altar {
                 return Some(Err(format!("the participant 17.5 blocks off: {goal:?}")));
             }
-            game.native_teleport_mob("minecraft:overworld", g, toward(zpos, 10.0));
-            game.native_hurt_entity("minecraft:overworld", zid, 1.0, "minecraft:mob_attack", Some(g));
+            game.sc_teleport_mob("minecraft:overworld", g, toward(zpos, 10.0));
+            game.sc_hurt_entity("minecraft:overworld", zid, 1.0, "minecraft:mob_attack", Some(g));
             c.phase = 3;
             c.since = now;
         }
@@ -641,7 +643,7 @@ fn ring_wall(game: &mut Game<'_>, r: i32, block: &str) {
     let (x0, z0, x1, z1) = (CORE[0] - r, CORE[2] - r, CORE[0] + r, CORE[2] + r);
     let (y0, y1) = (CORE[1], CORE[1] + 2);
     for (a, b) in [((x0, z0), (x1, z0)), ((x0, z1), (x1, z1)), ((x0, z0), (x0, z1)), ((x1, z0), (x1, z1))] {
-        game.native_run_command(&format!("fill {} {y0} {} {} {y1} {} {block}", a.0, a.1, b.0, b.1));
+        game.sc_run_command(&format!("fill {} {y0} {} {} {y1} {} {block}", a.0, a.1, b.0, b.1));
     }
 }
 
@@ -681,12 +683,12 @@ fn breach(game: &mut Game<'_>, now: u64, t: u64, c: &mut Case) -> Option<Result<
                 // Some blocks broken: none dropped, and the «player» builds on the first place.
                 let p = broke[0];
                 let dropped = game
-                    .native_item_entities(DIM, [f64::from(p[0]) - 3.0, f64::from(p[1]) - 1.0, f64::from(p[2]) - 3.0], [f64::from(p[0]) + 4.0, f64::from(p[1]) + 4.0, f64::from(p[2]) + 4.0])
+                    .sc_item_entities(DIM, [f64::from(p[0]) - 3.0, f64::from(p[1]) - 1.0, f64::from(p[2]) - 3.0], [f64::from(p[0]) + 4.0, f64::from(p[1]) + 4.0, f64::from(p[2]) + 4.0])
                     .len();
                 if dropped > 0 {
                     return Some(Err(format!("{dropped} items dropped by the breach")));
                 }
-                game.native_run_command(&format!("setblock {} {} {} oak_planks", p[0], p[1], p[2]));
+                game.sc_run_command(&format!("setblock {} {} {} oak_planks", p[0], p[1], p[2]));
                 c.probe = broke.clone();
                 c.phase = 1;
                 c.since = now;
@@ -695,8 +697,8 @@ fn breach(game: &mut Game<'_>, now: u64, t: u64, c: &mut Case) -> Option<Result<
             if c.phase == 1 && now - c.since >= 3 {
                 let all = broke;
                 event::stop(game, DIM, CORE, now);
-                let kept = game.native_block(all[0]);
-                let back = all[1..].iter().filter(|p| game.native_block(**p) == "minecraft:cobblestone").count();
+                let kept = game.sc_block(all[0]);
+                let back = all[1..].iter().filter(|p| game.sc_block(**p) == "minecraft:cobblestone").count();
                 let rec = event::records();
                 return Some(if kept == "minecraft:oak_planks" && back == all.len() - 1 && has(&rec, "restored") {
                     Ok(())
@@ -713,7 +715,7 @@ fn breach(game: &mut Game<'_>, now: u64, t: u64, c: &mut Case) -> Option<Result<
 /// `blocks` from `from` toward the core, on the ground.
 fn toward(from: V3, blocks: f64) -> V3 {
     let c = centre(CORE);
-    let d = soulscraft_rules::geom::flat_dir(from, c);
+    let d = soulscraft::rules::geom::flat_dir(from, c);
     [from[0] + d[0] * blocks, from[1], from[2] + d[2] * blocks]
 }
 
@@ -722,8 +724,8 @@ fn mob_pos(game: &Game<'_>, id: u32) -> Option<V3> {
 }
 
 fn fits_here(game: &Game<'_>, at: V3, width: f64, height: f64) -> bool {
-    let boxes = |c: [i32; 3]| game.native_block_collision(c);
-    soulscraft_rules::fit::fits(at, width, height, &boxes)
+    let boxes = |c: [i32; 3]| game.sc_block_collision(c);
+    soulscraft::rules::fit::fits(at, width, height, &boxes)
 }
 
 /// Round 9: a brute asked for under a ceiling 3 blocks over the floor (its box is 3.2) appears
@@ -732,7 +734,7 @@ fn fit_ceiling(game: &mut Game<'_>, t: u64, c: &mut Case) -> Option<Result<(), S
     let spot = at([8, 0, 0]);
     match t {
         1 => {
-            game.native_run_command(&format!("fill {} {} {} {} {} {} stone", spot[0] - 2, spot[1] + 3, spot[2] - 2, spot[0] + 2, spot[1] + 3, spot[2] + 2));
+            game.sc_run_command(&format!("fill {} {} {} {} {} {} stone", spot[0] - 2, spot[1] + 3, spot[2] - 2, spot[0] + 2, spot[1] + 3, spot[2] + 2));
         }
         3 => {
             c.golem = crate::game::soulscraft_tools::summon(game, DIM, "brute", centre(spot), 0.0, 0);
@@ -760,7 +762,7 @@ fn fit_roof(game: &mut Game<'_>, t: u64, c: &mut Case) -> Option<Result<(), Stri
     let spot = at([-8, 0, 0]);
     match t {
         1 => {
-            game.native_run_command(&format!("fill {} {} {} {} {} {} stone", spot[0] - 2, spot[1] + 1, spot[2] - 2, spot[0] + 2, spot[1] + 1, spot[2] + 2));
+            game.sc_run_command(&format!("fill {} {} {} {} {} {} stone", spot[0] - 2, spot[1] + 1, spot[2] - 2, spot[0] + 2, spot[1] + 1, spot[2] + 2));
         }
         3 => {
             c.golem = event::spawn_one(game, DIM, &zombies(1)[0], centre(spot), 0.0);
@@ -785,7 +787,7 @@ fn rebuild_altar(game: &mut Game<'_>, now: u64, t: u64) -> Option<Result<(), Str
         1 => build(game, 2),
         5 => {
             let (x0, z0, x1, z1) = (CORE[0] - 3, CORE[2] - 3, CORE[0] + 3, CORE[2] + 3);
-            game.native_run_command(&format!("fill {x0} {} {z0} {x1} {} {z1} air", CORE[1], CORE[1] + 3));
+            game.sc_run_command(&format!("fill {x0} {} {z0} {x1} {} {z1} air", CORE[1], CORE[1] + 3));
             build(game, 2);
         }
         10 => {
@@ -801,8 +803,8 @@ fn rebuild_altar(game: &mut Game<'_>, now: u64, t: u64) -> Option<Result<(), Str
 /// A water column 3 deep under the platform, closed on every side and on top, at `c`.
 fn water_column(game: &mut Game<'_>, c: [i32; 3]) {
     let p = at(c);
-    game.native_run_command(&format!("fill {} {} {} {} {} {} stone", p[0] - 1, p[1] - 5, p[2] - 1, p[0] + 1, p[1] - 1, p[2] + 1));
-    game.native_run_command(&format!("fill {} {} {} {} {} {} water", p[0], p[1] - 4, p[2], p[0], p[1] - 2, p[2]));
+    game.sc_run_command(&format!("fill {} {} {} {} {} {} stone", p[0] - 1, p[1] - 5, p[2] - 1, p[0] + 1, p[1] - 1, p[2] + 1));
+    game.sc_run_command(&format!("fill {} {} {} {} {} {} water", p[0], p[1] - 4, p[2], p[0], p[1] - 2, p[2]));
 }
 
 /// The zombie template turns a mob kept under water 900 ticks into a vanilla drowned
@@ -819,10 +821,10 @@ fn stays_lurker(game: &mut Game<'_>, t: u64, c: &mut Case) -> Option<Result<(), 
             let pa = at(a);
             let pb = at(b);
             let lurker = format!("{{Tags:[\"soulscraft.p=0.30\",\"soulscraft.fresh\"],PersistenceRequired:1b}}");
-            let Ok((crate::mod_api::Tag::Compound(nbt), _)) = crate::mod_api::parse_snbt(&lurker) else { return Some(Err("snbt".into())) };
-            c.golem = game.native_summon(DIM, "soulscraft:lurker", [f64::from(pa[0]) + 0.5, f64::from(pa[1]) - 4.0, f64::from(pa[2]) + 0.5], nbt);
-            let Ok((crate::mod_api::Tag::Compound(nbt), _)) = crate::mod_api::parse_snbt("{PersistenceRequired:1b}") else { return Some(Err("snbt".into())) };
-            let z = game.native_summon(DIM, "minecraft:zombie", [f64::from(pb[0]) + 0.5, f64::from(pb[1]) - 4.0, f64::from(pb[2]) + 0.5], nbt);
+            let Ok((horizon_core::nbt::Tag::Compound(nbt), _)) = horizon_core::nbt::parse_snbt(&lurker) else { return Some(Err("snbt".into())) };
+            c.golem = game.sc_summon(DIM, "soulscraft:lurker", [f64::from(pa[0]) + 0.5, f64::from(pa[1]) - 4.0, f64::from(pa[2]) + 0.5], nbt);
+            let Ok((horizon_core::nbt::Tag::Compound(nbt), _)) = horizon_core::nbt::parse_snbt("{PersistenceRequired:1b}") else { return Some(Err("snbt".into())) };
+            let z = game.sc_summon(DIM, "minecraft:zombie", [f64::from(pb[0]) + 0.5, f64::from(pb[1]) - 4.0, f64::from(pb[2]) + 0.5], nbt);
             c.probe = vec![[z.map_or(-1, |z| z as i32), 0, 0]];
             if c.golem.is_none() || z.is_none() {
                 return Some(Err("no lurker or no zombie".into()));
@@ -839,7 +841,7 @@ fn stays_lurker(game: &mut Game<'_>, t: u64, c: &mut Case) -> Option<Result<(), 
             if t >= 960 {
                 let m = game.mobs.iter().find(|m| m.id == id && !m.removed)?;
                 let kind = m.kind.id.clone();
-                let tags = game.native_entity(id).and_then(|e| game.native_entity_tags(e)).unwrap_or_default();
+                let tags = game.sc_entity(id).and_then(|e| game.sc_entity_tags(e)).unwrap_or_default();
                 let p_ok = tags.iter().any(|t| t == "soulscraft.p=0.30");
                 let pb = at(b);
                 let drowned = game.mobs.iter().any(|m| {
@@ -870,12 +872,12 @@ fn no_reinforcements(game: &mut Game<'_>, t: u64, c: &mut Case) -> Option<Result
                 _ => "normal",
             }
             .to_owned();
-            game.native_run_command("difficulty hard");
+            game.sc_run_command("difficulty hard");
         }
         3 => {
             c.golem = crate::game::soulscraft_tools::summon(game, DIM, "brute", centre(at(spot)), 0.0, 0);
-            let Ok((crate::mod_api::Tag::Compound(nbt), _)) = crate::mod_api::parse_snbt("{NoAI:1b,Invulnerable:1b,PersistenceRequired:1b}") else { return None };
-            let g = game.native_summon(DIM, "minecraft:iron_golem", centre(at([spot[0], spot[1], spot[2] + 3])), nbt);
+            let Ok((horizon_core::nbt::Tag::Compound(nbt), _)) = horizon_core::nbt::parse_snbt("{NoAI:1b,Invulnerable:1b,PersistenceRequired:1b}") else { return None };
+            let g = game.sc_summon(DIM, "minecraft:iron_golem", centre(at([spot[0], spot[1], spot[2] + 3])), nbt);
             c.probe = vec![[g.map_or(-1, |g| g as i32), 0, 0]];
         }
         6 => {
@@ -890,12 +892,12 @@ fn no_reinforcements(game: &mut Game<'_>, t: u64, c: &mut Case) -> Option<Result
             if let Some(m) = game.mobs.iter_mut().find(|m| m.id == id) {
                 m.invulnerable = 0;
             }
-            game.native_hurt_entity(DIM, id, 0.5, "minecraft:mob_attack", attacker);
+            game.sc_hurt_entity(DIM, id, 0.5, "minecraft:mob_attack", attacker);
         }
         60 => {
             let brutes = game.mobs.iter().filter(|m| !m.removed && m.alive() && m.kind.id == "soulscraft:brute").count();
             let back = c.note.clone();
-            game.native_run_command(&format!("difficulty {back}"));
+            game.sc_run_command(&format!("difficulty {back}"));
             return Some(if brutes == 1 { Ok(()) } else { Err(format!("{brutes} brutes after 40 hits on Hard")) });
         }
         _ => {}
@@ -935,9 +937,9 @@ fn intercept_walled(game: &mut Game<'_>, now: u64, t: u64, c: &mut Case) -> Opti
     match c.phase {
         0 => {
             // A sealed box 5 × 5 × 5 six blocks ahead of the zombie, on its way to the altar.
-            let d = soulscraft_rules::geom::flat_dir(zpos, centre(CORE));
+            let d = soulscraft::rules::geom::flat_dir(zpos, centre(CORE));
             let b = [(zpos[0] + d[0] * 6.0).floor() as i32, CORE[1], (zpos[2] + d[2] * 6.0).floor() as i32];
-            game.native_run_command(&format!("fill {} {} {} {} {} {} stone hollow", b[0] - 2, b[1] - 1, b[2] - 2, b[0] + 2, b[1] + 3, b[2] + 2));
+            game.sc_run_command(&format!("fill {} {} {} {} {} {} stone hollow", b[0] - 2, b[1] - 1, b[2] - 2, b[0] + 2, b[1] + 3, b[2] + 2));
             c.probe = vec![b];
             c.count = s.builds;
             c.phase = 1;
@@ -947,22 +949,22 @@ fn intercept_walled(game: &mut Game<'_>, now: u64, t: u64, c: &mut Case) -> Opti
         1 if s.builds > c.count || now - c.since >= 60 => {
             let b = c.probe.first().copied()?;
             c.count = 0;
-            game.native_teleport_mob(DIM, g, [f64::from(b[0]) + 0.5, f64::from(b[1]), f64::from(b[2]) + 0.5]);
+            game.sc_teleport_mob(DIM, g, [f64::from(b[0]) + 0.5, f64::from(b[1]), f64::from(b[2]) + 0.5]);
             c.phase = 2;
             c.since = now;
         }
         2 => {
             let gpos = game.mobs.iter().find(|m| m.id == g).map(|m| [m.position.x, m.position.y, m.position.z])?;
             if goal == Goal::Player(g) {
-                return Some(Err(format!("pulled through the wall from {:.1} blocks", soulscraft_rules::geom::dist(gpos, zpos))));
+                return Some(Err(format!("pulled through the wall from {:.1} blocks", soulscraft::rules::geom::dist(gpos, zpos))));
             }
-            if soulscraft_rules::geom::dist(gpos, zpos) <= 6.0 {
+            if soulscraft::rules::geom::dist(gpos, zpos) <= 6.0 {
                 c.count += 1;
                 if c.note.is_empty() {
                     if let Some(m) = game.mobs.iter_mut().find(|m| m.id == zid) {
                         m.invulnerable = 0;
                     }
-                    if !game.native_hurt_entity(DIM, zid, 0.5, "minecraft:on_fire", None) {
+                    if !game.sc_hurt_entity(DIM, zid, 0.5, "minecraft:on_fire", None) {
                         return Some(Err("the fire on the zombie did not land".into()));
                     }
                     c.note = "burnt".into();
@@ -1089,8 +1091,8 @@ fn skeleton_group(game: &mut Game<'_>, now: u64, t: u64, c: &mut Case) -> Option
 /// A stand-in with a P tag (a player's P in a bench without players).
 fn tagged_golem(game: &mut Game<'_>, c: [i32; 3], p: f64) -> Option<u32> {
     let snbt = format!("{{NoAI:1b,Invulnerable:1b,PersistenceRequired:1b,Tags:[\"{}{p:.2}\"]}}", event::P_TAG);
-    let Ok((crate::mod_api::Tag::Compound(nbt), _)) = crate::mod_api::parse_snbt(&snbt) else { return None };
-    game.native_summon(DIM, "minecraft:iron_golem", centre(at(c)), nbt)
+    let Ok((horizon_core::nbt::Tag::Compound(nbt), _)) = horizon_core::nbt::parse_snbt(&snbt) else { return None };
+    game.sc_summon(DIM, "minecraft:iron_golem", centre(at(c)), nbt)
 }
 
 /// The event's P is the mean of all its participants at the start (0.7.0, 06-altar.md): two
@@ -1199,7 +1201,7 @@ fn hardcore_spare(game: &mut Game<'_>, now: u64, t: u64, c: &mut Case) -> Option
     // From where the participant stood, beside the altar.
     let to = event::outside_zone(game, CORE, &flow, centre(at(STAND_IN)));
     let feet = [to[0].floor() as i32, to[1].floor() as i32, to[2].floor() as i32];
-    let free = |p: [i32; 3]| matches!(game.native_block(p).as_str(), "minecraft:air" | "minecraft:cave_air");
+    let free = |p: [i32; 3]| matches!(game.sc_block(p).as_str(), "minecraft:air" | "minecraft:cave_air");
     let floor = !free([feet[0], feet[1] - 1, feet[2]]) && free(feet) && free([feet[0], feet[1] + 1, feet[2]]);
     let outside = !flow.in_zone(CORE, to[0], to[2]);
     let gone = event::events().get(&(DIM.to_owned(), CORE)).is_some_and(|r| r.out.contains(&GHOST));
@@ -1254,10 +1256,10 @@ fn restore_orphans(game: &mut Game<'_>, now: u64, t: u64) -> Option<Result<(), S
         1 => build(game, 1),
         5 => {
             level(game, now)?;
-            if game.native_block(wall) != "minecraft:air" {
-                return Some(Err(format!("the wall's place holds {}", game.native_block(wall))));
+            if game.sc_block(wall) != "minecraft:air" {
+                return Some(Err(format!("the wall's place holds {}", game.sc_block(wall))));
             }
-            let mut b = soulscraft_rules::defense::Breaches::default();
+            let mut b = soulscraft::rules::defense::Breaches::default();
             b.record(wall, "minecraft:cobblestone");
             altar::set_core_lines(game, CORE, altar::BREACHED_KEY, &b.to_lines());
             if altar::core_lines(game, CORE, altar::BREACHED_KEY).is_empty() {
@@ -1266,7 +1268,7 @@ fn restore_orphans(game: &mut Game<'_>, now: u64, t: u64) -> Option<Result<(), S
             event::restore_orphans(game, DIM, CORE);
         }
         6 => {
-            let block = game.native_block(wall);
+            let block = game.sc_block(wall);
             let left = altar::core_lines(game, CORE, altar::BREACHED_KEY);
             let rec = has(&event::records(), "restored blocks=1");
             return Some(if block == "minecraft:cobblestone" && left.is_empty() && rec {

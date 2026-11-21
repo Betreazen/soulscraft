@@ -1,6 +1,6 @@
 // Smart mobs take cover from attack turrets (round 1; RustCraft's `rustcraft:turret`, whose block
 // entity says `role` "attack" or "support" — only attack turrets shoot, so only they count;
-// soulscraft_rules::cover decides). A SoulsCraft mob outside an altar's event that an attack
+// soulscraft::rules::cover decides). A SoulsCraft mob outside an altar's event that an attack
 // turret within its range sees walks to the nearest spot within `cover.search_blocks` where its
 // box fits and no turret sees it, stays there `cover.hold_ticks`, then its own mind takes over
 // again. Turrets are found through the level's mod block entities near the mob
@@ -12,10 +12,12 @@
 // sees its target, and other threats (players with bows) in the same list.
 //
 // Log line: soulscraft: cover mob=revenant id=12 from=-706,101,700 to=-697.5,101.0,700.5 tick=..
+#[allow(unused_imports)]
+use super::soulscraft_compat::*;
 use crate::game::Game;
 use horizon_client::containers::BlockEntity;
-use horizon_world::nbt::{JavaString, Tag};
-use soulscraft_rules::{
+use horizon_core::nbt::{JavaString, Tag};
+use soulscraft::rules::{
     cover::{self, CoverRules, Threat},
     fit,
     geom::{self, V3},
@@ -54,7 +56,7 @@ pub(super) fn threats(game: &Game<'_>, at: V3, reach: f64, range: f64) -> Vec<Th
     let near: Vec<(i32, i32, i32)> = game.world.block_entities.mods_near(at[0], at[2], reach).copied().collect();
     near.into_iter()
         .filter_map(|p| match game.world.block_entities.get(&p) {
-            Some(BlockEntity::Mod(m)) if m.id == TURRET && role(&m.nbt).as_deref() == Some("attack") => {
+            Some(BlockEntity::Mod(m)) if m.id() == TURRET && role(&m.nbt).as_deref() == Some("attack") => {
                 Some(Threat { pos: [f64::from(p.0) + 0.5, f64::from(p.1) + MUZZLE, f64::from(p.2) + 0.5], range })
             }
             _ => None,
@@ -64,7 +66,7 @@ pub(super) fn threats(game: &Game<'_>, at: V3, reach: f64, range: f64) -> Vec<Th
 }
 
 /// A turret's `role` (RustCraft slice 8: "attack" or "support").
-pub(super) fn role(nbt: &horizon_world::nbt::Compound) -> Option<String> {
+pub(super) fn role(nbt: &horizon_core::nbt::Compound) -> Option<String> {
     match nbt.get(&JavaString::from(ROLE_KEY)) {
         Some(Tag::String(s)) => Some(s.to_string_lossy()),
         _ => None,
@@ -72,7 +74,7 @@ pub(super) fn role(nbt: &horizon_world::nbt::Compound) -> Option<String> {
 }
 
 fn solid(game: &Game<'_>, c: [i32; 3]) -> bool {
-    !game.native_block_collision(c).is_empty()
+    !game.sc_block_collision(c).is_empty()
 }
 
 pub(super) fn sees(game: &Game<'_>, from: V3, to: V3) -> bool {
@@ -88,7 +90,7 @@ pub(super) fn steer(game: &mut Game<'_>, dim: &str, now: u64, id: u32, pos: V3, 
     if let Some(spot) = s.spot {
         if s.until.is_none() && geom::flat_dist(pos, spot) < 0.6 {
             s.until = Some(now + r.hold_ticks);
-            game.native_mob_stop(dim, id);
+            game.sc_mob_stop(dim, id);
         }
         if s.until.is_some_and(|u| now >= u) {
             states().remove(&id);
@@ -96,7 +98,7 @@ pub(super) fn steer(game: &mut Game<'_>, dim: &str, now: u64, id: u32, pos: V3, 
         }
         if now < s.next_check {
             if s.until.is_none() && now.saturating_sub(s.walked) >= REPATH {
-                game.native_mob_navigate(dim, id, spot, 0, cover::COVER_SPEED);
+                game.sc_mob_navigate(dim, id, spot, 0, cover::COVER_SPEED);
                 s.walked = now;
             }
             states().insert(id, s);
@@ -134,7 +136,7 @@ pub(super) fn steer(game: &mut Game<'_>, dim: &str, now: u64, id: u32, pos: V3, 
                     spot[2]
                 );
             }
-            game.native_mob_navigate(dim, id, spot, 0, cover::COVER_SPEED);
+            game.sc_mob_navigate(dim, id, spot, 0, cover::COVER_SPEED);
             s.spot = Some(spot);
             s.until = None;
             s.walked = now;
@@ -151,7 +153,7 @@ pub(super) fn steer(game: &mut Game<'_>, dim: &str, now: u64, id: u32, pos: V3, 
 /// The block centres within `k` blocks of `pos` (a block up or down too) where a box `width` by
 /// `height` fits and stands on something: where a mob may take cover.
 pub(super) fn spots(game: &Game<'_>, pos: V3, k: i32, width: f64, height: f64) -> Vec<V3> {
-    let boxes = |c: [i32; 3]| game.native_block_collision(c);
+    let boxes = |c: [i32; 3]| game.sc_block_collision(c);
     let mut spots = Vec::new();
     for dy in -1..=1 {
         for dx in -k..=k {
@@ -170,7 +172,7 @@ pub(super) fn spots(game: &Game<'_>, pos: V3, k: i32, width: f64, height: f64) -
 /// within `scan` blocks up or down, where the box fits and stands on something (the marksman's
 /// posts). None when there is none.
 pub(super) fn ground(game: &Game<'_>, at: V3, scan: i32, width: f64, height: f64) -> Option<V3> {
-    let boxes = |c: [i32; 3]| game.native_block_collision(c);
+    let boxes = |c: [i32; 3]| game.sc_block_collision(c);
     let base = at[1].floor();
     (0..=scan)
         .flat_map(|d| [d, -d])

@@ -1,5 +1,5 @@
 // The altar's spawn boost on the server (06-altar.md, the altar's second role; prototype П4;
-// prototypes/p4-spawn.md; the rules are soulscraft_rules::boost, numbers data/altar.json
+// prototypes/p4-spawn.md; the rules are soulscraft::rules::boost, numbers data/altar.json
 // `spawn_boost`). No trait mod: three injections on natural spawning reach it from the bundle.
 //
 // - `spawning_chunks` (RETURN; game/natural_spawning.rs:739-748, `ChunkMap.collectSpawningChunks`
@@ -9,12 +9,12 @@
 //   global cap is untouched: the union's size (the return value) is the same. Side effect: the
 //   chunk's inhabited time grows `1 + passes` times as fast (:766-768), so its local difficulty
 //   rises sooner.
-// - `spawn_hooks` (RETURN; natural_spawning.rs:457-459, `!mods().is_empty()` on 7e4e421): true in a
-//   dimension with an active sector, so `mobs_at` asks `native_potential_spawns`
-//   (spawn_selection.rs:707-721, 1312-1331) there; elsewhere it stays as the engine says.
+// - `spawn_hooks` (`!mods().is_empty()`, game/mobs/natural_spawning.rs:882): SoulsCraft has a
+//   Hooks impl on the Mod API, so natural spawning asks `native_potential_spawns` everywhere and
+//   the bundle era's RETURN on it is gone.
 // - `potential_spawns` (HEAD, catalog hook v1, API 388; native_hooks.rs:6335-6356): a monster
 //   position in a sector gets the other biomes' monsters and SoulsCraft's land mobs, the kin
-//   banners' kin weighted up (soulscraft_rules::boost::extend).
+//   banners' kin weighted up (soulscraft::rules::boost::extend).
 //   The tier gate of natural spawns (soulscraft_natural, `tier_p` against the players' P) does
 //   not apply here: in a sector the altar calls its mobs, and an event's power is its group's.
 //
@@ -25,10 +25,12 @@
 // Log lines:
 //   soulscraft: boost core=-700,101,700 level=2 passes=1 centre=-38,49 age=1200 kin=[]   (on change)
 //   soulscraft: boost spawn passes=+18 lists=40 tick=..   (every 200 ticks while a sector is active)
+#[allow(unused_imports)]
+use super::soulscraft_compat::*;
 use crate::game::Game;
 use horizon_client::biome::SpawnEntry;
-use soulscraft_rules::altar as ra;
-use soulscraft_rules::boost::{self, Boost, BoostDef, Entry};
+use soulscraft::rules::altar as ra;
+use soulscraft::rules::boost::{self, Boost, BoostDef, Entry};
 use std::collections::{BTreeMap, HashMap};
 use std::sync::{LazyLock, Mutex, MutexGuard, PoisonError};
 
@@ -52,7 +54,7 @@ struct Table {
 static TABLE: LazyLock<Mutex<Table>> = LazyLock::new(Mutex::default);
 static DEF: LazyLock<BoostDef> = LazyLock::new(BoostDef::embedded);
 /// The mobs' kin and keys, as built (a spawn list is asked often: no copy of the live data each time).
-static MOBS: LazyLock<soulscraft_rules::data::MobsFile> = LazyLock::new(soulscraft_rules::data::MobsFile::embedded);
+static MOBS: LazyLock<soulscraft::rules::data::MobsFile> = LazyLock::new(soulscraft::rules::data::MobsFile::embedded);
 
 fn table() -> MutexGuard<'static, Table> {
     TABLE.lock().unwrap_or_else(PoisonError::into_inner)
@@ -145,11 +147,6 @@ pub(super) fn extra_for(dim: &str, candidates: &[(i32, i32)]) -> Vec<(i32, i32)>
     boost::extra_candidates(candidates, &sectors(dim))
 }
 
-/// `spawn_hooks` RETURN: true where a sector is active, so the spawn list is asked for.
-pub(super) fn spawn_hooks(dim: &str, value: bool) -> bool {
-    value || table().sectors.get(dim).is_some_and(|l| !l.is_empty())
-}
-
 /// `potential_spawns` HEAD: a monster position in a sector gets its extra entries.
 pub(super) fn on_potential_spawns(dimension: &str, category: &str, pos: [i32; 3], entries: &mut Vec<SpawnEntry>) {
     if category != "monster" {
@@ -191,5 +188,5 @@ pub(super) fn on_potential_spawns(dimension: &str, category: &str, pos: [i32; 3]
 /// The self-test's call of the engine's own hook point with a list, as natural spawning asks it.
 pub(super) fn ask_engine(game: &Game<'_>, dim: &str, pos: [i32; 3], entries: &mut Vec<SpawnEntry>) {
     let mut canceled = false;
-    game.native_potential_spawns(dim, "monster", pos, entries, &mut canceled);
+    game.sc_potential_spawns(dim, "monster", pos, entries, &mut canceled);
 }

@@ -1,13 +1,14 @@
-// The operator's fast-test kit, `/sc …` (soulscraft_rules::command), and the bench's console
-// command `soulscraft_selftest run [filter]`. A player's command runs with their state swapped in
-// (game/native_server.rs:1480-1500), where `native_run_command` is refused (native_server.rs:
-// 726-736): whatever changes the world is queued here and done in the level's next tick
-// (`run_due`), with the player's place and facing taken at the command.
+// The operator's fast-test kit, `/sc …` (soulscraft::rules::command), and the bench's console
+// command `soulscraft_selftest run [filter]`, all registered by lib.rs and run here from the
+// `run_mod_command` mixin (`on_mod_command`). A player's command runs with their state swapped
+// in, where running other commands is not safe: whatever changes the world is queued here and done
+// in the level's next tick (`run_due`), with the player's place and facing taken at the command.
+#[allow(unused_imports)]
+use super::soulscraft_compat::*;
 use crate::game::Game;
 use crate::game::soulscraft_server::{self as server, TAG_FRESH};
-use crate::mod_api::{NativeCommand, NativeServerPlayer};
 use horizon_client::text::Text;
-use soulscraft_rules::{
+use soulscraft::rules::{
     command::{self, Cmd, WaveAction},
     geom::{self, V3},
 };
@@ -55,17 +56,34 @@ fn tools() -> std::sync::MutexGuard<'static, Tools> {
     TOOLS.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
-pub(super) fn on_register_commands(commands: &mut Vec<NativeCommand>) {
-    for usage in command::USAGES {
-        commands.push(NativeCommand::op(usage, 2));
+/// A registered command, parsed by the server (src/mixins/run_mod_command.rs): its line again for
+/// the `/sc` and book parsers (`soulscraft::bridge::command_line`), from a player or the console
+/// (a command block or a function as the console). Every SoulsCraft usage is in lib.rs's
+/// `register_commands`.
+pub(super) fn on_mod_command(
+    game: &mut Game<'_>,
+    source: &mod_api::CommandSource,
+    command: &mod_api::CommandInvocation,
+    ran: &mut bool,
+) {
+    let line = soulscraft::bridge::command_line(command);
+    let player = match source {
+        mod_api::CommandSource::Player { player, .. } => server_player(game, *player),
+        _ => None,
+    };
+    if player.is_none() && super::soulscraft_book::on_console(&line) {
+        *ran = true;
+        return;
     }
-    commands.push(NativeCommand::op(&format!("{} run [filter:word]", command::SELFTEST), 4));
+    if !super::soulscraft_book::on_command(game, &line, ran) {
+        on_command(game, player.as_ref(), &line, ran);
+    }
 }
 
 fn say(game: &mut Game<'_>, line: impl Into<String>) {
     let line = line.into();
     log::info!("soulscraft: {line}");
-    game.native_feedback(Text::literal(format!("[SoulsCraft] {line}")));
+    game.sc_feedback(Text::literal(format!("[SoulsCraft] {line}")));
 }
 
 fn queue(dim: &str, task: Task) {
@@ -92,7 +110,7 @@ pub(super) fn on_command(game: &mut Game<'_>, player: Option<&NativeServerPlayer
             queue(&dim, Task::Spawn { mob, p, count, at, yaw });
         }
         Cmd::SetP(p) => {
-            server::state().p_override = p.map(soulscraft_rules::scale::clamp_p);
+            server::state().p_override = p.map(soulscraft::rules::scale::clamp_p);
             say(game, format!("P for new spawns: {}", p.map_or("players' own".into(), |v| format!("{v:.2}"))));
         }
         Cmd::Reload => match server::reload() {
@@ -159,16 +177,16 @@ fn info(game: &mut Game<'_>) {
 /// SoulsCraft's own time in its level tick.
 fn cost(game: &mut Game<'_>, on: bool) {
     if on {
-        game.native_mob_cost_sampling(true);
+        game.sc_mob_cost_sampling(true);
         crate::game::soulscraft_cost::reset();
         tools().cost_since = Some(std::time::Instant::now());
         return say(game, "cost sampling on");
     }
-    game.native_mob_cost_sampling(false);
-    let costs = game.native_take_mob_costs();
+    game.sc_mob_cost_sampling(false);
+    let costs = game.sc_take_mob_costs();
     let since = tools().cost_since.take().map_or(0.0, |t| t.elapsed().as_secs_f64());
     let (own_ns, level_ticks, server_ticks, parts) = crate::game::soulscraft_cost::totals();
-    let (rate, mspt) = game.native_tick_stats();
+    let (rate, mspt) = game.sc_tick_stats();
     say(game, format!("cost over {since:.1} s: tick rate {rate}, server tick average {mspt:.2} ms"));
     // The samples come per mob type entry, and each SoulsCraft mob has its own (its type is
     // copied in register_goals to stop it burning): summed here by type name.
@@ -262,7 +280,7 @@ fn run(game: &mut Game<'_>, dim: &str, now: u64, task: Task) {
                 .map(|(id, _)| *id)
                 .collect();
             for id in &ids {
-                game.native_remove_mob(dim, *id);
+                game.sc_remove_mob(dim, *id);
             }
             // Forgotten at once: a removed mob would stay tracked until FORGET_AFTER and be the
             // nearest for `/sc force` in the meantime.
@@ -299,7 +317,7 @@ fn run(game: &mut Game<'_>, dim: &str, now: u64, task: Task) {
             Err(e) => say(game, format!("sc pct refused: {e}")),
         },
         Task::Run(line) => {
-            let ok = game.native_run_command(&line);
+            let ok = game.sc_run_command(&line);
             say(game, format!("{line}: {}", if ok { "done" } else { "refused" }));
         }
         Task::Altar { level, banners, at, yaw } => {
@@ -314,7 +332,7 @@ fn run(game: &mut Game<'_>, dim: &str, now: u64, task: Task) {
 }
 
 /// Where a mob of `mob` (a SoulsCraft id or key, else a vanilla zombie's box) fits near `at`
-/// (owner's decision, round 9; soulscraft_rules::fit): the spot and whether it moved, or None
+/// (owner's decision, round 9; soulscraft::rules::fit): the spot and whether it moved, or None
 /// when no spot within `spawn_fit.search_blocks` fits.
 pub(super) fn fit_spot(game: &Game<'_>, mob: &str, size: u8, at: V3) -> Option<(V3, bool)> {
     let (width, height, grounded, radius) = {
@@ -328,8 +346,8 @@ pub(super) fn fit_spot(game: &Game<'_>, mob: &str, size: u8, at: V3) -> Option<(
             None => (0.6, 1.95, true, r),
         }
     };
-    let boxes = |c: [i32; 3]| game.native_block_collision(c);
-    let spot = soulscraft_rules::fit::nearest(at, width, height, radius, grounded, &boxes)?;
+    let boxes = |c: [i32; 3]| game.sc_block_collision(c);
+    let spot = soulscraft::rules::fit::nearest(at, width, height, radius, grounded, &boxes)?;
     Some((spot, geom::dist(spot, at) > 1e-6))
 }
 
@@ -361,11 +379,11 @@ pub(super) fn summon_facing(game: &mut Game<'_>, dim: &str, mob: &str, at: V3, p
 }
 
 fn summon_nbt(game: &mut Game<'_>, dim: &str, key: &str, at: V3, snbt: &str) -> Option<u32> {
-    let nbt = match crate::mod_api::parse_snbt(&snbt) {
-        Ok((crate::mod_api::Tag::Compound(c), _)) => c,
+    let nbt = match horizon_core::nbt::parse_snbt(&snbt) {
+        Ok((horizon_core::nbt::Tag::Compound(c), _)) => c,
         _ => return None,
     };
-    let id = game.native_summon(dim, key, at, nbt);
+    let id = game.sc_summon(dim, key, at, nbt);
     if id.is_none() {
         log::warn!("soulscraft: {key} not spawned at {at:?}");
     }
@@ -440,9 +458,9 @@ fn arena(game: &mut Game<'_>, who: Option<&str>) {
             lines.push(format!("setblock {} {y} {} sea_lantern", x + gx, z + gz));
         }
     }
-    let refused: Vec<String> = lines.iter().filter(|l| !game.native_run_command(l)).cloned().collect();
+    let refused: Vec<String> = lines.iter().filter(|l| !game.sc_run_command(l)).cloned().collect();
     if let Some(name) = who {
-        game.native_run_command(&format!("tp {name} {} {} {}", x, y + 1, z));
+        game.sc_run_command(&format!("tp {name} {} {} {}", x, y + 1, z));
     }
     let ok = refused.is_empty();
     say(game, format!("arena at {x} {y} {z}{}", if ok { String::new() } else { format!(", refused: {}", refused.join("; ")) }));
@@ -455,7 +473,7 @@ pub(super) fn wave(game: &mut Game<'_>, dim: &str, now: u64, action: WaveAction,
         WaveAction::Stop => {
             let ids = tools().waves.take().map(|w| w.ids).unwrap_or_default();
             for id in &ids {
-                game.native_remove_mob(dim, *id);
+                game.sc_remove_mob(dim, *id);
             }
             say(game, format!("waves stopped, {} removed", ids.len()));
         }
@@ -504,8 +522,8 @@ fn spawn_wave(game: &mut Game<'_>, dim: &str, now: u64) {
                 gear = "equipment:{head:{id:\"minecraft:white_banner\",count:1}},drop_chances:{head:0f},".into();
             }
             let snbt = format!("{{{gear}Tags:[\"soulscraft.wave\"],PersistenceRequired:1b}}");
-            let Ok((crate::mod_api::Tag::Compound(nbt), _)) = crate::mod_api::parse_snbt(&snbt) else { continue };
-            let Some(id) = game.native_summon(dim, "minecraft:zombie", pos, nbt) else { continue };
+            let Ok((horizon_core::nbt::Tag::Compound(nbt), _)) = horizon_core::nbt::parse_snbt(&snbt) else { continue };
+            let Some(id) = game.sc_summon(dim, "minecraft:zombie", pos, nbt) else { continue };
             if let Some(mult) = group.health_mult
                 && let Some(m) = game.mobs.iter_mut().find(|m| m.id == id)
             {

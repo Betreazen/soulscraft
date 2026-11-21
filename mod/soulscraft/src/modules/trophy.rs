@@ -1,14 +1,13 @@
-// Trophies on the server (docs/design/09-trophies.md; soulscraft_rules::trophy): the block
+// Trophies on the server (docs/design/09-trophies.md; soulscraft::rules::trophy): the block
 // entities of heads and dioramas (so clients draw them), the state a placed head or diorama takes,
 // a head put on a wall, and the dioramas' particles.
 //
-// - Block entities (`native_block_entity`, API 15): every `<mob>_head`, `<mob>_wall_head` and
-//   `<mob>_trophy` has one; only dioramas tick (`native_block_entity_ticks`), and their tick only
-//   notes where they are (the tick hook has no game: native_hooks.rs:3526-3538).
-// - Placement (`native_state_for_placement`, API 76; called for every placement through vanilla's
-//   `BlockItem.place` on an authoritative server, game.rs:1659-1669, no `mods()` check): a floor
-//   head turns to the placer in 16 steps (vanilla's `SkullBlock`), a diorama turns its plaque to
-//   the placer (`getHorizontalDirection().getOpposite()`).
+// - Block entities: every `<mob>_head_stand`, `<mob>_head_mount` and `<mob>_trophy` has a declared
+//   type of its own (lib.rs); only dioramas tick, and their tick (lib.rs's BlockEntityPart) only
+//   notes where they are, in `soulscraft::bridge`. Their update tag (owner, kills) is lib.rs's too.
+// - Placement: lib.rs's `Placement` BlockPart: a floor head turns to the placer in 16 steps
+//   (vanilla's `SkullBlock`), a diorama turns its plaque to the placer
+//   (`getHorizontalDirection().getOpposite()`).
 // - A wall head (`native_right_click_block`, API 21, with the clicked face): a head item used on
 //   the side of a block is put up as `<mob>_wall_head` facing out of the wall, in the level's
 //   tick; the click is taken, so no floor head goes down there. One head comes off the stack
@@ -23,12 +22,13 @@
 // Log lines:
 //   soulscraft: trophy wall head=soulscraft:revenant_wall_head at=x,y,z facing=east by=sc_a
 //   soulscraft: trophy particles dioramas=3 sent=12 tick=..   (every 200 ticks while any ticks)
+#[allow(unused_imports)]
+use super::soulscraft_compat::*;
 use crate::game::Game;
 use horizon_client::particles::ParticleOptions;
-use horizon_world::nbt::{Compound, JavaString, Tag};
-use horizon_world::registry::BlockStateId;
-use soulscraft_rules::event::Rng;
-use soulscraft_rules::trophy::{self, Kind, TrophyFile};
+use horizon_core::nbt::{JavaString, Tag};
+use soulscraft::rules::event::Rng;
+use soulscraft::rules::trophy::{self, Kind, TrophyFile};
 use std::collections::HashMap;
 use std::sync::{LazyLock, Mutex, MutexGuard, PoisonError};
 
@@ -60,53 +60,9 @@ struct Hub {
 }
 
 static HUB: LazyLock<Mutex<Hub>> = LazyLock::new(Mutex::default);
-/// Dioramas whose block entity ticked since the level's last tick (the tick hook takes only this).
-static TICKED: Mutex<Vec<([i32; 3], String)>> = Mutex::new(Vec::new());
 
 fn hub() -> MutexGuard<'static, Hub> {
     HUB.lock().unwrap_or_else(PoisonError::into_inner)
-}
-
-/// `native_block_entity`: heads and dioramas get one on every side, so clients draw them.
-pub(super) fn on_block_entity(block: &str, entity: &mut Option<(String, Compound)>) {
-    if entity.is_none() && Kind::of(block).is_some() {
-        *entity = Some((block.to_owned(), Compound::new()));
-    }
-}
-
-/// `native_block_entity_ticks`: only dioramas tick (their particles).
-pub(super) fn on_block_entity_ticks(block: &str, ticks: &mut bool) {
-    if matches!(Kind::of(block), Some(Kind::Diorama(_))) {
-        *ticks = true;
-    }
-}
-
-pub(super) fn on_block_entity_tick(pos: [i32; 3], entity: &horizon_client::containers::ModBlockEntity) {
-    if matches!(Kind::of(&entity.id), Some(Kind::Diorama(_))) {
-        TICKED.lock().unwrap_or_else(PoisonError::into_inner).push((pos, entity.id.to_string()));
-    }
-}
-
-/// `native_state_for_placement` (GameLevel, read-only): the state a head or a diorama is placed in.
-#[allow(clippy::option_option)]
-pub(super) fn on_state_for_placement(
-    level: &crate::game::GameLevel<'_>,
-    state: BlockStateId,
-    context: &horizon_world::level::PlacementContext,
-    answer: &mut Option<Option<BlockStateId>>,
-) {
-    if answer.is_some() {
-        return;
-    }
-    let Some(block) = level.native_state_block(state) else { return };
-    let (key, value) = match Kind::of(block) {
-        Some(Kind::Head(_)) => ("rotation", trophy::floor_rotation(context.yaw).to_string()),
-        Some(Kind::Diorama(_)) => ("facing", trophy::facing_toward(context.yaw).to_owned()),
-        _ => return,
-    };
-    if let Some(s) = level.native_state_with_property(state, key, &value) {
-        *answer = Some(Some(s));
-    }
 }
 
 /// `native_right_click_block` with the clicked face: a head item on the side of a block goes up
@@ -115,24 +71,24 @@ pub(super) fn on_right_click_block(game: &mut Game<'_>, pos: [i32; 3], face: [i3
     if *canceled {
         return;
     }
-    let Some((item, _, _)) = game.native_held() else { return };
+    let Some((item, _, _)) = game.sc_held() else { return };
     if let Some(Kind::Diorama(_)) = Kind::of(&item) {
         // Vanilla places it after this hook: the level's tick finds it and names its owner.
-        if let Some(player) = game.native_acting_player() {
+        if let Some(player) = game.sc_acting_player() {
             note_placer(&player.dimension, pos, face, player.uuid, &player.name);
         }
         return;
     }
     let Some(mob) = trophy::head_item_mob(&item) else { return };
     let Some(facing) = trophy::wall_facing(face) else { return };
-    let Some(player) = game.native_acting_player() else { return };
+    let Some(player) = game.sc_acting_player() else { return };
     let cell = [pos[0] + face[0], pos[1] + face[1], pos[2] + face[2]];
     let id = game.world.block(cell[0], cell[1], cell[2]);
     if !game.res.facts().get(id).replaceable {
         return;
     }
     *canceled = true;
-    if player.game_mode != 1 && game.native_take_items(&item, 1) != 1 {
+    if player.game_mode != 1 && game.sc_take_items(&item, 1) != 1 {
         return;
     }
     let state = format!("{}[facing={facing}]", Kind::WallHead(mob).block());
@@ -157,7 +113,7 @@ pub(super) fn on_level_tick(game: &mut Game<'_>, dim: &str, now: u64) {
         crate::game::soulscraft_altar::setblock(game, dim, cell, &state, "keep");
     }
     claim_placed(game, dim);
-    let ticked: Vec<([i32; 3], String)> = std::mem::take(&mut *TICKED.lock().unwrap_or_else(PoisonError::into_inner));
+    let ticked: Vec<([i32; 3], String)> = soulscraft::bridge::take_dioramas_ticked();
     if ticked.is_empty() {
         return;
     }
@@ -194,7 +150,7 @@ fn claim_placed(game: &mut Game<'_>, dim: &str) {
         here
     };
     for mut p in placers {
-        let found = p.cells.iter().copied().find(|c| matches!(Kind::of(&game.native_block(*c)), Some(Kind::Diorama(_))) && owner_uuid(game, *c).is_none());
+        let found = p.cells.iter().copied().find(|c| matches!(Kind::of(&game.sc_block(*c)), Some(Kind::Diorama(_))) && owner_uuid(game, *c).is_none());
         if let Some(cell) = found {
             set_owner(game, cell, p.uuid, &p.name);
             continue;
@@ -208,22 +164,22 @@ fn claim_placed(game: &mut Game<'_>, dim: &str) {
 
 /// Names a diorama's owner and writes their kills (the self-test's way too).
 pub(super) fn set_owner(game: &mut Game<'_>, pos: [i32; 3], uuid: u128, name: &str) {
-    let block = game.native_block(pos);
+    let block = game.sc_block(pos);
     let Some(Kind::Diorama(mob)) = Kind::of(&block) else { return };
     let mob = mob.to_owned();
     let kills = crate::game::soulscraft_book::kills_of(uuid, &format!("soulscraft:{mob}")).unwrap_or(0.0);
-    game.native_with_mod_block_entity(pos, |e| {
+    game.sc_with_mod_block_entity(pos, |e| {
         e.nbt.insert(JavaString::from(trophy::OWNER_KEY), Tag::String(JavaString::from(name)));
         e.nbt.insert(JavaString::from(trophy::OWNER_UUID_KEY), Tag::String(JavaString::from(format!("{uuid:032x}").as_str())));
         e.nbt.insert(JavaString::from(trophy::KILLS_KEY), Tag::Double(kills.to_bits()));
     });
-    game.native_block_entity_sync(pos);
+    game.sc_block_entity_sync(pos);
     log::info!("soulscraft: trophy owner diorama={mob} at={},{},{} owner={name} kills={kills}", pos[0], pos[1], pos[2]);
 }
 
 /// The owner's UUID written in a diorama's block entity.
 pub(super) fn owner_uuid(game: &Game<'_>, pos: [i32; 3]) -> Option<u128> {
-    match game.native_mod_block_entity(pos)?.nbt.get(&JavaString::from(trophy::OWNER_UUID_KEY)) {
+    match game.sc_mod_block_entity(pos)?.nbt.get(&JavaString::from(trophy::OWNER_UUID_KEY)) {
         Some(Tag::String(s)) => u128::from_str_radix(&s.to_string_lossy(), 16).ok(),
         _ => None,
     }
@@ -231,7 +187,7 @@ pub(super) fn owner_uuid(game: &Game<'_>, pos: [i32; 3]) -> Option<u128> {
 
 /// The kills written in a diorama's block entity.
 pub(super) fn stored_kills(game: &Game<'_>, pos: [i32; 3]) -> Option<f64> {
-    match game.native_mod_block_entity(pos)?.nbt.get(&JavaString::from(trophy::KILLS_KEY)) {
+    match game.sc_mod_block_entity(pos)?.nbt.get(&JavaString::from(trophy::KILLS_KEY)) {
         Some(Tag::Double(k)) => Some(f64::from_bits(*k)),
         _ => None,
     }
@@ -245,30 +201,16 @@ fn refresh_kills(game: &mut Game<'_>, pos: [i32; 3], block: &str) {
     if stored_kills(game, pos) == Some(kills) {
         return;
     }
-    game.native_with_mod_block_entity(pos, |e| {
+    game.sc_with_mod_block_entity(pos, |e| {
         e.nbt.insert(JavaString::from(trophy::KILLS_KEY), Tag::Double(kills.to_bits()));
     });
-    game.native_block_entity_sync(pos);
-}
-
-/// `native_block_entity_update_tag`: clients get a diorama's owner and kills for its plaque.
-pub(super) fn on_update_tag(entity: &horizon_client::containers::ModBlockEntity, tag: &mut Option<Compound>) {
-    if !matches!(Kind::of(&entity.id), Some(Kind::Diorama(_))) {
-        return;
-    }
-    let mut c = Compound::new();
-    for key in [trophy::OWNER_KEY, trophy::KILLS_KEY] {
-        if let Some(v) = entity.nbt.get(&JavaString::from(key)) {
-            c.insert(JavaString::from(key), v.clone());
-        }
-    }
-    *tag = Some(c);
+    game.sc_block_entity_sync(pos);
 }
 
 /// One diorama's particles this tick; how many were queued.
 fn emit(game: &mut Game<'_>, pos: [i32; 3], block: &str) -> u64 {
     let Some(Kind::Diorama(mob)) = Kind::of(block) else { return 0 };
-    let facing = game.native_block_property(pos, "facing").unwrap_or_else(|| "north".into());
+    let facing = game.sc_block_property(pos, "facing").unwrap_or_else(|| "north".into());
     let mut points = Vec::new();
     {
         let mut h = hub();

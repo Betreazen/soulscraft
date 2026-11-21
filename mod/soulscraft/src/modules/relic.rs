@@ -13,6 +13,8 @@
 //
 // Log line (with `/sc log on`):
 //   soulscraft: relic player=Alex holds=true
+#[allow(unused_imports)]
+use super::soulscraft_compat::*;
 use crate::game::Game;
 use std::collections::HashMap;
 use std::sync::{LazyLock, Mutex, PoisonError};
@@ -33,12 +35,12 @@ pub(super) fn on_level_tick(game: &mut Game<'_>, dim: &str, now: u64) {
     if dim != "minecraft:overworld" || now % EVERY != 0 {
         return;
     }
-    let players = game.native_server_players();
+    let players = game.sc_server_players();
     let mut on = ON.lock().unwrap_or_else(PoisonError::into_inner);
     on.retain(|u, _| players.iter().any(|p| p.uuid == *u));
     for p in &players {
         let holds = game
-            .native_player_equipment(p.uuid, horizon_client::mod_api::EquipmentSlot::OffHand)
+            .sc_player_equipment(p.uuid, mod_api::EquipmentSlot::OffHand)
             .is_some_and(|s| &*s.item == ITEM);
         if on.get(&p.uuid) == Some(&holds) {
             continue;
@@ -48,7 +50,7 @@ pub(super) fn on_level_tick(game: &mut Game<'_>, dim: &str, now: u64) {
         } else {
             format!("attribute {} {ATTRIBUTE} modifier remove {MODIFIER}", p.name)
         };
-        game.native_run_command(&line);
+        game.sc_run_command(&line);
         on.insert(p.uuid, holds);
         log::log!(crate::game::soulscraft_server::chatty(), "soulscraft: relic player={} holds={holds}", p.name);
     }
