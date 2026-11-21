@@ -8,3 +8,6 @@ metrics/raw/
 
 # Raw bot screenshots (prototypes/shots.ps1); a scaled selection is kept in prototypes/evidence/.
 /prototypes/shots/
+
+# The pinned SDK that `cargo horizon-mod` fetches into the mod project; never committed.
+.horizon/

@@ -1,0 +1,22 @@
+[package]
+# The mod's crate (lib `soulscraft`): the `Hooks` impl and the Parts in src/lib.rs, and the two
+# game-free crates re-exported as `soulscraft::rules` and `soulscraft::loot`, which the support
+# modules (src/modules, compiled inside `crate::game`) and the mixin helpers (src/mixins) call.
+name = "soulscraft"
+version = "0.8.0"
+edition = "2024"
+publish = false
+description = "SoulsCraft: souls-like enemies, the altar and its wave events, trophies and the hunter's book, a native Horizon mod"
+
+[lib]
+name = "soulscraft"
+path = "src/lib.rs"
+
+[dependencies]
+# The pinned SDK's API crate (lib `mod_api`), fetched into .horizon/sdk/ by any `cargo horizon-mod`
+# command. Registry dependencies are pinned by Cargo.lock, seeded from the game's own Cargo.lock
+# (docs/development.md).
+horizon-mod-api = { path = ".horizon/sdk/api/crates/horizon-mod-api" }
+soulscraft-rules = { path = "rules" }
+soulscraft-loot = { path = "loot" }
+serde_json = "1"

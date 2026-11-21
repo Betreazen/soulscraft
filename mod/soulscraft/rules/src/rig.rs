@@ -501,12 +501,12 @@ mod tests {
     #[test]
     fn the_goal_hook_boxes_match_the_data() {
         use crate::data::MobsFile;
-        let path = format!("{}/../hook_register_goals.rs", env!("CARGO_MANIFEST_DIR"));
+        let path = format!("{}/../src/mixins/register_goals.rs", env!("CARGO_MANIFEST_DIR"));
         let Ok(hook) = std::fs::read_to_string(path) else { return };
         for m in &MobsFile::embedded().mobs {
             let h = m.hitbox.unwrap();
             let row = format!("(\"{}\", {:?}, {:?}, {:?})", m.key, h.width, h.height, h.eye);
-            assert!(hook.contains(&row), "hook_register_goals.rs lacks {row}");
+            assert!(hook.contains(&row), "src/mixins/register_goals.rs lacks {row}");
         }
     }
 
@@ -514,12 +514,12 @@ mod tests {
     #[test]
     fn the_goal_hook_undead_matches_the_data() {
         use crate::data::MobsFile;
-        let path = format!("{}/../hook_register_goals.rs", env!("CARGO_MANIFEST_DIR"));
+        let path = format!("{}/../src/mixins/register_goals.rs", env!("CARGO_MANIFEST_DIR"));
         let Ok(hook) = std::fs::read_to_string(path) else { return };
         let living: Vec<String> =
             MobsFile::embedded().mobs.iter().filter(|m| !m.undead).map(|m| format!("\"{}\"", m.key)).collect();
         let row = format!("const LIVING: [&str; {}] = [{}];", living.len(), living.join(", "));
-        assert!(hook.contains(&row), "hook_register_goals.rs lacks {row}");
+        assert!(hook.contains(&row), "src/mixins/register_goals.rs lacks {row}");
     }
 
     /// `cargo test print_rig_bounds -- --ignored --nocapture`: the numbers data/README.md's

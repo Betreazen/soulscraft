@@ -1,5 +1,8 @@
-# Workspace for running the tests of the mod's own crate. The engine stages the crate itself
-# (mod/soulscraft/horizon-mixin.toml, [[crate]]) and takes versions from Horizon's Cargo.lock.
+# Workspace for running the tests of the mod's two game-free crates from the repository root
+# (`cargo test -p soulscraft-rules`, `cargo test -p soulscraft-loot`). The mod's own crate,
+# mod/soulscraft, depends on the pinned SDK in mod/soulscraft/.horizon and on the game's prebuilt
+# build, so it stays outside: the launcher stages it with these two as its path dependencies.
 [workspace]
 resolver = "3"
 members = ["mod/soulscraft/rules", "mod/soulscraft/loot"]
+exclude = ["mod/soulscraft"]

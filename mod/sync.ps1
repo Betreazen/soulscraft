@@ -1,4 +1,5 @@
-# Fills the content mod (mod\content) and the rules crate's data from the one source of truth:
+# Fills the mod package's resources (mod\soulscraft\assets and mod\soulscraft\data) and the rules
+# crate's data from the one source of truth:
 # data\mobs.json and assets\ (rigs, textures, item models from assets\models\build.py). Never edit
 # the copies; change the source and run this again. The output is deterministic: running it twice
 # changes nothing, so `git status` shows only what the sources changed.
@@ -8,7 +9,7 @@ param([switch]$Check)
 $ErrorActionPreference = 'Stop'
 
 $Repo = Split-Path $PSScriptRoot
-$Content = Join-Path $PSScriptRoot 'content'
+$Content = Join-Path $PSScriptRoot 'soulscraft'
 $Crate = Join-Path $PSScriptRoot 'soulscraft\rules'
 $Utf8 = [Text.UTF8Encoding]::new($false)
 $script:Changed = @()
