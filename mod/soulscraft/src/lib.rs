@@ -215,8 +215,20 @@ impl Hooks for SoulsCraft {
 
     /// Chest horns and shards, zombies' Rotten Horn (data/loot.json): the same each time a
     /// table loads, on a server and a client.
+    /// The table is the SDK's `serde_json::Value`, a crate the mod can't share (SDK values keep
+    /// their crate identity; ours derives with the registry's serde), so it goes through text.
     fn loot_table_load(&self, _: &dyn mod_api::DataLoadContext, event: &mut mod_api::LootTableLoadEvent<'_>) {
-        loot::apply(event.id, event.table);
+        let Ok(text) = mod_api::serde_json::to_string(&*event.table) else { return };
+        let Ok(mut ours) = serde_json::from_str::<serde_json::Value>(&text) else { return };
+        let before = ours.clone();
+        loot::apply(event.id, &mut ours);
+        if ours == before {
+            return;
+        }
+        match serde_json::to_string(&ours).map(|t| mod_api::serde_json::from_str(&t)) {
+            Ok(Ok(table)) => *event.table = table,
+            _ => log::error!("soulscraft: loot table {} could not be written back", event.id),
+        }
     }
 
     // ---- Client ----
