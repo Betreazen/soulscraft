@@ -20,12 +20,31 @@ mixins = "e59da9094f0c2fdda6c627fe9eff22dec6a906f0"
 # Each is `crate::game::soulscraft_<id>` and sees Game's private items. They call the mod's crate
 # as `soulscraft::…` (rules, loot, bridge); the crate cannot call them.
 
-# The old native names over 8f83e5c's (the shared shim's place: see the file's head).
+# The old native names over 8f83e5c's, as `game.sc_<old name>(…)` (the shared shim's place: see
+# compat.rs's head), one file per area, re-exported by compat.rs.
 [[native.module]]
 id = "compat"
 file = "crates/horizon-client/src/game.rs"
 name = "soulscraft_compat"
 source = "src/modules/compat.rs"
+
+[[native.module]]
+id = "compat_entities"
+file = "crates/horizon-client/src/game.rs"
+name = "soulscraft_compat_entities"
+source = "src/modules/compat_entities.rs"
+
+[[native.module]]
+id = "compat_world"
+file = "crates/horizon-client/src/game.rs"
+name = "soulscraft_compat_world"
+source = "src/modules/compat_world.rs"
+
+[[native.module]]
+id = "compat_client"
+file = "crates/horizon-client/src/game.rs"
+name = "soulscraft_compat_client"
+source = "src/modules/compat_client.rs"
 
 # New mobs' goals, box and flags (the bundle era's register_goals hook).
 [[native.module]]
