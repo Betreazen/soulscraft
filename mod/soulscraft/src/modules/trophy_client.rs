@@ -30,7 +30,10 @@ fn file(game: &Game<'_>, mob: &str) -> Option<Arc<TrophyFile>> {
         .entry(mob.to_owned())
         .or_insert_with(|| {
             let path = format!("assets/soulscraft/rigs/{mob}.trophy.json");
-            let bytes = game.sc_client_resources().read(&path)?;
+            let bytes = game
+                .sc_client_resources()
+                .read(&path)
+                .or_else(|| soulscraft_rules::trophy::embedded_text(mob).map(|t| t.as_bytes().to_vec()))?;
             match TrophyFile::parse(&String::from_utf8_lossy(&bytes)) {
                 Ok(f) => {
                     log::info!("soulscraft: trophy {mob}: {} particle rows, light {}", f.diorama.particles.len(), f.diorama.light);

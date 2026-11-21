@@ -197,12 +197,19 @@ fn part_mut<'a>(tree: &'a mut ModelPart, path: &[String]) -> Option<&'a mut Mode
     Some(at)
 }
 
-/// The mob's rig from the content mod's resources.
+/// The mob's rig: a resource pack's file if one has it, else the crate's own copy (on 8f83e5c a
+/// mod's assets are layered into the packs, not into the tree `ClientResources` reads).
 pub(super) fn load_rig(game: &Game<'_>, id: &str) -> Option<Rig> {
     let path = format!("assets/soulscraft/rigs/{id}.rig.json");
-    let Some(bytes) = game.sc_client_resources().read(&path) else {
-        log::warn!("soulscraft: no {path} in the resources (is the content mod on?)");
-        return None;
+    let bytes = match game.sc_client_resources().read(&path) {
+        Some(bytes) => bytes,
+        None => match soulscraft_rules::rig::embedded_text(id) {
+            Some(text) => text.as_bytes().to_vec(),
+            None => {
+                log::warn!("soulscraft: no {path} in the resources and no built-in rig");
+                return None;
+            }
+        },
     };
     match Rig::parse(&String::from_utf8_lossy(&bytes)) {
         Ok(rig) => {

@@ -338,6 +338,27 @@ pub fn blend(a: &[Pose], b: &[Pose], f: f32) -> Vec<Pose> {
     a.iter().zip(b).map(|(x, y)| Pose::lerp(*x, *y, f.clamp(0.0, 1.0))).collect()
 }
 
+/// The crate's copy of a mob's rig (mod/sync.ps1 writes `assets/soulscraft/rigs/<mob>.rig.json`).
+/// On 8f83e5c a mod's assets are layered into the packs, not copied into the tree that
+/// `ClientResources` reads, so the client falls back to this copy (a resource pack still wins).
+pub fn embedded_text(mob: &str) -> Option<&'static str> {
+    macro_rules! file {
+        ($id:literal) => {
+            include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/soulscraft/rigs/", $id, ".rig.json"))
+        };
+    }
+    Some(match mob {
+        "revenant" => file!("revenant"),
+        "stalker" => file!("stalker"),
+        "marksman" => file!("marksman"),
+        "brute" => file!("brute"),
+        "shrike" => file!("shrike"),
+        "lurker" => file!("lurker"),
+        "bog_slime" => file!("bog_slime"),
+        _ => return None,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
