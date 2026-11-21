@@ -6,7 +6,7 @@ use super::soulscraft_compat::*;
 use crate::game::Game;
 use crate::game::soulscraft_altar as altar_srv;
 use crate::game::soulscraft_event::{EventRun, core_centre, events};
-use soulscraft::rules::{
+use soulscraft_rules::{
     defense::Goal,
     event as rev,
     geom,

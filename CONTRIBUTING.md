@@ -12,14 +12,14 @@
 Нужны Rust (stable, edition 2024), для моделей — Blender 5.2, для проверки в игре — [лаунчер Horizon](https://github.com/horizon-rust/horizon).
 
 ```powershell
-cargo test                      # правила без игры
+cd mod/soulscraft; cargo test --lib; cd ../..   # правила без игры (SDK в mod/soulscraft/.horizon: cargo horizon-mod check)
 .\mod\sync.ps1                  # разложить data/ и assets/ по контент-моду и крейту
 ```
 
 Правила проекта:
 
-- **Код правил не зависит от игры.** Всё, что можно проверить тестом, живёт в крейте `mod/soulscraft/rules` без `Game`, а модули с `Game` только передают события. Новое правило приходит с тестом.
-- **Числа в данных.** Атаки, мобы, ивент и алтарь задают `data/*.json`, а не код. Копии в `mod/content` и в крейте пишет только `mod/sync.ps1`.
+- **Код правил не зависит от игры.** Всё, что можно проверить тестом, живёт в крейте мода (`mod/soulscraft/src`, кроме `modules/` и `mixins/`) без `Game`, а модули с `Game` только передают события. Новое правило приходит с тестом.
+- **Числа в данных.** Атаки, мобы, ивент и алтарь задают `data/*.json`, а не код. Копии в пакете мода (`mod/soulscraft/assets`, `mod/soulscraft/data`) пишет только `mod/sync.ps1`.
 - **Атаки считаются в тиках.** Замах, удар и восстановление задаются в тиках, а не в секундах, и проверяются самотестом `vtiming_*`.
 - **Модели строятся кодом.** Мобы, блоки и трофеи собираются скриптами в Blender ([assets/models/README.md](assets/models/README.md)); руками `.blend` и `.png` не правятся.
 - **Проверка в игре.** Самотест в мире сервера (`soulscraft_selftest run`) и скрипты ботов в `prototypes/` со снимками. Как ими пользоваться — [prototypes/README.md](prototypes/README.md).

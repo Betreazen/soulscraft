@@ -17,7 +17,7 @@
 use super::soulscraft_compat::*;
 use crate::game::Game;
 use crate::game::soulscraft_selftest_altar::{at, centre, clear_site};
-use soulscraft::rules::geom::{self, V3};
+use soulscraft_rules::geom::{self, V3};
 use std::collections::HashMap;
 use std::sync::{Mutex, PoisonError};
 

@@ -3,7 +3,7 @@
 // the ghost's outlines, the event's spawn points and the beams of drains and curses (world
 // geometry, `submit_custom_geometry`), and the altar's menu (a mod screen,
 // `native_mod_screen_open`, drawn in `native_screen_render_post` as Path-of-craft-tree's tree
-// window is). Everything drawn comes from the server's last message (soulscraft::rules::view); the
+// window is). Everything drawn comes from the server's last message (soulscraft_rules::view); the
 // client sends back only the menu's buttons.
 #[allow(unused_imports)]
 use super::soulscraft_compat::*;
@@ -17,7 +17,7 @@ use horizon_client::items::ItemStack;
 use horizon_client::world_geometry::WorldGeometry;
 use mod_api::{WorldDepth, WorldLine, WorldQuad};
 use horizon_core::nbt::{JavaString, Tag};
-use soulscraft::rules::{
+use soulscraft_rules::{
     altar::{self as ra, AltarFile},
     view::{self, BeamKind, Button, Menu, Press, View},
 };
@@ -148,7 +148,7 @@ fn wrapped(game: &Game<'_>, screen: &ScreenView<'_>, menu: &view::Menu) -> Vec<S
 /// An item's name in the player's language, by its id.
 fn item_name(id: &str) -> String {
     let key = format!("item.{}", id.replacen(':', ".", 1));
-    horizon_client::lang::get_or(&key, &soulscraft::rules::book_page::piece_name(id))
+    horizon_client::lang::get_or(&key, &soulscraft_rules::book_page::piece_name(id))
 }
 
 fn inside(r: [f32; 4], at: [f32; 2]) -> bool {

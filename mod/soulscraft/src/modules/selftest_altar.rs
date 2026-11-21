@@ -13,7 +13,7 @@ use super::soulscraft_compat::*;
 use crate::game::Game;
 use crate::game::soulscraft_altar as altar;
 use crate::game::soulscraft_event::{self as event, Overrides};
-use soulscraft::rules::{
+use soulscraft_rules::{
     altar::{self as ra, AltarFile},
     defense::{Goal, Role},
     event::SpawnMob,
@@ -715,7 +715,7 @@ fn breach(game: &mut Game<'_>, now: u64, t: u64, c: &mut Case) -> Option<Result<
 /// `blocks` from `from` toward the core, on the ground.
 fn toward(from: V3, blocks: f64) -> V3 {
     let c = centre(CORE);
-    let d = soulscraft::rules::geom::flat_dir(from, c);
+    let d = soulscraft_rules::geom::flat_dir(from, c);
     [from[0] + d[0] * blocks, from[1], from[2] + d[2] * blocks]
 }
 
@@ -725,7 +725,7 @@ fn mob_pos(game: &Game<'_>, id: u32) -> Option<V3> {
 
 fn fits_here(game: &Game<'_>, at: V3, width: f64, height: f64) -> bool {
     let boxes = |c: [i32; 3]| game.sc_block_collision(c);
-    soulscraft::rules::fit::fits(at, width, height, &boxes)
+    soulscraft_rules::fit::fits(at, width, height, &boxes)
 }
 
 /// Round 9: a brute asked for under a ceiling 3 blocks over the floor (its box is 3.2) appears
@@ -937,7 +937,7 @@ fn intercept_walled(game: &mut Game<'_>, now: u64, t: u64, c: &mut Case) -> Opti
     match c.phase {
         0 => {
             // A sealed box 5 × 5 × 5 six blocks ahead of the zombie, on its way to the altar.
-            let d = soulscraft::rules::geom::flat_dir(zpos, centre(CORE));
+            let d = soulscraft_rules::geom::flat_dir(zpos, centre(CORE));
             let b = [(zpos[0] + d[0] * 6.0).floor() as i32, CORE[1], (zpos[2] + d[2] * 6.0).floor() as i32];
             game.sc_run_command(&format!("fill {} {} {} {} {} {} stone hollow", b[0] - 2, b[1] - 1, b[2] - 2, b[0] + 2, b[1] + 3, b[2] + 2));
             c.probe = vec![b];
@@ -956,9 +956,9 @@ fn intercept_walled(game: &mut Game<'_>, now: u64, t: u64, c: &mut Case) -> Opti
         2 => {
             let gpos = game.mobs.iter().find(|m| m.id == g).map(|m| [m.position.x, m.position.y, m.position.z])?;
             if goal == Goal::Player(g) {
-                return Some(Err(format!("pulled through the wall from {:.1} blocks", soulscraft::rules::geom::dist(gpos, zpos))));
+                return Some(Err(format!("pulled through the wall from {:.1} blocks", soulscraft_rules::geom::dist(gpos, zpos))));
             }
-            if soulscraft::rules::geom::dist(gpos, zpos) <= 6.0 {
+            if soulscraft_rules::geom::dist(gpos, zpos) <= 6.0 {
                 c.count += 1;
                 if c.note.is_empty() {
                     if let Some(m) = game.mobs.iter_mut().find(|m| m.id == zid) {
@@ -1259,7 +1259,7 @@ fn restore_orphans(game: &mut Game<'_>, now: u64, t: u64) -> Option<Result<(), S
             if game.sc_block(wall) != "minecraft:air" {
                 return Some(Err(format!("the wall's place holds {}", game.sc_block(wall))));
             }
-            let mut b = soulscraft::rules::defense::Breaches::default();
+            let mut b = soulscraft_rules::defense::Breaches::default();
             b.record(wall, "minecraft:cobblestone");
             altar::set_core_lines(game, CORE, altar::BREACHED_KEY, &b.to_lines());
             if altar::core_lines(game, CORE, altar::BREACHED_KEY).is_empty() {

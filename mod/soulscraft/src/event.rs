@@ -10,7 +10,7 @@ use serde_json::{Map, Value};
 use std::collections::BTreeMap;
 
 /// The copy of data/trophies.json the crate was built with (mod/sync.ps1 writes it).
-pub const TROPHIES: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/data/trophies.json"));
+pub const TROPHIES: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/data/soulscraft/trophies.json"));
 
 /// The zone and path numbers of an event (data/mobs.json `events[].flow`).
 #[derive(Clone, Debug, PartialEq)]

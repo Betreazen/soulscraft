@@ -3,7 +3,7 @@ target/
 /prototypes/**/target/
 metrics/raw/
 
-# The engine takes the crate dependency versions from Horizon's own Cargo.lock.
+# No workspace at the root any more; a stray lock from an old checkout stays out.
 /Cargo.lock
 
 # Raw bot screenshots (prototypes/shots.ps1); a scaled selection is kept in prototypes/evidence/.

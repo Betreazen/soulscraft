@@ -6,8 +6,8 @@
 use serde_json::{Value, json};
 use std::sync::OnceLock;
 
-/// The numbers, `data/loot.json` (copied here by mod/sync.ps1).
-pub const LOOT: &str = include_str!("../data/loot.json");
+/// The numbers, `data/loot.json` (copied into the package as data/soulscraft/loot.json by mod/sync.ps1).
+pub const LOOT: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/data/soulscraft/loot.json"));
 
 /// One structure chest's summoning horn.
 #[derive(Clone, Debug, PartialEq)]

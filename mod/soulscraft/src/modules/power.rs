@@ -1,6 +1,6 @@
 // The player power P (hypothesis Г1, weights in data/mobs.json `power`): gear from the engine
 // (armour attribute, weapon in hand) and Path-of-craft-tree's combat summary from the player's
-// persistent data (`pct:summary`, soulscraft::rules::pct).
+// persistent data (`pct:summary`, soulscraft_rules::pct).
 //
 // The persistent data is one compound per player that every mod shares (NeoForgeData;
 // `native_player_persistent_data`, game/native_player_state.rs:381-392), so this bundle reads
@@ -13,7 +13,7 @@ use super::soulscraft_compat::*;
 use crate::game::Game;
 use horizon_core::nbt::Tag;
 use serde_json::Value;
-use soulscraft::rules::{
+use soulscraft_rules::{
     data::PowerDef,
     geom::V3,
     pct::{self, Cache, Read, Summary},

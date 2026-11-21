@@ -761,7 +761,7 @@ fn roar_ticks(m: &MobDef) -> u64 {
 
 #[test]
 fn the_roar_lasts_the_rage_clip() {
-    let path = format!("{}/../../../assets/rigs/brute.rig.json", env!("CARGO_MANIFEST_DIR"));
+    let path = format!("{}/../../assets/rigs/brute.rig.json", env!("CARGO_MANIFEST_DIR"));
     let rig = crate::rig::Rig::parse(&std::fs::read_to_string(&path).unwrap()).unwrap();
     assert_eq!(rig.clip_ticks("rage").map(u64::from), Some(roar_ticks(&mob("brute"))), "clip_ticks is the rig's rage clip");
 }

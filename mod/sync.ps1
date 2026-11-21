@@ -10,7 +10,6 @@ $ErrorActionPreference = 'Stop'
 
 $Repo = Split-Path $PSScriptRoot
 $Content = Join-Path $PSScriptRoot 'soulscraft'
-$Crate = Join-Path $PSScriptRoot 'soulscraft\rules'
 $Utf8 = [Text.UTF8Encoding]::new($false)
 $script:Changed = @()
 
@@ -37,9 +36,8 @@ function Json([object]$Value) {
 
 $mobs = Get-Content -Raw -Encoding utf8 (Join-Path $Repo 'data\mobs.json') | ConvertFrom-Json
 
-# The numbers: the crate compiles them in; RustCraft and others read them from the content mod
+# The numbers: the crate compiles this copy in (src/data.rs); RustCraft and others read it from the mod
 # at horizon-mods\soulscraft\data\soulscraft\mobs.json (integration.md, 4.1).
-Copy-File (Join-Path $Repo 'data\mobs.json') (Join-Path $Crate 'data\mobs.json')
 Copy-File (Join-Path $Repo 'data\mobs.json') (Join-Path $Content 'data\soulscraft\mobs.json')
 
 # Entity types on the zombie template (docs/mods.md: a living type copies zombie, villager or the
@@ -99,13 +97,13 @@ foreach ($f in Get-ChildItem (Join-Path $Repo 'assets\textures\entity') -Filter 
 }
 
 # ---- The altar (docs/design/06-altar.md, data/altar.json): blocks, banners, the summon item ----
-# The crate reads the altar's cells and the trophy chances compiled in, as it does mobs.json.
-Copy-File (Join-Path $Repo 'data\altar.json') (Join-Path $Crate 'data\altar.json')
-Copy-File (Join-Path $Repo 'data\trophies.json') (Join-Path $Crate 'data\trophies.json')
-Copy-File (Join-Path $Repo 'data\book.json') (Join-Path $Crate 'data\book.json')
-# The loot crate (horizon-world's side: chest horns and shards, zombies' Rotten Horn) compiles
-# data/loot.json in (docs/design/11-summons-rewards.md).
-Copy-File (Join-Path $Repo 'data\loot.json') (Join-Path $PSScriptRoot 'soulscraft\loot\data\loot.json')
+# The crate compiles these in from the package's data/soulscraft (src/altar.rs, src/event.rs,
+# src/book.rs, src/loot.rs), as it does mobs.json; nothing reads them as content.
+Copy-File (Join-Path $Repo 'data\altar.json') (Join-Path $Content 'data\soulscraft\altar.json')
+Copy-File (Join-Path $Repo 'data\trophies.json') (Join-Path $Content 'data\soulscraft\trophies.json')
+Copy-File (Join-Path $Repo 'data\book.json') (Join-Path $Content 'data\soulscraft\book.json')
+# Chest horns and shards, zombies' Rotten Horn (src/loot.rs, docs/design/11-summons-rewards.md).
+Copy-File (Join-Path $Repo 'data\loot.json') (Join-Path $Content 'data\soulscraft\loot.json')
 $altar =Get-Content -Raw -Encoding utf8 (Join-Path $Repo 'data\altar.json') | ConvertFrom-Json
 $art = Join-Path $Repo 'assets\soulscraft'
 
@@ -386,8 +384,7 @@ foreach ($m in $mobs.mobs) {
     $id = $m.id
     $tf = Get-Content -Raw -Encoding utf8 (Join-Path $Repo "assets\rigs\$id.trophy.json") | ConvertFrom-Json
     Copy-File (Join-Path $Repo "assets\rigs\$id.trophy.json") (Join-Path $Content "assets\soulscraft\rigs\$id.trophy.json")
-    # The server sends the diorama's particles from the crate's copy (soulscraft_rules::trophy::embedded).
-    Copy-File (Join-Path $Repo "assets\rigs\$id.trophy.json") (Join-Path $Crate "data\trophy\$id.json")
+    # The server sends the diorama's particles from this copy, compiled in (soulscraft_rules::trophy::embedded_text).
     # The floor head: 16 rotations, a vanilla head's box; worn on the head (equippable, its item
     # model's `display.head`). Light passes it: the block entity draws the head in its cell.
     $rot = [ordered]@{ type = 'enum'; values = @(0..15 | ForEach-Object { "$_" }) }

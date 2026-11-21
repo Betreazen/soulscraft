@@ -1,10 +1,10 @@
-// Trophies on the server (docs/design/09-trophies.md; soulscraft::rules::trophy): the block
+// Trophies on the server (docs/design/09-trophies.md; soulscraft_rules::trophy): the block
 // entities of heads and dioramas (so clients draw them), the state a placed head or diorama takes,
 // a head put on a wall, and the dioramas' particles.
 //
 // - Block entities: every `<mob>_head_stand`, `<mob>_head_mount` and `<mob>_trophy` has a declared
 //   type of its own (lib.rs); only dioramas tick, and their tick (lib.rs's BlockEntityPart) only
-//   notes where they are, in `soulscraft::bridge`. Their update tag (owner, kills) is lib.rs's too.
+//   notes where they are, in `soulscraft_rules::bridge`. Their update tag (owner, kills) is lib.rs's too.
 // - Placement: lib.rs's `Placement` BlockPart: a floor head turns to the placer in 16 steps
 //   (vanilla's `SkullBlock`), a diorama turns its plaque to the placer
 //   (`getHorizontalDirection().getOpposite()`).
@@ -27,8 +27,8 @@ use super::soulscraft_compat::*;
 use crate::game::Game;
 use horizon_client::particles::ParticleOptions;
 use horizon_core::nbt::{JavaString, Tag};
-use soulscraft::rules::event::Rng;
-use soulscraft::rules::trophy::{self, Kind, TrophyFile};
+use soulscraft_rules::event::Rng;
+use soulscraft_rules::trophy::{self, Kind, TrophyFile};
 use std::collections::HashMap;
 use std::sync::{LazyLock, Mutex, MutexGuard, PoisonError};
 
@@ -113,7 +113,7 @@ pub(super) fn on_level_tick(game: &mut Game<'_>, dim: &str, now: u64) {
         crate::game::soulscraft_altar::setblock(game, dim, cell, &state, "keep");
     }
     claim_placed(game, dim);
-    let ticked: Vec<([i32; 3], String)> = soulscraft::bridge::take_dioramas_ticked();
+    let ticked: Vec<([i32; 3], String)> = soulscraft_rules::bridge::take_dioramas_ticked();
     if ticked.is_empty() {
         return;
     }

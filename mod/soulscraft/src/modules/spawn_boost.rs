@@ -1,5 +1,5 @@
 // The altar's spawn boost on the server (06-altar.md, the altar's second role; prototype П4;
-// prototypes/p4-spawn.md; the rules are soulscraft::rules::boost, numbers data/altar.json
+// prototypes/p4-spawn.md; the rules are soulscraft_rules::boost, numbers data/altar.json
 // `spawn_boost`). No trait mod: three injections on natural spawning reach it from the bundle.
 //
 // - `spawning_chunks` (RETURN; game/natural_spawning.rs:739-748, `ChunkMap.collectSpawningChunks`
@@ -14,7 +14,7 @@
 //   the bundle era's RETURN on it is gone.
 // - `potential_spawns` (HEAD, catalog hook v1, API 388; native_hooks.rs:6335-6356): a monster
 //   position in a sector gets the other biomes' monsters and SoulsCraft's land mobs, the kin
-//   banners' kin weighted up (soulscraft::rules::boost::extend).
+//   banners' kin weighted up (soulscraft_rules::boost::extend).
 //   The tier gate of natural spawns (soulscraft_natural, `tier_p` against the players' P) does
 //   not apply here: in a sector the altar calls its mobs, and an event's power is its group's.
 //
@@ -29,8 +29,8 @@
 use super::soulscraft_compat::*;
 use crate::game::Game;
 use horizon_client::biome::SpawnEntry;
-use soulscraft::rules::altar as ra;
-use soulscraft::rules::boost::{self, Boost, BoostDef, Entry};
+use soulscraft_rules::altar as ra;
+use soulscraft_rules::boost::{self, Boost, BoostDef, Entry};
 use std::collections::{BTreeMap, HashMap};
 use std::sync::{LazyLock, Mutex, MutexGuard, PoisonError};
 
@@ -54,7 +54,7 @@ struct Table {
 static TABLE: LazyLock<Mutex<Table>> = LazyLock::new(Mutex::default);
 static DEF: LazyLock<BoostDef> = LazyLock::new(BoostDef::embedded);
 /// The mobs' kin and keys, as built (a spawn list is asked often: no copy of the live data each time).
-static MOBS: LazyLock<soulscraft::rules::data::MobsFile> = LazyLock::new(soulscraft::rules::data::MobsFile::embedded);
+static MOBS: LazyLock<soulscraft_rules::data::MobsFile> = LazyLock::new(soulscraft_rules::data::MobsFile::embedded);
 
 fn table() -> MutexGuard<'static, Table> {
     TABLE.lock().unwrap_or_else(PoisonError::into_inner)

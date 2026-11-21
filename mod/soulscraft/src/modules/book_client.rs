@@ -1,7 +1,7 @@
 // The hunter's book on the client (08-guide-book.md): the window a right click on the book opens
 // (a mod screen of its own, `native_mod_screen_open("soulscraft_book")`, drawn in
 // `native_screen_render_post` as the altar's menu is), with the sections «Враги», «Алтарь»,
-// «Ивенты» made from the player's progress the server last sent (soulscraft::rules::book_page).
+// «Ивенты» made from the player's progress the server last sent (soulscraft_rules::book_page).
 //
 // The enemy's model (path А): the mob's rig with its clips, drawn in the window by
 // `native_draw_scene` (game/native_scene.rs:78-221, API scenes_in_screens). The scene is one
@@ -20,7 +20,7 @@ use crate::game::soulscraft_client as client;
 use mod_api::{ModBlockEntity, ModelPart, SceneBlockEntity};
 use horizon_client::hud::HudBatch;
 use serde_json::Value;
-use soulscraft::rules::{
+use soulscraft_rules::{
     altar::AltarFile,
     book::{self, BookFile, Catalog, Progress},
     book_page::{self, Page, Seg, Tone},
@@ -83,7 +83,7 @@ static DATA: LazyLock<Data> = LazyLock::new(|| Data {
     book: BookFile::embedded(),
     catalog: Catalog::embedded(),
     altar: AltarFile::embedded(),
-    trophies: serde_json::from_str(soulscraft::rules::event::TROPHIES).unwrap_or(Value::Null),
+    trophies: serde_json::from_str(soulscraft_rules::event::TROPHIES).unwrap_or(Value::Null),
 });
 static CLIENT: LazyLock<Mutex<BookClient>> = LazyLock::new(Mutex::default);
 /// The figure's block entity as the scene takes it: an id and empty fields (the scene makes a

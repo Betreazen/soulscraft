@@ -6,7 +6,7 @@ use super::soulscraft_compat::*;
 use crate::game::Game;
 use crate::game::soulscraft_altar::{Altar, altars_in, evaluate, file, run, setblock};
 use crate::game::soulscraft_event as event;
-use soulscraft::rules::{
+use soulscraft_rules::{
     altar::{self, AltarFile},
     view,
 };
@@ -14,7 +14,7 @@ use soulscraft::rules::{
 /// Views go to players this close to a core.
 const VIEW_RANGE: f64 = 40.0;
 
-/// The menu's lines for one altar (soulscraft::rules::view::Menu).
+/// The menu's lines for one altar (soulscraft_rules::view::Menu).
 pub(super) fn menu_of(a: &Altar, now: u64) -> view::Menu {
     let file = file();
     let mut counts: Vec<(String, usize)> = Vec::new();
@@ -39,7 +39,7 @@ pub(super) fn menu_of(a: &Altar, now: u64) -> view::Menu {
         unlocks.push(file.levels[a.level as usize - 1].unlocks.clone());
     }
     // Every event, open here or not: its name, its horn (the client names it in its language) and
-    // the level it needs (soulscraft::rules::view::menu_lines).
+    // the level it needs (soulscraft_rules::view::menu_lines).
     let events = crate::game::soulscraft_server::state()
         .data
         .events
@@ -47,8 +47,8 @@ pub(super) fn menu_of(a: &Altar, now: u64) -> view::Menu {
         .map(|e| view::MenuEvent { name: if e.name.is_empty() { e.id.clone() } else { e.name.clone() }, horn: e.item.clone(), tier: e.tier.max(1) })
         .collect();
     let effects_sum = altar::effects(&file, &a.banner_ids());
-    unlocks.push(soulscraft::rules::boost::menu_line(
-        &soulscraft::rules::boost::BoostDef::embedded(),
+    unlocks.push(soulscraft_rules::boost::menu_line(
+        &soulscraft_rules::boost::BoostDef::embedded(),
         a.core,
         a.level,
         a.boost,
@@ -71,7 +71,7 @@ pub(super) fn menu_of(a: &Altar, now: u64) -> view::Menu {
 
 /// An item's name in the server's words (the client names the menu's horns from its language).
 pub(super) fn item_name(item: &str) -> String {
-    soulscraft::rules::book_page::piece_name(item)
+    soulscraft_rules::book_page::piece_name(item)
 }
 
 fn block_name(file: &AltarFile, block: &str) -> String {
@@ -99,7 +99,7 @@ pub(super) fn send_views(game: &mut Game<'_>, dim: &str, now: u64) {
         let c = [f64::from(a.core[0]) + 0.5, f64::from(a.core[1]), f64::from(a.core[2]) + 0.5];
         let near: Vec<u128> = players
             .iter()
-            .filter(|(_, p)| soulscraft::rules::geom::dist(*p, c) <= VIEW_RANGE)
+            .filter(|(_, p)| soulscraft_rules::geom::dist(*p, c) <= VIEW_RANGE)
             .map(|(u, _)| *u)
             .collect();
         if near.is_empty() {
@@ -129,7 +129,7 @@ pub(super) fn send_views(game: &mut Game<'_>, dim: &str, now: u64) {
 /// stone floor, its pieces' bottoms set (the tick puts up the rest), the sample banners on its
 /// sockets when asked.
 pub(super) fn build_here(game: &mut Game<'_>, dim: &str, at: [f64; 3], yaw: f64, level: u32, banners: bool, now: u64) -> String {
-    let dir = soulscraft::rules::geom::yaw_dir(yaw);
+    let dir = soulscraft_rules::geom::yaw_dir(yaw);
     let (dx, dz) = if dir[0].abs() > dir[2].abs() { (dir[0].signum() as i32, 0) } else { (0, dir[2].signum() as i32) };
     let core = [at[0].floor() as i32 + 6 * dx, at[1].floor() as i32, at[2].floor() as i32 + 6 * dz];
     let r = altar::MAX_RING as i32 + 1;
@@ -165,7 +165,7 @@ pub(super) fn build_here(game: &mut Game<'_>, dim: &str, at: [f64; 3], yaw: f64,
 pub(super) fn event_here(game: &mut Game<'_>, dim: &str, at: [f64; 3], start: bool, now: u64) -> String {
     let near = altars_in(dim)
         .into_iter()
-        .map(|a| (soulscraft::rules::geom::dist(at, [f64::from(a.core[0]), f64::from(a.core[1]), f64::from(a.core[2])]), a))
+        .map(|a| (soulscraft_rules::geom::dist(at, [f64::from(a.core[0]), f64::from(a.core[1]), f64::from(a.core[2])]), a))
         .filter(|(d, _)| *d <= 32.0)
         .min_by(|a, b| a.0.total_cmp(&b.0))
         .map(|(_, a)| a);

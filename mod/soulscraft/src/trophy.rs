@@ -119,12 +119,12 @@ impl TrophyFile {
     }
 }
 
-/// The crate's copy of a mob's trophy file (mod/sync.ps1 writes `data/trophy/<mob>.json`): the
+/// The crate's copy of a mob's trophy file (mod/sync.ps1 writes `assets/soulscraft/rigs/<mob>.trophy.json`): the
 /// server sends the diorama's particles from it.
 pub fn embedded_text(mob: &str) -> Option<&'static str> {
     macro_rules! file {
         ($id:literal) => {
-            include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/data/trophy/", $id, ".json"))
+            include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/soulscraft/rigs/", $id, ".trophy.json"))
         };
     }
     Some(match mob {
@@ -354,7 +354,7 @@ mod tests {
     pub(crate) const MOBS: [&str; 7] = ["revenant", "stalker", "marksman", "brute", "shrike", "lurker", "bog_slime"];
 
     fn file(id: &str) -> TrophyFile {
-        let path = format!("{}/../../../assets/rigs/{id}.trophy.json", env!("CARGO_MANIFEST_DIR"));
+        let path = format!("{}/../../assets/rigs/{id}.trophy.json", env!("CARGO_MANIFEST_DIR"));
         TrophyFile::parse(&std::fs::read_to_string(path).unwrap()).unwrap()
     }
 
@@ -392,7 +392,7 @@ mod tests {
 
     #[test]
     fn bad_files_are_refused() {
-        let path = format!("{}/../../../assets/rigs/revenant.trophy.json", env!("CARGO_MANIFEST_DIR"));
+        let path = format!("{}/../../assets/rigs/revenant.trophy.json", env!("CARGO_MANIFEST_DIR"));
         let good = std::fs::read_to_string(path).unwrap();
         assert!(TrophyFile::parse(&good.replace("soulscraft:revenant_trophy", "soulscraft:x")).unwrap_err().contains("block"));
         assert!(TrophyFile::parse(&good.replace("\"light\": 4", "\"light\": 16")).unwrap_err().contains("light"));

@@ -7,8 +7,8 @@
 // (mobs/model_layers.rs: MeshDefinition, CubeListBuilder, LayerDefinition::bake_root) and drawn by
 // `native_draw_model_part` (game/native_block_entity_draw.rs:727) in the model's frame
 // (`scale(1, -1, -1)`, `translate(0, -1.501, 0)`, native_block_entity_draw.rs:716-726). Each
-// frame every part takes its pose from the clip the server named (soulscraft::rules::wire), at
-// `game_time - start + partial` ticks, interpolated by soulscraft::rules::rig. Cubes marked `glow`
+// frame every part takes its pose from the clip the server named (soulscraft_rules::wire), at
+// `game_time - start + partial` ticks, interpolated by soulscraft_rules::rig. Cubes marked `glow`
 // are children of their part, drawn in a second pass at full light (`draw.light = 0xF0F0`,
 // native_block_entity_draw.rs:51-56). The weapon is drawn at its socket: the parts' chain to the
 // socket's parent, its offset and turns, then `native_draw_item` with the socket's display context
@@ -23,7 +23,7 @@ use horizon_client::items::ItemStack;
 use horizon_client::world_geometry::WorldGeometry;
 use mod_api::{CubeDeformation, CubeListBuilder, LayerDefinition, MeshDefinition, ModelPart, PartPose};
 use horizon_core::geometry::Direction;
-use soulscraft::rules::{
+use soulscraft_rules::{
     rig::{Pose, Rig},
     wire,
 };

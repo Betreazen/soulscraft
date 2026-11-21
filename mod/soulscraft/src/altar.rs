@@ -12,7 +12,7 @@ use serde_json::{Map, Value};
 use std::collections::BTreeMap;
 
 /// The copy of data/altar.json the crate was built with (mod/sync.ps1 writes it).
-pub const EMBEDDED: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/data/altar.json"));
+pub const EMBEDDED: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/data/soulscraft/altar.json"));
 
 pub const CORE: &str = "soulscraft:altar_core";
 pub const PEDESTAL: &str = "soulscraft:altar_pedestal";

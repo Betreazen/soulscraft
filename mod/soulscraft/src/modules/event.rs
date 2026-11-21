@@ -1,5 +1,5 @@
 // The wave event on an altar, on the server (06-altar.md, «Ивент на алтаре» and «Оборона алтаря»;
-// the decisions are soulscraft::rules::{event, defense, flow}): the run's phases, the spawn points
+// the decisions are soulscraft_rules::{event, defense, flow}): the run's phases, the spawn points
 // shown before each wave, the participants in the 3 × 3-chunk zone, the altar's health, the path
 // map of the zone and the wave mobs driven along it, their drain, curse and the brute's breach,
 // the boss bar with its warning, the reward of a win and the walls put back at the end.
@@ -27,7 +27,7 @@ use crate::game::Game;
 use crate::game::soulscraft_altar::{self as altar_srv, Altar};
 use crate::game::soulscraft_server as server;
 use horizon_client::mobs::Who;
-use soulscraft::rules::{
+use soulscraft_rules::{
     altar as ra,
     data::Stats,
     defense::{self, AltarHealth, Breaches, Drain, Goal, Harm, Mind, Numbers, Role},
@@ -70,7 +70,7 @@ pub(super) struct Overrides {
     pub curse_after_ticks: Option<u64>,
     pub grace_ticks: Option<u64>,
     pub power: Option<f64>,
-    /// The reward's random stream (a seeded run drops what soulscraft::rules::event::rewards rolls).
+    /// The reward's random stream (a seeded run drops what soulscraft_rules::event::rewards rolls).
     pub seed: Option<u64>,
     /// Mobs (iron golems) that stand in for players: participants, and targets of interception.
     pub stand_ins: Vec<u32>,
@@ -896,7 +896,7 @@ fn telegraph(game: &mut Game<'_>, r: &mut EventRun, w: usize, now: u64) {
             .filter(|c| f.grid.headroom(*c, height))
             .collect();
         let seed = r.rng.next_u64();
-        points = soulscraft::rules::flow::pick_spread(&cells, r.core, count, seed);
+        points = soulscraft_rules::flow::pick_spread(&cells, r.core, count, seed);
     }
     if points.is_empty() {
         // No reachable ground in the band (a walled altar): the ring at the near edge.
@@ -984,7 +984,7 @@ pub(super) fn spawn_one(game: &mut Game<'_>, dim: &str, m: &SpawnMob, at: V3, po
 /// the event's P as its tag, which it takes as its own (vanilla.rs `adopt`: a tagged mob is not
 /// fresh, no spawner check). The event knows it by id (`WAVE_IDS`, `LED`). A summon with a
 /// compound skips vanilla's finalizeSpawn, so it gets the weapon that would give it
-/// (soulscraft::rules::event::vanilla_weapon); like the event's zombies it does not burn by day.
+/// (soulscraft_rules::event::vanilla_weapon); like the event's zombies it does not burn by day.
 fn summon_led(game: &mut Game<'_>, dim: &str, m: &SpawnMob, at: V3, power: f64) -> Option<u32> {
     let gear = rev::vanilla_weapon(&m.kind)
         .map(|w| format!("equipment:{{mainhand:{{id:\"{w}\",count:1}}}},drop_chances:{{mainhand:0f}},"))
@@ -1071,7 +1071,7 @@ fn restore(game: &mut Game<'_>, dim: &str, b: &mut Breaches) {
     }
 }
 
-/// The win's reward (09-trophies.md, data/trophies.json; soulscraft::rules::event::rewards with the
+/// The win's reward (09-trophies.md, data/trophies.json; soulscraft_rules::event::rewards with the
 /// banners the run started with), dropped over the core: heads, armour pieces, a diorama, and the
 /// event tier's shards and item (11-summons-rewards.md, Г19).
 fn reward(game: &mut Game<'_>, r: &mut EventRun, now: u64) {

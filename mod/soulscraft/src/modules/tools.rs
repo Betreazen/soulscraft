@@ -1,4 +1,4 @@
-// The operator's fast-test kit, `/sc …` (soulscraft::rules::command), and the bench's console
+// The operator's fast-test kit, `/sc …` (soulscraft_rules::command), and the bench's console
 // command `soulscraft_selftest run [filter]`, all registered by lib.rs and run here from the
 // `run_mod_command` mixin (`on_mod_command`). A player's command runs with their state swapped
 // in, where running other commands is not safe: whatever changes the world is queued here and done
@@ -8,7 +8,7 @@ use super::soulscraft_compat::*;
 use crate::game::Game;
 use crate::game::soulscraft_server::{self as server, TAG_FRESH};
 use horizon_client::text::Text;
-use soulscraft::rules::{
+use soulscraft_rules::{
     command::{self, Cmd, WaveAction},
     geom::{self, V3},
 };
@@ -57,7 +57,7 @@ fn tools() -> std::sync::MutexGuard<'static, Tools> {
 }
 
 /// A registered command, parsed by the server (src/mixins/run_mod_command.rs): its line again for
-/// the `/sc` and book parsers (`soulscraft::bridge::command_line`), from a player or the console
+/// the `/sc` and book parsers (`soulscraft_rules::bridge::command_line`), from a player or the console
 /// (a command block or a function as the console). Every SoulsCraft usage is in lib.rs's
 /// `register_commands`.
 pub(super) fn on_mod_command(
@@ -66,7 +66,7 @@ pub(super) fn on_mod_command(
     command: &mod_api::CommandInvocation,
     ran: &mut bool,
 ) {
-    let line = soulscraft::bridge::command_line(command);
+    let line = soulscraft_rules::bridge::command_line(command);
     let player = match source {
         mod_api::CommandSource::Player { player, .. } => server_player(game, *player),
         _ => None,
@@ -110,7 +110,7 @@ pub(super) fn on_command(game: &mut Game<'_>, player: Option<&NativeServerPlayer
             queue(&dim, Task::Spawn { mob, p, count, at, yaw });
         }
         Cmd::SetP(p) => {
-            server::state().p_override = p.map(soulscraft::rules::scale::clamp_p);
+            server::state().p_override = p.map(soulscraft_rules::scale::clamp_p);
             say(game, format!("P for new spawns: {}", p.map_or("players' own".into(), |v| format!("{v:.2}"))));
         }
         Cmd::Reload => match server::reload() {
@@ -332,7 +332,7 @@ fn run(game: &mut Game<'_>, dim: &str, now: u64, task: Task) {
 }
 
 /// Where a mob of `mob` (a SoulsCraft id or key, else a vanilla zombie's box) fits near `at`
-/// (owner's decision, round 9; soulscraft::rules::fit): the spot and whether it moved, or None
+/// (owner's decision, round 9; soulscraft_rules::fit): the spot and whether it moved, or None
 /// when no spot within `spawn_fit.search_blocks` fits.
 pub(super) fn fit_spot(game: &Game<'_>, mob: &str, size: u8, at: V3) -> Option<(V3, bool)> {
     let (width, height, grounded, radius) = {
@@ -347,7 +347,7 @@ pub(super) fn fit_spot(game: &Game<'_>, mob: &str, size: u8, at: V3) -> Option<(
         }
     };
     let boxes = |c: [i32; 3]| game.sc_block_collision(c);
-    let spot = soulscraft::rules::fit::nearest(at, width, height, radius, grounded, &boxes)?;
+    let spot = soulscraft_rules::fit::nearest(at, width, height, radius, grounded, &boxes)?;
     Some((spot, geom::dist(spot, at) > 1e-6))
 }
 

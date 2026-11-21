@@ -343,7 +343,7 @@ mod tests {
     use super::*;
 
     fn read(id: &str) -> Rig {
-        let path = format!("{}/../../../assets/rigs/{id}.rig.json", env!("CARGO_MANIFEST_DIR"));
+        let path = format!("{}/../../assets/rigs/{id}.rig.json", env!("CARGO_MANIFEST_DIR"));
         Rig::parse(&std::fs::read_to_string(path).unwrap()).unwrap()
     }
 
@@ -501,7 +501,7 @@ mod tests {
     #[test]
     fn the_goal_hook_boxes_match_the_data() {
         use crate::data::MobsFile;
-        let path = format!("{}/../src/modules/goals.rs", env!("CARGO_MANIFEST_DIR"));
+        let path = format!("{}/src/modules/goals.rs", env!("CARGO_MANIFEST_DIR"));
         let Ok(hook) = std::fs::read_to_string(path) else { return };
         for m in &MobsFile::embedded().mobs {
             let h = m.hitbox.unwrap();
@@ -514,7 +514,7 @@ mod tests {
     #[test]
     fn the_goal_hook_undead_matches_the_data() {
         use crate::data::MobsFile;
-        let path = format!("{}/../src/modules/goals.rs", env!("CARGO_MANIFEST_DIR"));
+        let path = format!("{}/src/modules/goals.rs", env!("CARGO_MANIFEST_DIR"));
         let Ok(hook) = std::fs::read_to_string(path) else { return };
         let living: Vec<String> =
             MobsFile::embedded().mobs.iter().filter(|m| !m.undead).map(|m| format!("\"{}\"", m.key)).collect();

@@ -1,4 +1,4 @@
-// Trophies on the client (docs/design/09-trophies.md; soulscraft::rules::trophy): the block entities
+// Trophies on the client (docs/design/09-trophies.md; soulscraft_rules::trophy): the block entities
 // of the heads (`<mob>_head`, `<mob>_wall_head`) and of the dioramas (`<mob>_trophy`) draw the mob's
 // head, or its figure in the looping clip `trophy`, with the mob's own rig and texture
 // (soulscraft_client::draw_rig), from `assets/soulscraft/rigs/<mob>.trophy.json` in the content
@@ -18,7 +18,7 @@ use crate::game::native_block_entity_draw::BlockEntityDraw;
 use crate::game::soulscraft_client as client;
 use mod_api::ModBlockEntity;
 use horizon_core::nbt::{JavaString, Tag};
-use soulscraft::rules::trophy::{self, Kind, TrophyFile};
+use soulscraft_rules::trophy::{self, Kind, TrophyFile};
 use std::collections::HashMap;
 use std::sync::{Arc, LazyLock, Mutex, PoisonError};
 

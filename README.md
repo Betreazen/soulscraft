@@ -152,10 +152,10 @@ horizon-server --dir <папка сервера> restart
 ## Для разработчиков
 
 ```powershell
-cargo test     # правила без игры: атаки, мозг мобов, алтарь, ивент, книга, трофеи
+cd mod/soulscraft; cargo test --lib     # правила без игры: атаки, мозг мобов, алтарь, ивент, книга, трофеи, лут
 ```
 
-- **Правила без игры.** Вся логика — в крейте [`soulscraft-rules`](mod/soulscraft/rules), её проверяет `cargo test`. Модули с `Game` только передают события.
+- **Правила без игры.** Вся логика — в крейте мода [`soulscraft-rules`](mod/soulscraft/src), её проверяет `cargo test --lib` в `mod/soulscraft`. Модули с `Game` только передают события.
 - **Один источник чисел.** [`data/mobs.json`](data/mobs.json), [`data/altar.json`](data/altar.json), [`data/trophies.json`](data/trophies.json) и [`data/book.json`](data/book.json) читают сервер, Blender и витрина.
 - **Модели кодом.** Мобы, блоки и трофеи строятся скриптами в Blender: [`assets/models/README.md`](assets/models/README.md).
 - **Проверка в игре.** Самотест стенда и боты-клиенты со снимками: [`prototypes/README.md`](prototypes/README.md). Как устроен код и какие хуки Horizon он берёт — [`mod/README.md`](mod/README.md).

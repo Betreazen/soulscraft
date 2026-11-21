@@ -1,4 +1,4 @@
-// The hunter's book on the server (docs/design/08-guide-book.md; soulscraft::rules::book): each
+// The hunter's book on the server (docs/design/08-guide-book.md; soulscraft_rules::book): each
 // player's progress (met, weighted kills, altar and event entries) in their persistent data under
 // `soulscraft:book`, beside the other mods' keys; kill credit; the action-bar line of a new stage;
 // the progress sent to the player's client at login, on each new entry and when the book opens.
@@ -13,7 +13,7 @@
 // - turret kills: RustCraft's `soulscraft-kill …` report, a command lib.rs registers at level 4,
 //   reaches `on_console` through soulscraft_tools::on_mod_command;
 // - spawners' mobs: `Game::add_planned`'s ids (game/mobs/spawner.rs:151), tagged `soulscraft.spawner`;
-// - the book's use: lib.rs's `HunterBook` ItemPart queues the player in `soulscraft::bridge`.
+// - the book's use: lib.rs's `HunterBook` ItemPart queues the player in `soulscraft_rules::bridge`.
 //
 // Log lines: `soulscraft: book player=sc_a entry=revenant stage=Убит kills=1`,
 // `soulscraft: book credit mob=revenant id=12 players=[sc_a] weight=1 how=kill`.
@@ -24,7 +24,7 @@ use crate::game::soulscraft_altar as altar;
 use horizon_core::nbt::Tag;
 use horizon_client::text::Text;
 use horizon_client::mobs::{Mob, Who};
-use soulscraft::rules::{
+use soulscraft_rules::{
     altar::AltarFile,
     book::{self, BookFile, BookMsg, Catalog, Held, HitLog, MachineKill, Progress, Unlock},
     geom::{self, V3},
@@ -597,7 +597,7 @@ fn flush(game: &mut Game<'_>, now: u64) {
             }
         }
         // The book's right clicks (lib.rs `HunterBook`, queued in the bridge) and `/sc book … open`.
-        let opens: HashSet<u128> = std::mem::take(&mut b.opens).into_iter().chain(soulscraft::bridge::take_book_opens()).collect();
+        let opens: HashSet<u128> = std::mem::take(&mut b.opens).into_iter().chain(soulscraft_rules::bridge::take_book_opens()).collect();
         let mut lines = Vec::new();
         let mut writes = Vec::new();
         let mut sends = Vec::new();
@@ -825,11 +825,11 @@ fn fixture(name: &str, mob: &str, kills: Option<f64>) -> String {
 }
 
 /// A vanilla type's own numbers as the engine has them (its `MobType`: max health, attack damage,
-/// armour), for the book's pages of changed vanilla mobs (soulscraft::rules::book_page::VanillaStats)
+/// armour), for the book's pages of changed vanilla mobs (soulscraft_rules::book_page::VanillaStats)
 /// on the client, and for the self-test on the server.
-pub(super) fn engine_stats(game: &Game<'_>, kind: &str) -> Option<soulscraft::rules::data::Stats> {
+pub(super) fn engine_stats(game: &Game<'_>, kind: &str) -> Option<soulscraft_rules::data::Stats> {
     let t = game.res.mob_types().get(kind)?;
-    Some(soulscraft::rules::data::Stats {
+    Some(soulscraft_rules::data::Stats {
         health: f64::from(t.max_health),
         damage: f64::from(t.attack_damage),
         armor: f64::from(t.armor),

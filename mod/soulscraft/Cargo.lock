@@ -287,27 +287,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "33f4fe9184a62d842c9ef383018f3306d8ba224fd9d836f56d7288308847c256"
 
 [[package]]
-name = "soulscraft"
+name = "soulscraft-rules"
 version = "0.8.0"
 dependencies = [
  "horizon-mod-api",
  "log",
- "serde_json",
- "soulscraft-loot",
- "soulscraft-rules",
-]
-
-[[package]]
-name = "soulscraft-loot"
-version = "0.1.0"
-dependencies = [
- "serde_json",
-]
-
-[[package]]
-name = "soulscraft-rules"
-version = "0.1.0"
-dependencies = [
  "serde",
  "serde_json",
 ]

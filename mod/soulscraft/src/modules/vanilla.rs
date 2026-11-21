@@ -1,5 +1,5 @@
 // The approved vanilla changes on the server (docs/design/07-vanilla-mobs.md; the decisions are
-// soulscraft::rules::vanilla). Every mob of a changed vanilla type (data/mobs.json `vanilla.groups`)
+// soulscraft_rules::vanilla). Every mob of a changed vanilla type (data/mobs.json `vanilla.groups`)
 // is adopted the first time the level tick sees it:
 //   - its P (Г1, Г5: the players near, or its tag `soulscraft.p=`), kept as that tag;
 //   - Г2's growth as attribute modifiers `soulscraft:power` on its own vanilla base (health, damage,
@@ -26,7 +26,7 @@ use crate::game::Game;
 use horizon_client::mobs::finalize::{self, Attr, Op};
 use horizon_client::mobs::goals::{Cx, Goal, JUMP, LOOK, MOVE};
 use horizon_client::mobs::{Mob, Who};
-use soulscraft::rules::{
+use soulscraft_rules::{
     attack::Phase,
     brain::{Event, Order, Strike},
     cover::{self, Threat},
@@ -479,7 +479,7 @@ fn tick_mob(
             size: m.size,
             answer: v.answer.take(),
         };
-        (sense, Scaled::at(&soulscraft::rules::data::Stats::default(), v.p).decide_every)
+        (sense, Scaled::at(&soulscraft_rules::data::Stats::default(), v.p).decide_every)
     };
     let mut sense = sense;
     if let Some(t) = target

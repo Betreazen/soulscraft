@@ -1,6 +1,6 @@
 // Smart mobs take cover from attack turrets (round 1; RustCraft's `rustcraft:turret`, whose block
 // entity says `role` "attack" or "support" — only attack turrets shoot, so only they count;
-// soulscraft::rules::cover decides). A SoulsCraft mob outside an altar's event that an attack
+// soulscraft_rules::cover decides). A SoulsCraft mob outside an altar's event that an attack
 // turret within its range sees walks to the nearest spot within `cover.search_blocks` where its
 // box fits and no turret sees it, stays there `cover.hold_ticks`, then its own mind takes over
 // again. Turrets are found through the level's mod block entities near the mob
@@ -17,7 +17,7 @@ use super::soulscraft_compat::*;
 use crate::game::Game;
 use horizon_client::containers::BlockEntity;
 use horizon_core::nbt::{JavaString, Tag};
-use soulscraft::rules::{
+use soulscraft_rules::{
     cover::{self, CoverRules, Threat},
     fit,
     geom::{self, V3},

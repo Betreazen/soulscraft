@@ -1,4 +1,4 @@
-// The vanilla changes in the world (07-vanilla-mobs.md; soulscraft_vanilla, soulscraft::rules::vanilla),
+// The vanilla changes in the world (07-vanilla-mobs.md; soulscraft_vanilla, soulscraft_rules::vanilla),
 // on the altar site's platform (soulscraft_selftest_altar::clear_site), against a still invulnerable
 // iron golem set as the mob's target (its vanilla target too):
 //   vanilla_adopt_p          zombies at P 0 and 1: Г2 on the vanilla base (20 → 38 health, 3 → 4.8
@@ -20,7 +20,7 @@ use crate::game::Game;
 use crate::game::soulscraft_selftest_altar::{at, centre, clear_site};
 use crate::game::soulscraft_vanilla as vanilla;
 use horizon_client::mobs::Who;
-use soulscraft::rules::{attack::Timeline, data::MobsFile, geom, vanilla::Behavior};
+use soulscraft_rules::{attack::Timeline, data::MobsFile, geom, vanilla::Behavior};
 use std::sync::{Mutex, PoisonError};
 
 const DIM: &str = "minecraft:overworld";
@@ -103,7 +103,7 @@ pub(super) fn cleanup(game: &mut Game<'_>) {
 }
 
 /// Where a mob of this move stands and where its golem stands (blocks south).
-fn layout(behavior: Behavior, attack: &soulscraft::rules::data::AttackDef) -> f64 {
+fn layout(behavior: Behavior, attack: &soulscraft_rules::data::AttackDef) -> f64 {
     match behavior {
         _ if attack.projectile.is_some() => 8.0,
         Behavior::Cube => 4.0,

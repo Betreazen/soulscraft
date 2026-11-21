@@ -1,4 +1,4 @@
-// The summoning altar on the server (docs/design/06-altar.md; the rules are soulscraft::rules::altar):
+// The summoning altar on the server (docs/design/06-altar.md; the rules are soulscraft_rules::altar):
 // which cores stand where, their level, the tall pieces placed and broken together, the pedestal
 // and its summon item, the menu, and what clients are told to draw.
 //
@@ -8,7 +8,7 @@
 // blocks inside a known altar's event zone. The level tick then fixes tall pieces, marks the
 // altar whose 9 × 9 × 4 cells or roof column changed, and evaluates only that altar: 324 cells and
 // one heightmap column. Cores are found when placed (the queue) and when their chunk loads (their
-// block entity ticks: lib.rs's BlockEntityPart queues it in `soulscraft::bridge`).
+// block entity ticks: lib.rs's BlockEntityPart queues it in `soulscraft_rules::bridge`).
 //
 // What is saved: the pedestal's item and the core's spawn-boost switch and the event's broken
 // blocks are block entity data (`native_with_mod_block_entity`, sent to clients by lib.rs's
@@ -24,7 +24,7 @@ use crate::game::Game;
 use crate::game::soulscraft_event as event;
 use horizon_core::nbt::{Compound, JavaString, Tag};
 use horizon_world::registry::BlockStateId;
-use soulscraft::rules::{
+use soulscraft_rules::{
     altar::{self, AltarFile, Report, Seen},
     data::MobsFile,
     view,
@@ -40,7 +40,7 @@ const ITEM_KEY: &str = "item";
 const BOOST_KEY: &str = "boost";
 /// The game time the core was first seen (the spawn boost's age; survives restarts).
 const SINCE_KEY: &str = "since";
-/// The core's book of broken blocks while an event runs (soulscraft::rules::defense::Breaches).
+/// The core's book of broken blocks while an event runs (soulscraft_rules::defense::Breaches).
 pub(super) const BREACHED_KEY: &str = "breached";
 /// Views go out this often (soulscraft_altar_ui::send_views).
 const VIEW_EVERY: u64 = 10;
@@ -442,7 +442,7 @@ pub(super) fn on_level_tick(game: &mut Game<'_>, dim: &str, now: u64) {
 }
 
 fn register_ticked(game: &mut Game<'_>, dim: &str, now: u64) {
-    let cores: Vec<[i32; 3]> = soulscraft::bridge::take_cores_ticked();
+    let cores: Vec<[i32; 3]> = soulscraft_rules::bridge::take_cores_ticked();
     for core in cores {
         let known = {
             let mut h = hub();
@@ -474,8 +474,8 @@ fn register(game: &mut Game<'_>, dim: &str, core: [i32; 3], now: u64) {
 }
 
 fn update_zones() {
-    let flow = crate::game::soulscraft_server::state().data.events.first().map(soulscraft::rules::event::Flow::of);
-    let flow = flow.unwrap_or_else(|| soulscraft::rules::event::Flow::from_map(&Default::default()));
+    let flow = crate::game::soulscraft_server::state().data.events.first().map(soulscraft_rules::event::Flow::of);
+    let flow = flow.unwrap_or_else(|| soulscraft_rules::event::Flow::from_map(&Default::default()));
     let zones: Vec<(&'static str, [i32; 4])> = hub()
         .altars
         .values()

@@ -12,7 +12,7 @@ use crate::game::soulscraft_selftest_altar::{Case, DIM, at, build, golem, has, i
 use crate::game::soulscraft_spawn_boost as boost;
 use crate::game::soulscraft_trophy as trophy;
 use horizon_client::biome::SpawnEntry;
-use soulscraft::rules::{
+use soulscraft_rules::{
     altar::{self as ra, AltarFile},
     event::{self as rev, Rng, SpawnMob, Trophy},
     trophy as rt,
@@ -245,7 +245,7 @@ fn particles(game: &mut Game<'_>, t: u64, c: &mut Case) -> Option<Result<(), Str
 }
 
 /// A seeded win on a level-3 altar with two «harder» banners (weight, horde) of a wave with a
-/// revenant and a zombie: what drops over the core is exactly what soulscraft::rules::event::rewards
+/// revenant and a zombie: what drops over the core is exactly what soulscraft_rules::event::rewards
 /// rolls with that seed, and it has three heads and the revenant's diorama.
 fn seeded_win(game: &mut Game<'_>, now: u64, t: u64, c: &mut Case) -> Option<Result<(), String>> {
     if t == 1 {
@@ -354,10 +354,10 @@ fn kin_wave(game: &mut Game<'_>, now: u64, t: u64, c: &mut Case) -> Option<Resul
 /// tier gate's P there as the hook reads it. As in the hook, nothing where the chunk isn't loaded
 /// (no biome: `native_biome` gives None).
 fn natural_extras(game: &Game<'_>, pos: [i32; 3], listed: &[&str]) -> Vec<String> {
-    let mobs = soulscraft::rules::data::MobsFile::embedded();
+    let mobs = soulscraft_rules::data::MobsFile::embedded();
     let Some(biome) = game.sc_biome(pos) else { return Vec::new() };
     let best = crate::game::soulscraft_natural::best_power_at([f64::from(pos[0]) + 0.5, f64::from(pos[1]), f64::from(pos[2]) + 0.5]);
-    soulscraft::rules::natural::extras(&mobs.natural, &mobs, &biome, pos[1], listed, best).into_iter().map(|e| e.key).collect()
+    soulscraft_rules::natural::extras(&mobs.natural, &mobs, &biome, pos[1], listed, best).into_iter().map(|e| e.key).collect()
 }
 
 /// Sets `/sc p` (None: the players' own) and has the tier gate read it now; returns the old one.
@@ -447,13 +447,13 @@ fn zombie_list_extras(game: &mut Game<'_>, pos: [i32; 3]) -> Vec<String> {
 }
 
 /// A seeded win of a tier-2 event (Ночь мертвецов) on a level-2 altar: its 8 shards, and the
-/// revenant's blade, the seed picked so that soulscraft::rules::event::rewards rolls it.
+/// revenant's blade, the seed picked so that soulscraft_rules::event::rewards rolls it.
 fn tier_item(game: &mut Game<'_>, now: u64, t: u64, c: &mut Case) -> Option<Result<(), String>> {
     const BLADE: &str = "soulscraft:revenant_blade";
     let kinds = vec!["minecraft:zombie".to_owned(), "soulscraft:revenant".to_owned()];
     let data = crate::game::soulscraft_server::state().data.clone();
     let chances = rev::TrophyChances::embedded();
-    let roll = |seed: u64| rev::rewards(&kinds, &data, &soulscraft::rules::altar::Effects::default(), 2, 2, &chances, &mut Rng::new(seed));
+    let roll = |seed: u64| rev::rewards(&kinds, &data, &soulscraft_rules::altar::Effects::default(), 2, 2, &chances, &mut Rng::new(seed));
     if t == 1 {
         build(game, 2);
         return None;
@@ -542,7 +542,7 @@ fn boost_sector(game: &mut Game<'_>, now: u64, t: u64, c: &mut Case) -> Option<R
         if lv != 2 {
             return Some(Err(format!("altar level {lv}")));
         }
-        let def = soulscraft::rules::boost::BoostDef::embedded();
+        let def = soulscraft_rules::boost::BoostDef::embedded();
         // A fresh world is younger than the drift: since may lie before tick 0.
         altar::set_since(game, DIM, core, now as i64 - (3 * def.drift_ticks) as i64);
         return None;

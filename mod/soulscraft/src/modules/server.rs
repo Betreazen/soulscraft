@@ -1,9 +1,9 @@
 // SoulsCraft's server half: every SoulsCraft mob of a level is found after the level's tick
 // (`native_level_tick_post`, game/levels.rs:559-561), given its numbers from P once, and driven
-// from its brain (soulscraft::rules::brain): the brain's orders become the engine's navigation,
+// from its brain (soulscraft_rules::brain): the brain's orders become the engine's navigation,
 // look and velocity, its blows become damage (`native_hurt_entity`, game/native_entities.rs:375,
 // armour, shields and the damage hooks included), and the clip each mob shows is sent to the
-// players of the level as mod messages (soulscraft::rules::wire, API 40). The zombie template's
+// players of the level as mod messages (soulscraft_rules::wire, API 40). The zombie template's
 // own goals are dropped in `register_goals` (hook_register_goals.rs), so nothing else attacks.
 //
 // What survives: a mob's P (and the slime's size) is an entity tag, `soulscraft.p=0.40`, which is
@@ -18,7 +18,7 @@
 use super::soulscraft_compat::*;
 use crate::game::Game;
 use horizon_client::particles::ParticleOptions;
-use soulscraft::rules::{
+use soulscraft_rules::{
     attack::{Phase, Timeline, clears_wave, wave_center, wave_hits},
     brain::{self, Brain, DiveTurns, Event, Order, Senses, Strike, Style, TargetSense, Tick},
     data::{MobDef, MobsFile},
@@ -107,7 +107,7 @@ pub(super) struct State {
     /// Bleed hits due, from the effect tick (which may not change the game): (dimension, mob
     /// or player, amplifier).
     pub bleeds: Vec<(String, Option<i32>, Option<u128>, i32)>,
-    /// The shrikes' dive turns: one dives at a target at a time (soulscraft::rules::brain::DiveTurns).
+    /// The shrikes' dive turns: one dives at a target at a time (soulscraft_rules::brain::DiveTurns).
     pub turns: DiveTurns,
 }
 
@@ -594,7 +594,7 @@ fn play_cues(game: &mut Game<'_>, def: &MobDef, m: &Seen, tick: &Tick, size: u8)
     }
 }
 
-/// A cue (the vanilla groups' schema, soulscraft::rules::vanilla::Cue): its sound at `at` from the
+/// A cue (the vanilla groups' schema, soulscraft_rules::vanilla::Cue): its sound at `at` from the
 /// hostile source (`GameLevel::native_play_sound`, native_hooks.rs:9906), its particles round the
 /// mob's feet (`native_send_particles`, native_hooks.rs:9936) and a small hop while it stands. The
 /// vanilla groups' windups (soulscraft_vanilla) and SoulsCraft's own mobs play it; the `pose` is
@@ -625,7 +625,7 @@ pub(super) fn play_cue(game: &mut Game<'_>, mob_id: u32, at: V3, cue: &Cue) {
 /// A standing player's eye height (vanilla `Player`), when the target's own is not at hand.
 const PLAYER_EYE: f64 = 1.62;
 
-/// The marksman's asks of this tick (soulscraft::rules::brain, `Tick::wants_cover`, `wants_post`):
+/// The marksman's asks of this tick (soulscraft_rules::brain, `Tick::wants_cover`, `wants_post`):
 /// cover from its target for the reload that starts, a post in its kept distance.
 #[allow(clippy::too_many_arguments)]
 fn answer_marksman(game: &mut Game<'_>, def: &MobDef, m: &Seen, tick: &Tick, target: Option<&Target>, size: u8, now: u64) {
@@ -646,9 +646,9 @@ fn answer_marksman(game: &mut Game<'_>, def: &MobDef, m: &Seen, tick: &Tick, tar
 }
 
 /// Where the marksman reloads: the nearest spot within `reload_cover_blocks` its target cannot see
-/// at its eyes nor at `cover_min_height_blocks` over its feet (soulscraft::rules::cover::reload_cover,
+/// at its eyes nor at `cover_min_height_blocks` over its feet (soulscraft_rules::cover::reload_cover,
 /// the lines and spots of soulscraft_cover).
-fn reload_cover(game: &Game<'_>, def: &MobDef, m: &Seen, tg: &Target, hb: soulscraft::rules::data::Hitbox) -> Option<V3> {
+fn reload_cover(game: &Game<'_>, def: &MobDef, m: &Seen, tg: &Target, hb: soulscraft_rules::data::Hitbox) -> Option<V3> {
     let k = def.param("reload_cover_blocks").unwrap_or(8.0) as i32;
     let top = def.param("cover_min_height_blocks").unwrap_or(2.0);
     // A player's own (`Guest::eye_height`, lan/guest.rs:812: sneaking too), a mob's (mobs/living.rs:558).
@@ -659,13 +659,13 @@ fn reload_cover(game: &Game<'_>, def: &MobDef, m: &Seen, tg: &Target, hb: soulsc
     let eye = geom::add(tg.pos, [0.0, eye_height, 0.0]);
     let spots = crate::game::soulscraft_cover::spots(game, m.pos, k, hb.width, hb.height);
     let sight = |a: V3, b: V3| crate::game::soulscraft_cover::sees(game, a, b);
-    soulscraft::rules::cover::reload_cover(m.pos, &spots, &[hb.eye, top], eye, &sight)
+    soulscraft_rules::cover::reload_cover(m.pos, &spots, &[hb.eye, top], eye, &sight)
 }
 
-/// The marksman's post: the candidates of soulscraft::rules::brain::post_candidates on the ground
+/// The marksman's post: the candidates of soulscraft_rules::brain::post_candidates on the ground
 /// (within `high_ground_scan_blocks` up or down; where it stands is kept as it is), the highest
 /// with `prefers_high_ground` (`pick_post`).
-fn high_post(game: &Game<'_>, def: &MobDef, m: &Seen, tg: &Target, hb: soulscraft::rules::data::Hitbox) -> Option<V3> {
+fn high_post(game: &Game<'_>, def: &MobDef, m: &Seen, tg: &Target, hb: soulscraft_rules::data::Hitbox) -> Option<V3> {
     let (lo, hi) = def.param_range("keep_distance_blocks").unwrap_or((10.0, 16.0));
     let scan = def.param("high_ground_scan_blocks").unwrap_or(6.0) as i32;
     let grounded: Vec<V3> = brain::post_candidates(tg.pos, m.pos, lo, hi)
@@ -1232,7 +1232,7 @@ fn hit_at(game: &mut Game<'_>, i: usize, value: f32) -> f64 {
 
 /// The wave of a blow on the players it catches (the target the blow hit aside): from the impact
 /// point (`wave.impact_ahead_blocks` in front of the mob), within `radius`, and for a `jumpable`
-/// one only those not over it (soulscraft::rules::attack::wave_hits). True when one was hurt.
+/// one only those not over it (soulscraft_rules::attack::wave_hits). True when one was hurt.
 #[allow(clippy::too_many_arguments)]
 fn deal_wave(
     game: &mut Game<'_>,
@@ -1240,7 +1240,7 @@ fn deal_wave(
     m: &Seen,
     def: &MobDef,
     sc: &Scaled,
-    a: &soulscraft::rules::data::AttackDef,
+    a: &soulscraft_rules::data::AttackDef,
     radius: f64,
     blow: f64,
     hits_target: bool,
@@ -1268,12 +1268,12 @@ fn deal_wave(
 }
 
 /// The top of the ground under a player's feet at `feet`, over every column its box stands on
-/// (soulscraft::rules::attack::ground_under: a player on a block's edge stands on it): in each, the
+/// (soulscraft_rules::attack::ground_under: a player on a block's edge stands on it): in each, the
 /// highest collision box top at or below the feet in their block or the one beneath. None
 /// anywhere (feet a block or more over the ground) gives minus infinity: they are over any wave.
 fn ground_under(game: &Game<'_>, feet: V3) -> f64 {
     let top = feet[1].floor() as i32;
-    soulscraft::rules::attack::ground_under(feet, |[x, z]| {
+    soulscraft_rules::attack::ground_under(feet, |[x, z]| {
         [top, top - 1].into_iter().find_map(|y| {
             game.sc_block_collision([x, y, z])
                 .iter()
@@ -1331,7 +1331,7 @@ fn shoot(game: &mut Game<'_>, dim: &str, m: &Seen, tg: &Target, blow: f64, eye_h
 
 /// The effects of a blow on a player: mobs.json names `bleed` (SoulsCraft's shared
 /// `soulscraft:bleeding`) and vanilla effects by their path (`slowness`).
-fn give_effects(game: &mut Game<'_>, effects: &[soulscraft::rules::data::EffectDef], player: Option<u128>) {
+fn give_effects(game: &mut Game<'_>, effects: &[soulscraft_rules::data::EffectDef], player: Option<u128>) {
     let Some(uuid) = player else { return };
     for e in effects {
         let id = match e.id.as_str() {
@@ -1353,18 +1353,18 @@ fn give_effects(game: &mut Game<'_>, effects: &[soulscraft::rules::data::EffectD
 /// The bog slime's contact: its `stick` passive's effects.
 fn stick(game: &mut Game<'_>, def: &MobDef, tg: &Target, _id: u32) {
     let Some(p) = def.passive("stick") else { return };
-    let effects: Vec<soulscraft::rules::data::EffectDef> = p
+    let effects: Vec<soulscraft_rules::data::EffectDef> = p
         .get("effects")
         .and_then(|v| serde_json_effects(v))
         .unwrap_or_default();
     give_effects(game, &effects, tg.player);
 }
 
-fn serde_json_effects(v: &serde_json::Value) -> Option<Vec<soulscraft::rules::data::EffectDef>> {
+fn serde_json_effects(v: &serde_json::Value) -> Option<Vec<soulscraft_rules::data::EffectDef>> {
     v.as_array()?
         .iter()
         .map(|e| {
-            Some(soulscraft::rules::data::EffectDef {
+            Some(soulscraft_rules::data::EffectDef {
                 id: e.get("id")?.as_str()?.to_owned(),
                 seconds: e.get("seconds").and_then(serde_json::Value::as_f64).unwrap_or(0.0),
                 level: e.get("level").and_then(serde_json::Value::as_u64).map(|l| l as u32),

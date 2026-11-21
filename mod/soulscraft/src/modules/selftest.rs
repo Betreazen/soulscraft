@@ -10,7 +10,7 @@
 use super::soulscraft_compat::*;
 use crate::game::Game;
 use crate::game::soulscraft_server as server;
-use soulscraft::rules::{
+use soulscraft_rules::{
     attack::{Phase, Timeline},
     data::MobsFile,
 };
@@ -493,9 +493,9 @@ fn hitbox(game: &mut Game<'_>, dim: &str, live: &mut Live, mob: &str, size: u8, 
     // PCT's experience tag at P 0 carries the size's share (scale::size_share): the full slime
     // and every other mob pct.xp100, a size-2 slime pct.xp25.
     let full = server::state().data.mob(mob)?.full_size();
-    let want_xp = format!("{}{}", soulscraft::rules::scale::XP_TAG_PREFIX, (100.0 * soulscraft::rules::scale::size_share(size, full)).round());
+    let want_xp = format!("{}{}", soulscraft_rules::scale::XP_TAG_PREFIX, (100.0 * soulscraft_rules::scale::size_share(size, full)).round());
     let tags = game.sc_entity_tags(e).unwrap_or_default();
-    let xp: Vec<&String> = tags.iter().filter(|t| t.starts_with(soulscraft::rules::scale::XP_TAG_PREFIX)).collect();
+    let xp: Vec<&String> = tags.iter().filter(|t| t.starts_with(soulscraft_rules::scale::XP_TAG_PREFIX)).collect();
     Some(if xp.len() == 1 && *xp[0] == want_xp { Ok(()) } else { Err(format!("experience tags {xp:?}, wanted [{want_xp}]")) })
 }
 
@@ -528,7 +528,7 @@ fn timing(game: &mut Game<'_>, dim: &str, now: u64, live: &mut Live, mob: &str, 
     let strikes: Vec<_> = s.strikes.iter().filter(|r| r.mob == id && r.attack == attack && r.tick >= t0).cloned().collect();
     let first_blow = strikes.first().map(|r| (r.tick - t0) as u32);
     // A jump's window is the `recover` ticks after it lands (its blow); an ambush that bit ends on
-    // its blow, as the grab follows (soulscraft::rules::brain).
+    // its blow, as the grab follows (soulscraft_rules::brain).
     let grabbed = def.attacks.iter().any(|g| g.follows.as_deref() == Some(attack)) && first_blow.is_some_and(|b| b < line.recover_start());
     let (recover_at, end_at) = match first_blow {
         Some(land) if mob == "bog_slime" => (Some(land), land + line.recover),
@@ -550,7 +550,7 @@ fn timing(game: &mut Game<'_>, dim: &str, now: u64, live: &mut Live, mob: &str, 
         }
     }
     let end = (done.tick - t0) as u32;
-    let open_charge = a.recover_if.as_deref() == Some("wall") && end == line.recover_start() + soulscraft::rules::brain::CHARGE_OPEN_RECOVER;
+    let open_charge = a.recover_if.as_deref() == Some("wall") && end == line.recover_start() + soulscraft_rules::brain::CHARGE_OPEN_RECOVER;
     if end != end_at && !open_charge {
         problems.push(format!("end at {end} not {end_at}"));
     }
@@ -603,7 +603,7 @@ fn reload_scenario(game: &mut Game<'_>, dim: &str, now: u64, live: &mut Live, fi
     if first {
         let path = reload_path()?;
         live.saved = Some(std::fs::read_to_string(&path).ok());
-        let mut v: serde_json::Value = serde_json::from_str(soulscraft::rules::data::EMBEDDED).ok()?;
+        let mut v: serde_json::Value = serde_json::from_str(soulscraft_rules::data::EMBEDDED).ok()?;
         let attacks = v["mobs"].as_array_mut()?.iter_mut().find(|m| m["id"] == "revenant")?["attacks"].as_array_mut()?;
         let o = attacks.iter_mut().find(|a| a["id"] == "overhead")?;
         o["windup"] = serde_json::json!(14);
@@ -726,7 +726,7 @@ fn bleed(game: &mut Game<'_>, dim: &str, now: u64, live: &mut Live, first: bool)
 /// the next one (8), then stopped. The altar's rules (Г12) are not in this stub.
 fn waves(game: &mut Game<'_>, dim: &str, now: u64, live: &mut Live) -> Option<Result<(), String>> {
     use crate::game::soulscraft_tools::{wave, wave_state};
-    use soulscraft::rules::command::WaveAction;
+    use soulscraft_rules::command::WaveAction;
     let want = |n: usize| -> u32 {
         let s = server::state();
         s.data.events.first().and_then(|e| e.waves.get(n - 1)).map_or(0, |w| w.mobs.iter().map(|m| m.count).sum())
@@ -872,7 +872,7 @@ fn shield_bash_knocks(game: &mut Game<'_>, dim: &str, now: u64, live: &mut Live,
         "thrust" => {
             let rec = settled("thrust", live.mark)?;
             let from = DUEL.lock().unwrap_or_else(PoisonError::into_inner).as_ref()?.from?;
-            let plain = soulscraft::rules::geom::flat_dist(from, pos_of(game, sheep)?);
+            let plain = soulscraft_rules::geom::flat_dist(from, pos_of(game, sheep)?);
             if !rec.hit {
                 return Some(Err(format!("the thrust missed (the sheep moved {plain:.2})")));
             }
@@ -895,7 +895,7 @@ fn shield_bash_knocks(game: &mut Game<'_>, dim: &str, now: u64, live: &mut Live,
             let Some(after) = health(game, sheep) else {
                 return Some(Err("the sheep is gone after the bash (killed by an axe-sized blow?)".into()));
             };
-            let moved = soulscraft::rules::geom::flat_dist(from?, pos_of(game, sheep)?);
+            let moved = soulscraft_rules::geom::flat_dist(from?, pos_of(game, sheep)?);
             let lost = live.golem_health - after;
             let blow = {
                 let s = server::state();
@@ -1014,7 +1014,7 @@ const WAVE_RECOVER: u64 = 25;
 /// A still brute (NoAI: the brain runs, the body stays) swings `overhead_wave` at a still iron
 /// golem at its impact point twice: the golem on the platform loses health; then held a block up
 /// (no gravity, put back every tick), as a player mid-jump is over `jump_clear_blocks` 0.5, it
-/// loses none and the blow does not land (soulscraft::rules::attack::clears_wave).
+/// loses none and the blow does not land (soulscraft_rules::attack::clears_wave).
 fn brute_wave_spares_jumper(game: &mut Game<'_>, dim: &str, now: u64, live: &mut Live, first: bool) -> Option<Result<(), String>> {
     let up = [WAVE_GOLEM_AT[0], WAVE_GOLEM_AT[1] + 1.0, WAVE_GOLEM_AT[2]];
     if first {
@@ -1154,7 +1154,7 @@ fn slime_splits(game: &mut Game<'_>, dim: &str, now: u64, live: &mut Live, first
         s.mobs
             .iter()
             .filter(|(c, t)| **c != id && t.alive && t.size == 2 && s.data.mobs[t.kind].id == "bog_slime")
-            .filter(|(_, t)| soulscraft::rules::geom::dist(t.pos, BASE) <= 4.0)
+            .filter(|(_, t)| soulscraft_rules::geom::dist(t.pos, BASE) <= 4.0)
             .map(|(c, _)| *c)
             .collect()
     };
@@ -1210,7 +1210,7 @@ fn grab(game: &mut Game<'_>, dim: &str, now: u64, live: &mut Live, case: &str, f
         }
         _ => {
             let at = |id: u32| game.mobs.iter().find(|m| m.id == id && !m.removed).map(|m| [m.position.x, m.position.y, m.position.z]);
-            let d = soulscraft::rules::geom::dist(at(mob)?, at(golem)?);
+            let d = soulscraft_rules::geom::dist(at(mob)?, at(golem)?);
             if d > 1.5 {
                 return Some(Err(format!("the golem is {d:.2} blocks from the lurker {since} ticks into the grab")));
             }
@@ -1232,7 +1232,7 @@ fn kept_prey(game: &Game<'_>, live: &Live, golem: u32) -> Result<(), String> {
     let find = |id: u32| game.mobs.iter().find(|m| m.id == id && !m.removed);
     let g = find(golem).ok_or("the first golem is gone")?;
     let o = find(other).ok_or("the second golem is gone")?;
-    let moved = soulscraft::rules::geom::dist([o.position.x, o.position.y, o.position.z], OTHER_AT);
+    let moved = soulscraft_rules::geom::dist([o.position.x, o.position.y, o.position.z], OTHER_AT);
     let bitten = g.health < g.attrs.max_health;
     let spared = o.health >= o.attrs.max_health;
     if bitten && spared && moved < 0.5 {

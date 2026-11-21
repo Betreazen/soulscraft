@@ -13,7 +13,7 @@ use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 /// The copy of data/book.json the crate was built with (mod/sync.ps1 writes it).
-pub const EMBEDDED: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/data/book.json"));
+pub const EMBEDDED: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/data/soulscraft/book.json"));
 /// The player's persistent data key the progress lives under (PCT's `pct:summary` sits beside it).
 pub const KEY: &str = "soulscraft:book";
 /// Server → client: a [`BookMsg`].

@@ -1,21 +1,45 @@
 //! SoulsCraft, a native Horizon mod on the Mod API (Nightly 8f83e5c).
 //!
-//! The mod is three layers:
-//! - the game-free crates, re-exported here as [`rules`] (the data, the brain, rigs, the wire
-//!   formats, the commands) and [`loot`] (the loot table changes);
-//! - this crate's `Hooks` impl and Parts: the registrations (block entity types, Parts, payloads,
+//! One crate, `soulscraft_rules` (the name the glue has always called it by):
+//! - the game-free rules: the mob data, attack phases, power scaling, the mobs' minds, the rigs
+//!   the client draws, the wire formats between the halves, the commands, the altar, the event,
+//!   trophies, the book (the modules below, all with their own tests), and [`loot`], the loot
+//!   table changes;
+//! - the `Hooks` impl and Parts: the registrations (block entity types, Parts, payloads,
 //!   commands), the hooks that need no game (loot tables, the bleed's period, block entity
 //!   answers, placement states, the book's right click), and the empty methods that open the
 //!   game's gates for the mixins;
-//! - the game glue: support modules (src/modules, `crate::game::soulscraft_*`) and the
-//!   `[[native.mixin]]` helpers (src/mixins) that call them with the game, as horizon-mod.toml
-//!   lists them.
+//! - the game glue, outside this crate's module tree: support modules (src/modules, compiled as
+//!   `crate::game::soulscraft_*` in the game's mirror) and the `[[native.mixin]]` helpers
+//!   (src/mixins) that call them with the game, as horizon-mod.toml lists them.
 //!
 //! The glue can call this crate; this crate cannot call the glue. What the crate hears without
-//! the game goes through [`bridge`].
+//! the game goes through [`bridge`]. The JSON it compiles in is the package's own
+//! `data/soulscraft/*.json` and `assets/soulscraft/rigs/*.trophy.json`, written by mod/sync.ps1.
 
-pub use soulscraft_loot as loot;
-pub use soulscraft_rules as rules;
+pub mod attack;
+pub mod brain;
+pub mod data;
+pub mod geom;
+pub mod pct;
+pub mod scale;
+pub mod rig;
+pub mod wire;
+pub mod command;
+pub mod altar;
+pub mod flow;
+pub mod defense;
+pub mod event;
+pub mod view;
+pub mod fit;
+pub mod cover;
+pub mod trophy;
+pub mod boost;
+pub mod vanilla;
+pub mod book;
+pub mod book_page;
+pub mod natural;
+pub mod loot;
 
 pub mod bridge;
 
@@ -23,7 +47,6 @@ use mod_api::{
     BlockEntityPart, BlockPart, Flow, Hooks, IPayloadContext, IPayloadHandler, ItemPart, PayloadBytes,
     PayloadHandleError, PayloadId,
 };
-use rules::{altar, book, trophy, view, wire};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -118,12 +141,12 @@ impl Hooks for SoulsCraft {
     /// `/sc` for operators, the book's command, the bench's console command (level 4: only the
     /// console and the mods run it) and RustCraft's machine kills.
     fn register_commands(&self, _: &mut dyn mod_api::ServerHost, event: &mut mod_api::RegisterCommandsEvent<'_>) {
-        for usage in rules::command::USAGES {
+        for usage in command::USAGES {
             event.commands.push(mod_api::Command::op(usage, 2));
         }
         event
             .commands
-            .push(mod_api::Command::op(&format!("{} run [filter:word]", rules::command::SELFTEST), 4));
+            .push(mod_api::Command::op(&format!("{} run [filter:word]", command::SELFTEST), 4));
         event.commands.push(mod_api::Command::op("sc book <player:word> [action:text]", 2));
         // The type has a colon, which a `word` does not take: the rest of the line is one `text`.
         event.commands.push(mod_api::Command::op(
@@ -359,7 +382,7 @@ mod tests {
     #[test]
     fn every_trophy_mob_has_its_file() {
         for mob in TROPHY_MOBS {
-            assert!(rules::trophy::embedded_text(mob).is_some(), "{mob}");
+            assert!(trophy::embedded_text(mob).is_some(), "{mob}");
         }
     }
 

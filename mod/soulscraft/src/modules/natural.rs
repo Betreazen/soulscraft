@@ -1,4 +1,4 @@
-// The survival slice in the world (docs/design/10-survival.md; soulscraft::rules::natural):
+// The survival slice in the world (docs/design/10-survival.md; soulscraft_rules::natural):
 // SoulsCraft's mobs in the overworld's natural spawn lists by biome (hypothesis Г14), the lurker's
 // own spawner in deep ocean water, and the soul shard a credited kill drops (Г15).
 //
@@ -27,14 +27,14 @@
 use super::soulscraft_compat::*;
 use crate::game::Game;
 use horizon_client::biome::SpawnEntry;
-use soulscraft::rules::data::MobsFile;
-use soulscraft::rules::event::Rng;
+use soulscraft_rules::data::MobsFile;
+use soulscraft_rules::event::Rng;
 use std::sync::{LazyLock, Mutex, PoisonError};
 
 /// The data as built: spawn lists are asked often, no copy of the live data each time.
 static MOBS: LazyLock<MobsFile> = LazyLock::new(MobsFile::embedded);
 /// The head's world chances (data/trophies.json).
-static CHANCES: LazyLock<soulscraft::rules::event::TrophyChances> = LazyLock::new(soulscraft::rules::event::TrophyChances::embedded);
+static CHANCES: LazyLock<soulscraft_rules::event::TrophyChances> = LazyLock::new(soulscraft_rules::event::TrophyChances::embedded);
 static RNG: LazyLock<Mutex<Rng>> = LazyLock::new(|| Mutex::new(Rng::new(0x5EED_50_11)));
 /// Lists extended since the last read (the self-test and the cost line).
 static EXTENDED: Mutex<u64> = Mutex::new(0);
@@ -55,7 +55,7 @@ pub(super) fn on_potential_spawns(game: &Game<'_>, dimension: &str, category: &s
     let Some(biome) = game.sc_biome(pos) else { return };
     let listed: Vec<&str> = entries.iter().map(|e| e.entity.as_str()).collect();
     let best = best_power_at([f64::from(pos[0]) + 0.5, f64::from(pos[1]), f64::from(pos[2]) + 0.5]);
-    let extras = soulscraft::rules::natural::extras(&MOBS.natural, &MOBS, &biome, pos[1], &listed, best);
+    let extras = soulscraft_rules::natural::extras(&MOBS.natural, &MOBS, &biome, pos[1], &listed, best);
     if extras.is_empty() {
         return;
     }
@@ -69,7 +69,7 @@ pub(super) fn on_potential_spawns(game: &Game<'_>, dimension: &str, category: &s
 /// `natural.tier_gate_blocks` (None: nobody that near).
 pub(super) fn best_power_at(at: [f64; 3]) -> Option<f64> {
     let p = POWERS.lock().unwrap_or_else(PoisonError::into_inner);
-    p.1.or_else(|| soulscraft::rules::scale::best_power_near(at, &p.0, MOBS.natural.tier_gate_blocks))
+    p.1.or_else(|| soulscraft_rules::scale::best_power_near(at, &p.0, MOBS.natural.tier_gate_blocks))
 }
 
 /// Reads the overworld players' P and the override for the tier gate now (the level tick, and the
@@ -113,7 +113,7 @@ pub(super) fn on_level_tick(game: &mut Game<'_>, dim: &str, now: u64) {
         if !MOBS.natural.lurker_allowed(&MOBS, best_power_at(spot)) {
             continue;
         }
-        let near = game.mobs.iter().filter(|m| !m.removed && m.alive() && m.kind.id == def.key && soulscraft::rules::geom::dist([m.position.x, m.position.y, m.position.z], spot) <= l.near_blocks).count();
+        let near = game.mobs.iter().filter(|m| !m.removed && m.alive() && m.kind.id == def.key && soulscraft_rules::geom::dist([m.position.x, m.position.y, m.position.z], spot) <= l.near_blocks).count();
         if near >= l.near_cap {
             continue;
         }
@@ -133,11 +133,11 @@ fn water_column(game: &Game<'_>, x: i32, z: i32, max_y: i32) -> Option<i32> {
 }
 
 /// What credited kills drop in the world, from the book's deaths: (mob key, where). Shards, now
-/// and then a horn, the head, armour pieces (soulscraft::rules::natural::world_drops).
+/// and then a horn, the head, armour pieces (soulscraft_rules::natural::world_drops).
 pub(super) fn drop_loot(game: &mut Game<'_>, dim: &str, kills: &[(String, [f64; 3])]) {
     for (kind, at) in kills {
         let Some(def) = MOBS.mob(kind) else { continue };
-        for (item, n) in soulscraft::rules::natural::world_drops(&MOBS, &CHANCES, def, roll) {
+        for (item, n) in soulscraft_rules::natural::world_drops(&MOBS, &CHANCES, def, roll) {
             let snbt = format!("{{Item:{{id:\"{item}\",count:{n}}},PickupDelay:10}}");
             let Ok((horizon_core::nbt::Tag::Compound(nbt), _)) = horizon_core::nbt::parse_snbt(&snbt) else { continue };
             game.sc_summon(dim, "minecraft:item", [at[0], at[1] + 0.3, at[2]], nbt);

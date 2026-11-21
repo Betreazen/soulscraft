@@ -1,15 +1,17 @@
 [package]
-# The mod's crate (lib `soulscraft`): the `Hooks` impl and the Parts in src/lib.rs, and the two
-# game-free crates re-exported as `soulscraft::rules` and `soulscraft::loot`, which the support
-# modules (src/modules, compiled inside `crate::game`) and the mixin helpers (src/mixins) call.
-name = "soulscraft"
+# The mod's crate keeps the rules crate's name: the glue (src/modules, compiled inside
+# `crate::game`, and the mixin helpers in src/mixins) calls it as `soulscraft_rules`, as the bundle
+# era did. It holds the game-free rules, the loot table changes, and the Hooks impl and Parts.
+# The package must be one flat Cargo project (horizon-mod-package `source_file`): no crates of its
+# own besides this one, only Rust and TOML under src/.
+name = "soulscraft-rules"
 version = "0.8.0"
 edition = "2024"
 publish = false
 description = "SoulsCraft: souls-like enemies, the altar and its wave events, trophies and the hunter's book, a native Horizon mod"
 
 [lib]
-name = "soulscraft"
+name = "soulscraft_rules"
 path = "src/lib.rs"
 
 [dependencies]
@@ -17,7 +19,6 @@ path = "src/lib.rs"
 # command. Registry dependencies are pinned by Cargo.lock, seeded from the game's own Cargo.lock
 # (docs/development.md).
 horizon-mod-api = { path = ".horizon/sdk/api/crates/horizon-mod-api" }
-soulscraft-rules = { path = "rules" }
-soulscraft-loot = { path = "loot" }
+serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 log = "0.4"

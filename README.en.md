@@ -152,10 +152,10 @@ Hunter's book progress is kept in player data (`soulscraft:book`) and survives a
 ## For developers
 
 ```powershell
-cargo test     # the game-free rules: attacks, mob minds, the altar, events, the book, trophies
+cd mod/soulscraft; cargo test --lib     # the game-free rules: attacks, mob minds, the altar, events, the book, trophies, loot
 ```
 
-- **Rules without the game.** All logic lives in the [`soulscraft-rules`](mod/soulscraft/rules) crate and is checked by `cargo test`; the modules that hold `Game` only pass events on.
+- **Rules without the game.** All logic lives in the mod's crate [`soulscraft-rules`](mod/soulscraft/src) and is checked by `cargo test --lib` in `mod/soulscraft`; the modules that hold `Game` only pass events on.
 - **One source of numbers.** [`data/mobs.json`](data/mobs.json), [`data/altar.json`](data/altar.json), [`data/trophies.json`](data/trophies.json) and [`data/book.json`](data/book.json) feed the server, Blender and the showcase.
 - **Models from code.** Mobs, blocks and trophies are built by Blender scripts: [`assets/models/README.md`](assets/models/README.md).
 - **In-game checks.** The bench self-test and bot clients with screenshots: [`prototypes/README.md`](prototypes/README.md). How the code is laid out and which Horizon hooks it takes: [`mod/README.md`](mod/README.md).

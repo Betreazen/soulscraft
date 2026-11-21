@@ -16,10 +16,10 @@ mod/
     assets/soulscraft/textures/entity/*.png       текстуры мобов
     assets/soulscraft/{items,models/item,textures/item}/   модели и текстуры оружия
     assets/soulscraft/lang/                       имена
-  soulscraft/                 нативный бандл
-    horizon-mixin.toml        хуки, модули, крейт; в шапке — места вызова хуков и ловушки
-    rules/                    крейт soulscraft-rules без игры: вся логика, cargo test
-    loot/                     крейт soulscraft-loot для horizon-world: пулы лута из data/loot.json, cargo test
+  soulscraft/                 пакет мода на Mod API (Horizon 8f83e5c): только Cargo-проект, assets/ и data/
+    horizon-mod.toml          манифест: модули и миксины, привязка [native] к сборке
+    src/*.rs                  крейт мода soulscraft-rules: правила без игры, лут (loot.rs), Hooks и Part (lib.rs), cargo test --lib
+    src/modules, src/mixins   код в игре: модули и хелперы миксинов (в дерево модулей крейта не входят)
     server.rs                 сервер: учёт мобов, статы от P, мозг → навигация и урон, заметки клиентам
     tools.rs                  /sc, арена, волны, стенд П5
     power.rs                  сила игрока P: снаряжение и сводка PCT `pct:summary` (кэш на тике уровня)
@@ -75,7 +75,7 @@ mod/
 ## Команды
 
 ```powershell
-cargo test                         # крейт rules, секунды (из корня репозитория)
+cargo test --lib                   # правила и лут, секунды (в mod/soulscraft)
 .\mod\sync.ps1                     # обновить копии после правки data/ или assets/
 .\mod\sync.ps1 -Check              # упасть, если копия отстала (перед коммитом и stage)
 ```
@@ -94,7 +94,7 @@ cargo test                         # крейт rules, секунды (из ко
 
 ## Где лежат числа во время игры
 
-- Сервер берёт `data/mobs.json`, вкомпилированный в крейт (`rules/data/mobs.json`, копия от `sync.ps1`).
+- Сервер берёт `data/mobs.json`, вкомпилированный в крейт (`soulscraft/data/soulscraft/mobs.json`, копия от `sync.ps1`).
 - `/sc reload` читает `config/soulscraft/mobs.json` в папке сервера. Туда его кладёт `prototypes/tune.ps1`. Если файл есть при старте, сервер берёт его.
 - Другие моды (турели RustCraft: `turret_effects`, `effects.bleeding`) читают копию из контент-мода: **`horizon-mods/soulscraft/data/soulscraft/mobs.json`** от папки сервера или instance.
 

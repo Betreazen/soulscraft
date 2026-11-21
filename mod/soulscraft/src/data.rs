@@ -10,7 +10,7 @@ use serde::Deserialize;
 use serde_json::{Map, Value};
 
 /// The copy of data/mobs.json the crate was built with (mod/sync.ps1 writes it; never edit it).
-pub const EMBEDDED: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/data/mobs.json"));
+pub const EMBEDDED: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/data/soulscraft/mobs.json"));
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct MobsFile {

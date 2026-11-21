@@ -11,7 +11,7 @@ use crate::game::soulscraft_book as book;
 use crate::game::soulscraft_event as event;
 use crate::game::soulscraft_selftest_altar::{Case, DIM, at, build, centre, has, level, start};
 use crate::game::soulscraft_server as server;
-use soulscraft::rules::{
+use soulscraft_rules::{
     book::{self as rb, BookFile, Progress},
     defense::Role,
     event::SpawnMob,
@@ -323,13 +323,13 @@ fn kill_command(game: &mut Game<'_>, t: u64, c: &mut Case) -> Option<Result<(), 
 fn vanilla_numbers(game: &Game<'_>) -> Result<(), String> {
     let file = BookFile::embedded();
     let catalog = rb::Catalog::embedded();
-    let trophies: serde_json::Value = serde_json::from_str(soulscraft::rules::event::TROPHIES).map_err(|e| e.to_string())?;
+    let trophies: serde_json::Value = serde_json::from_str(soulscraft_rules::event::TROPHIES).map_err(|e| e.to_string())?;
     let stats = |k: &str| book::engine_stats(game, k);
     let page_text = |id: &str, kills: f64| -> Result<String, String> {
         let (e, m) = catalog.get(id).ok_or(format!("no entry {id}"))?.clone();
         let mut p = Progress::default();
         p.kill(&file, &e, kills);
-        let page = soulscraft::rules::book_page::mob_page_with(&file, &catalog, &trophies, &e, &m, &p, &stats);
+        let page = soulscraft_rules::book_page::mob_page_with(&file, &catalog, &trophies, &e, &m, &p, &stats);
         Ok(page.lines.iter().map(|l| l.text.as_str()).collect::<Vec<_>>().join(" | "))
     };
     let killed = page_text("zombie", 1.0)?;
