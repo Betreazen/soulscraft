@@ -1,0 +1,457 @@
+id = "soulscraft"
+name = "SoulsCraft"
+version = "0.8.0"
+description = """Souls-like enemies (revenant, stalker, marksman, brute, shrike, lurker, bog slime) with
+their own rigs, weapons and attacks, the altar and its wave events, trophies and the hunter's book."""
+authors = ["SoulsCraft"]
+api = "0.2"
+# Both halves: the server drives the mobs and the altar, every client draws them. The server
+# compares id and version with each joining client.
+side = "both"
+capabilities = ["registries"]
+
+# The build every row below is written against: a native mod works only on its pinned build.
+[native]
+game = "26.3"
+horizon = "8f83e5c85ae3b9a117f742e8d91170c5c9080a06"
+mixins = "e59da9094f0c2fdda6c627fe9eff22dec6a906f0"
+
+# ---- Support modules: the game glue, compiled in the mirror of `crate::game` ----
+# Each is `crate::game::soulscraft_<id>` and sees Game's private items. They call the mod's crate
+# as `soulscraft::…` (rules, loot, bridge); the crate cannot call them.
+
+# The old native names over 8f83e5c's (the shared shim's place: see the file's head).
+[[native.module]]
+id = "compat"
+file = "crates/horizon-client/src/game.rs"
+name = "soulscraft_compat"
+source = "src/modules/compat.rs"
+
+# New mobs' goals, box and flags (the bundle era's register_goals hook).
+[[native.module]]
+id = "goals"
+file = "crates/horizon-client/src/game.rs"
+name = "soulscraft_goals"
+source = "src/modules/goals.rs"
+
+# The server half: tracking, stats from P, driving each mob from its brain, damage, clip notes.
+[[native.module]]
+id = "server"
+file = "crates/horizon-client/src/game.rs"
+name = "soulscraft_server"
+source = "src/modules/server.rs"
+
+# The operator's /sc commands, the arena, the test waves and the П5 bench.
+[[native.module]]
+id = "tools"
+file = "crates/horizon-client/src/game.rs"
+name = "soulscraft_tools"
+source = "src/modules/tools.rs"
+
+# The player power P: gear and Path-of-craft-tree's `pct:summary`, read on the level tick.
+[[native.module]]
+id = "power"
+file = "crates/horizon-client/src/game.rs"
+name = "soulscraft_power"
+source = "src/modules/power.rs"
+
+# The client half: the clip notes, the rigs and the drawing, the debug labels.
+[[native.module]]
+id = "client"
+file = "crates/horizon-client/src/game.rs"
+name = "soulscraft_client"
+source = "src/modules/client.rs"
+
+# The altar on the server: cores, levels, tall pieces, the pedestal, the menu.
+[[native.module]]
+id = "altar"
+file = "crates/horizon-client/src/game.rs"
+name = "soulscraft_altar"
+source = "src/modules/altar.rs"
+
+# The wave event: phases, participants, the path map, drain, curse, breach, reward, restore.
+[[native.module]]
+id = "event"
+file = "crates/horizon-client/src/game.rs"
+name = "soulscraft_event"
+source = "src/modules/event.rs"
+
+[[native.module]]
+id = "event_path"
+file = "crates/horizon-client/src/game.rs"
+name = "soulscraft_event_path"
+source = "src/modules/event_path.rs"
+
+[[native.module]]
+id = "event_ui"
+file = "crates/horizon-client/src/game.rs"
+name = "soulscraft_event_ui"
+source = "src/modules/event_ui.rs"
+
+# The altar on the client: the pedestal's item, the ghost, beams and spawn points, the menu.
+[[native.module]]
+id = "altar_client"
+file = "crates/horizon-client/src/game.rs"
+name = "soulscraft_altar_client"
+source = "src/modules/altar_client.rs"
+
+# What players see of an altar: the menu's lines, the views, `/sc altar` and `/sc event`.
+[[native.module]]
+id = "altar_ui"
+file = "crates/horizon-client/src/game.rs"
+name = "soulscraft_altar_ui"
+source = "src/modules/altar_ui.rs"
+
+# Cover from RustCraft's attack turrets (role "attack" in the turret's block entity).
+[[native.module]]
+id = "cover"
+file = "crates/horizon-client/src/game.rs"
+name = "soulscraft_cover"
+source = "src/modules/cover.rs"
+
+# The approved vanilla changes (07-vanilla-mobs.md), driven after SoulsCraft's own mobs.
+[[native.module]]
+id = "vanilla"
+file = "crates/horizon-client/src/game.rs"
+name = "soulscraft_vanilla"
+source = "src/modules/vanilla.rs"
+
+# Heads and dioramas on the server: block entities, wall heads, particles.
+[[native.module]]
+id = "trophy"
+file = "crates/horizon-client/src/game.rs"
+name = "soulscraft_trophy"
+source = "src/modules/trophy.rs"
+
+# Heads and dioramas drawn from the trophy files and the mobs' rigs.
+[[native.module]]
+id = "trophy_client"
+file = "crates/horizon-client/src/game.rs"
+name = "soulscraft_trophy_client"
+source = "src/modules/trophy_client.rs"
+
+# The altar's sector of more frequent spawns.
+[[native.module]]
+id = "spawn_boost"
+file = "crates/horizon-client/src/game.rs"
+name = "soulscraft_spawn_boost"
+source = "src/modules/spawn_boost.rs"
+
+# The survival slice: natural spawns by biome, the lurker's water spawner, soul shards.
+[[native.module]]
+id = "natural"
+file = "crates/horizon-client/src/game.rs"
+name = "soulscraft_natural"
+source = "src/modules/natural.rs"
+
+# The hunter's book on the server: progress in the players' persistent data, kill credit.
+[[native.module]]
+id = "book"
+file = "crates/horizon-client/src/game.rs"
+name = "soulscraft_book"
+source = "src/modules/book.rs"
+
+# The book's window on the client.
+[[native.module]]
+id = "book_client"
+file = "crates/horizon-client/src/game.rs"
+name = "soulscraft_book_client"
+source = "src/modules/book_client.rs"
+
+# The Abyss Heart's +4 max health in the off hand, through the `attribute` command.
+[[native.module]]
+id = "relic"
+file = "crates/horizon-client/src/game.rs"
+name = "soulscraft_relic"
+source = "src/modules/relic.rs"
+
+# SoulsCraft's own time in its level ticks (`/sc cost`).
+[[native.module]]
+id = "cost"
+file = "crates/horizon-client/src/game.rs"
+name = "soulscraft_cost"
+source = "src/modules/cost.rs"
+
+# A level's mob by id through an index rebuilt each level tick.
+[[native.module]]
+id = "find"
+file = "crates/horizon-client/src/game.rs"
+name = "soulscraft_find"
+source = "src/modules/find.rs"
+
+# The bench's self-test scenarios (`soulscraft_selftest run [filter]`).
+[[native.module]]
+id = "selftest"
+file = "crates/horizon-client/src/game.rs"
+name = "soulscraft_selftest"
+source = "src/modules/selftest.rs"
+
+[[native.module]]
+id = "selftest_altar"
+file = "crates/horizon-client/src/game.rs"
+name = "soulscraft_selftest_altar"
+source = "src/modules/selftest_altar.rs"
+
+[[native.module]]
+id = "selftest_turret"
+file = "crates/horizon-client/src/game.rs"
+name = "soulscraft_selftest_turret"
+source = "src/modules/selftest_turret.rs"
+
+[[native.module]]
+id = "selftest_undead"
+file = "crates/horizon-client/src/game.rs"
+name = "soulscraft_selftest_undead"
+source = "src/modules/selftest_undead.rs"
+
+[[native.module]]
+id = "selftest_vanilla"
+file = "crates/horizon-client/src/game.rs"
+name = "soulscraft_selftest_vanilla"
+source = "src/modules/selftest_vanilla.rs"
+
+[[native.module]]
+id = "selftest_trophy"
+file = "crates/horizon-client/src/game.rs"
+name = "soulscraft_selftest_trophy"
+source = "src/modules/selftest_trophy.rs"
+
+[[native.module]]
+id = "selftest_book"
+file = "crates/horizon-client/src/game.rs"
+name = "soulscraft_selftest_book"
+source = "src/modules/selftest_book.rs"
+
+# ---- Mixins ----
+# A HEAD row on a `native_*` entry point is silent unless lib.rs implements the matching Hooks or
+# Part method (the game asks `listened` / `has_part_hook` before it calls the entry point), so
+# each such row has a gate method there, empty or thin.
+
+# ---- Server ----
+
+# Each level after its tick: the bridge's queues, then the server half (gate: level_tick_post).
+[[native.mixin]]
+id = "level_tick"
+target = "horizon_client::game::native_hooks::base::Game<'_>::native_level_tick_post"
+kind = "HEAD"
+helper = "src/mixins/level_tick.rs"
+bindings = [
+  { name = "game", ty = "&mut Game<'_>", value = "&mut *self" },
+  { name = "level", ty = "mod_api::LevelRef", value = "level" },
+]
+
+# A mob joining a server level, before its first tick: goals, box, flags (gate: entity_join_level).
+[[native.mixin]]
+id = "entity_join"
+target = "horizon_client::game::native_hooks::base::Game<'_>::native_entity_join_level"
+kind = "HEAD"
+helper = "src/mixins/entity_join.rs"
+bindings = [
+  { name = "game", ty = "&mut Game<'_>", value = "&mut *self" },
+  { name = "entity", ty = "u32", value = "entity" },
+  { name = "kind", ty = "&str", value = "kind" },
+]
+
+# /sc, the book's command, the bench's console command, RustCraft's machine kills, as registered
+# in lib.rs (gate: run_mod_command).
+[[native.mixin]]
+id = "run_mod_command"
+target = "horizon_client::game::native_hooks::base::Game<'_>::native_run_mod_command"
+kind = "HEAD"
+helper = "src/mixins/run_mod_command.rs"
+bindings = [
+  { name = "game", ty = "&mut Game<'_>", value = "&mut *self" },
+  { name = "source", ty = "&mod_api::CommandSource", value = "source" },
+  { name = "command", ty = "&mod_api::CommandInvocation", value = "command" },
+  { name = "ran", ty = "&mut bool", value = "&mut *ran" },
+]
+
+# soulscraft:bleeding's hurt, queued for the level's tick (gate: apply_effect_tick). The call is
+# passed by value, so the helper borrows it.
+[[native.mixin]]
+id = "effect_tick"
+target = "horizon_client::game::native_hooks::base::Game<'_>::native_apply_effect_tick"
+kind = "HEAD"
+helper = "src/mixins/effect_tick.rs"
+bindings = [
+  { name = "game", ty = "&Game<'_>", value = "&*self" },
+  { name = "call", ty = "&mod_api::__private::ApplyEffectTickCall<'_>", value = "&call" },
+]
+
+# Every committed setBlock of an authoritative server. The entry point it calls
+# (`native_block_changed`) is #[inline(always)], so the row is on its one caller.
+[[native.mixin]]
+id = "block_changed"
+target = "horizon_client::game::level_access::<GameLevel<'_> as LevelAccess>::observe_block_changed"
+kind = "HEAD"
+helper = "src/mixins/block_changed.rs"
+bindings = [
+  { name = "level", ty = "&GameLevel<'_>", value = "&*self" },
+  { name = "pos", ty = "BlockPos", value = "pos" },
+  { name = "old", ty = "BlockStateId", value = "old" },
+  { name = "new", ty = "BlockStateId", value = "new" },
+]
+
+# A right click on a block (gate: right_click_block).
+[[native.mixin]]
+id = "right_click_block"
+target = "horizon_client::game::native_hooks::base::Game<'_>::native_right_click_block"
+kind = "HEAD"
+helper = "src/mixins/right_click_block.rs"
+bindings = [
+  { name = "game", ty = "&mut Game<'_>", value = "&mut *self" },
+  { name = "click", ty = "&BlockClick<'_>", value = "click" },
+  { name = "cancellation_result", ty = "&mut mod_api::InteractionResult", value = "&mut *cancellation_result" },
+  { name = "canceled", ty = "&mut bool", value = "&mut *canceled" },
+]
+
+# A player about to break a block (gate: break_block).
+[[native.mixin]]
+id = "break_block"
+target = "horizon_client::game::native_hooks::base::Game<'_>::native_break_block"
+kind = "HEAD"
+helper = "src/mixins/break_block.rs"
+bindings = [
+  { name = "game", ty = "&mut Game<'_>", value = "&mut *self" },
+  { name = "pos", ty = "[i32; 3]", value = "pos" },
+]
+
+# A position's possible natural spawns (gate: potential_spawns). SoulsCraft has a Hooks impl now,
+# so natural spawning asks for them everywhere (`spawn_hooks` is `!mods().is_empty()`): the bundle
+# era's `spawn_hooks` row is gone, and the modules filter by dimension.
+[[native.mixin]]
+id = "potential_spawns"
+target = "horizon_client::game::native_hooks::native_potential_spawns::Game<'_>::native_potential_spawns"
+kind = "HEAD"
+helper = "src/mixins/potential_spawns.rs"
+bindings = [
+  { name = "game", ty = "&Game<'_>", value = "&*self" },
+  { name = "dimension", ty = "&str", value = "dimension" },
+  { name = "category", ty = "&str", value = "category" },
+  { name = "pos", ty = "[i32; 3]", value = "pos" },
+  { name = "entries", ty = "&mut Vec<SpawnEntry>", value = "&mut *entries" },
+]
+
+# A mob's death, at the function the `living_death` hook is told from; before its listened check,
+# so no gate.
+[[native.mixin]]
+id = "mob_death"
+target = "horizon_client::game::native_hooks::living_death::Game<'_>::mob_death_canceled"
+kind = "HEAD"
+helper = "src/mixins/mob_death.rs"
+bindings = [
+  { name = "game", ty = "&mut Game<'_>", value = "&mut *self" },
+  { name = "mob", ty = "&horizon_client::mobs::Mob", value = "mob" },
+]
+
+# The mobs a spawner made.
+[[native.mixin]]
+id = "spawner_planned"
+target = "horizon_client::game::spawner::Game<'_>::add_planned"
+kind = "RETURN"
+helper = "src/mixins/spawner_planned.rs"
+bindings = [
+  { name = "value", ty = "std::collections::HashMap<u32, u32>", value = "$value" },
+]
+
+# Natural spawning's candidate chunks: an altar sector's chunks come again.
+[[native.mixin]]
+id = "spawning_chunks"
+target = "horizon_client::game::natural_spawning::Game<'a>::spawning_chunks"
+kind = "RETURN"
+helper = "src/mixins/spawning_chunks.rs"
+bindings = [
+  { name = "value", ty = "i32", value = "$value" },
+  { name = "game", ty = "&Game<'_>", value = "&*self" },
+  { name = "scratch", ty = "&mut SpawnScratch", value = "&mut *scratch" },
+]
+
+# The hardcore guard: `ServerPlayer.die` for a guest.
+[[native.mixin]]
+id = "guest_die"
+target = "horizon_client::game::lan_actions::respawn::Game<'_>::guest_die"
+kind = "HEAD"
+helper = "src/mixins/guest_die.rs"
+bindings = [
+  { name = "game", ty = "&mut Game<'_>", value = "&mut *self" },
+  { name = "gi", ty = "usize", value = "gi" },
+]
+
+# ---- Client ----
+
+# The window's tick: the queued payloads, the menus, the book's window, new mob copies' boxes
+# (gate: client_tick_post).
+[[native.mixin]]
+id = "client_tick"
+target = "horizon_client::game::native_hooks::client_tick_post::Game<'_>::native_client_tick_post"
+kind = "HEAD"
+helper = "src/mixins/client_tick.rs"
+bindings = [
+  { name = "game", ty = "&mut Game<'_>", value = "&mut *self" },
+]
+
+# Every mob in view each frame (gate: render_living_pre).
+[[native.mixin]]
+id = "render_living_pre"
+target = "horizon_client::game::native_hooks::render_living_pre::Game<'_>::native_render_living_pre"
+kind = "HEAD"
+helper = "src/mixins/render_living_pre.rs"
+bindings = [
+  { name = "game", ty = "&Game<'_>", value = "&*self" },
+  { name = "entity", ty = "&MobRender<'_>", value = "entity" },
+  { name = "draw", ty = "&mut BlockEntityDraw", value = "&mut *draw" },
+  { name = "canceled", ty = "&mut bool", value = "&mut *canceled" },
+]
+
+# The debug labels and the altar's beams and wave points, each frame (gate: submit_custom_geometry).
+[[native.mixin]]
+id = "custom_geometry"
+target = "horizon_client::game::native_hooks::submit_custom_geometry::Game<'_>::native_submit_custom_geometry"
+kind = "HEAD"
+helper = "src/mixins/custom_geometry.rs"
+bindings = [
+  { name = "game", ty = "&Game<'_>", value = "&*self" },
+  { name = "view", ty = "&mod_api::WorldRenderView", value = "view" },
+  { name = "draw", ty = "&mut horizon_client::world_geometry::WorldGeometry", value = "&mut *draw" },
+]
+
+# The pedestal's item, the core's ghost, heads, dioramas, the book's figure (gate:
+# BlockEntityPart::block_entity_submit).
+[[native.mixin]]
+id = "block_entity_submit"
+target = "horizon_client::game::native_hooks::base::Game<'_>::native_block_entity_submit"
+kind = "HEAD"
+helper = "src/mixins/block_entity_submit.rs"
+bindings = [
+  { name = "game", ty = "&Game<'_>", value = "&*self" },
+  { name = "pos", ty = "[i32; 3]", value = "pos" },
+  { name = "block", ty = "&str", value = "block" },
+  { name = "entity", ty = "&ModBlockEntity", value = "entity" },
+  { name = "draw", ty = "&mut BlockEntityDraw", value = "&mut *draw" },
+]
+
+# The menu and the book drawn over the mod screen (gate: screen_render_post, which also makes the
+# game build the screen view).
+[[native.mixin]]
+id = "screen_render_post"
+target = "horizon_client::game::native_hooks::base::Game<'_>::native_screen_render_post"
+kind = "HEAD"
+helper = "src/mixins/screen_render_post.rs"
+bindings = [
+  { name = "game", ty = "&Game<'_>", value = "&*self" },
+  { name = "batch", ty = "&mut HudBatch", value = "&mut *draw" },
+  { name = "screen", ty = "&ScreenView<'_>", value = "screen" },
+]
+
+# Their buttons (gate: screen_mouse_button_pressed_pre).
+[[native.mixin]]
+id = "screen_press"
+target = "horizon_client::game::native_hooks::base::Game<'_>::native_screen_mouse_button_pressed_pre"
+kind = "HEAD"
+helper = "src/mixins/screen_press.rs"
+bindings = [
+  { name = "game", ty = "&Game<'_>", value = "&*self" },
+  { name = "screen", ty = "&ScreenView<'_>", value = "screen" },
+  { name = "button", ty = "i32", value = "button" },
+  { name = "canceled", ty = "&mut bool", value = "&mut *canceled" },
+]
