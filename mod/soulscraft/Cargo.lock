@@ -291,6 +291,7 @@ name = "soulscraft"
 version = "0.8.0"
 dependencies = [
  "horizon-mod-api",
+ "log",
  "serde_json",
  "soulscraft-loot",
  "soulscraft-rules",
