@@ -3,8 +3,8 @@
 // puts them outside the zone on the next tick.
 fn soulscraft_guest_die(game: &mut Game<'_>, gi: usize) {
     let Some(host) = game.lan.as_mut() else { return };
-    let Some(g) = host.hub.guests.get_mut(gi) else { return };
+    let Some(g) = host.hub.guests.get(gi) else { return };
     if g.health <= 0.0 && !g.dead && crate::game::soulscraft_event::spare_death(g.uuid) {
-        g.health = 1.0;
+        host.hub.guests.update(gi, |g| g.health = 1.0);
     }
 }

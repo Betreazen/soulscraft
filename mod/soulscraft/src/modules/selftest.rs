@@ -282,11 +282,11 @@ pub(super) fn on_tick(game: &mut Game<'_>, dim: &str, now: u64) {
 
 fn finish(game: &mut Game<'_>, run: Run) {
     clean_area(game, run.peaceful);
-    let json = serde_json::json!({
+    let json = soulscraft_rules::serde_json::json!({
         "mod": "soulscraft",
         "done": true,
         "passed": run.passed,
-        "failed": run.failed.iter().map(|(n, w)| serde_json::json!({"name": n, "why": w})).collect::<Vec<_>>(),
+        "failed": run.failed.iter().map(|(n, w)| soulscraft_rules::serde_json::json!({"name": n, "why": w})).collect::<Vec<_>>(),
     });
     let _ = std::fs::create_dir_all("selftest");
     if let Err(e) = std::fs::write(OUT, json.to_string()) {
@@ -603,10 +603,10 @@ fn reload_scenario(game: &mut Game<'_>, dim: &str, now: u64, live: &mut Live, fi
     if first {
         let path = reload_path()?;
         live.saved = Some(std::fs::read_to_string(&path).ok());
-        let mut v: serde_json::Value = serde_json::from_str(soulscraft_rules::data::EMBEDDED).ok()?;
+        let mut v: soulscraft_rules::serde_json::Value = soulscraft_rules::serde_json::from_str(soulscraft_rules::data::EMBEDDED).ok()?;
         let attacks = v["mobs"].as_array_mut()?.iter_mut().find(|m| m["id"] == "revenant")?["attacks"].as_array_mut()?;
         let o = attacks.iter_mut().find(|a| a["id"] == "overhead")?;
-        o["windup"] = serde_json::json!(14);
+        o["windup"] = soulscraft_rules::serde_json::json!(14);
         let _ = std::fs::create_dir_all(path.parent()?);
         if let Err(e) = std::fs::write(&path, v.to_string()) {
             return Some(Err(format!("{}: {e}", path.display())));

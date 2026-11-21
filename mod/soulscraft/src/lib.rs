@@ -43,6 +43,10 @@ pub mod loot;
 
 pub mod bridge;
 
+/// The crate's own serde_json, for the game glue: values that cross into the rules (book pages,
+/// PCT summaries, mob params) must be this crate's `Value`, not the game's (another crate there).
+pub use serde_json;
+
 use mod_api::{
     BlockEntityPart, BlockPart, Flow, Hooks, IPayloadContext, IPayloadHandler, ItemPart, PayloadBytes,
     PayloadHandleError, PayloadId,

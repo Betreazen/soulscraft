@@ -83,7 +83,7 @@ fn mob<'a>(game: &'a Game<'_>, id: u32) -> Option<&'a horizon_client::mobs::Mob>
 }
 
 fn effects(game: &Game<'_>, id: u32) -> Vec<(String, i32)> {
-    mob(game, id).map(|m| m.extra.effects.iter().map(|(e, t, _)| ((*e).to_owned(), *t)).collect()).unwrap_or_default()
+    mob(game, id).map(|m| m.extra.effects.iter().map(|e| (e.id.to_owned(), e.duration)).collect()).unwrap_or_default()
 }
 
 /// Records each effect's ticks left the first time it shows on the mob.

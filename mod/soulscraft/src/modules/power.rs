@@ -12,7 +12,7 @@
 use super::soulscraft_compat::*;
 use crate::game::Game;
 use horizon_core::nbt::Tag;
-use serde_json::Value;
+use soulscraft_rules::serde_json::Value;
 use soulscraft_rules::{
     data::PowerDef,
     geom::V3,

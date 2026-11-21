@@ -19,7 +19,7 @@ use mod_api::ScreenView;
 use crate::game::soulscraft_client as client;
 use mod_api::{ModBlockEntity, ModelPart, SceneBlockEntity};
 use horizon_client::hud::HudBatch;
-use serde_json::Value;
+use soulscraft_rules::serde_json::Value;
 use soulscraft_rules::{
     altar::AltarFile,
     book::{self, BookFile, Catalog, Progress},
@@ -83,7 +83,7 @@ static DATA: LazyLock<Data> = LazyLock::new(|| Data {
     book: BookFile::embedded(),
     catalog: Catalog::embedded(),
     altar: AltarFile::embedded(),
-    trophies: serde_json::from_str(soulscraft_rules::event::TROPHIES).unwrap_or(Value::Null),
+    trophies: soulscraft_rules::serde_json::from_str(soulscraft_rules::event::TROPHIES).unwrap_or(Value::Null),
 });
 static CLIENT: LazyLock<Mutex<BookClient>> = LazyLock::new(Mutex::default);
 /// The figure's block entity as the scene takes it: an id and empty fields (the scene makes a

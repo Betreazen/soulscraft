@@ -560,7 +560,7 @@ fn tick_mob(
         hold_target(game, dimension, tg, at, players);
     }
     if let Some(at) = tick.shadow
-        && let Some(kind) = def.params.get("shadow_particle").and_then(serde_json::Value::as_str)
+        && let Some(kind) = def.params.get("shadow_particle").and_then(soulscraft_rules::serde_json::Value::as_str)
     {
         shadow(game, &def, size, at, kind);
     }
@@ -696,7 +696,7 @@ fn roar(game: &mut Game<'_>, def: &MobDef, m: &Seen, tick: &Tick, size: u8) {
     if !tick.events.contains(&Event::Mode("rage")) {
         return;
     }
-    let Some(cue) = def.passive("rage").and_then(|r| serde_json::from_value::<Cue>(r.get("cue")?.clone()).ok()) else { return };
+    let Some(cue) = def.passive_cue("rage") else { return };
     let at = geom::add(m.pos, [0.0, def.hitbox_at(size).height * 0.6, 0.0]);
     play_cue(game, m.id, at, &cue);
 }
@@ -1296,10 +1296,12 @@ fn clear_hurt_cooldown(game: &mut Game<'_>, tg: &Target) {
         return;
     }
     let Some(host) = game.lan.as_mut() else { return };
-    let Some(g) = host.hub.guests.iter_mut().find(|g| g.entity_id as u32 == tg.entity) else { return };
-    if let Some(motion) = g.motion.as_deref_mut() {
-        motion.health.hurt.cooldown = 0;
-    }
+    let Some(i) = host.hub.guests.iter().position(|g| g.entity_id as u32 == tg.entity) else { return };
+    host.hub.guests.update(i, |g| {
+        if let Some(motion) = g.motion.as_deref_mut() {
+            motion.health.hurt.cooldown = 0;
+        }
+    });
 }
 
 /// The marksman's bolt: an arrow from its eyes (its hitbox's eye height) at the target. An arrow deals its speed times
@@ -1360,14 +1362,14 @@ fn stick(game: &mut Game<'_>, def: &MobDef, tg: &Target, _id: u32) {
     give_effects(game, &effects, tg.player);
 }
 
-fn serde_json_effects(v: &serde_json::Value) -> Option<Vec<soulscraft_rules::data::EffectDef>> {
+fn serde_json_effects(v: &soulscraft_rules::serde_json::Value) -> Option<Vec<soulscraft_rules::data::EffectDef>> {
     v.as_array()?
         .iter()
         .map(|e| {
             Some(soulscraft_rules::data::EffectDef {
                 id: e.get("id")?.as_str()?.to_owned(),
-                seconds: e.get("seconds").and_then(serde_json::Value::as_f64).unwrap_or(0.0),
-                level: e.get("level").and_then(serde_json::Value::as_u64).map(|l| l as u32),
+                seconds: e.get("seconds").and_then(soulscraft_rules::serde_json::Value::as_f64).unwrap_or(0.0),
+                level: e.get("level").and_then(soulscraft_rules::serde_json::Value::as_u64).map(|l| l as u32),
             })
         })
         .collect()
@@ -1400,7 +1402,7 @@ fn on_death(game: &mut Game<'_>, dim: &str, now: u64, m: &Seen) {
     if child == 0 {
         return;
     }
-    let (lo, hi) = match split.get("spawn_count").and_then(serde_json::Value::as_array) {
+    let (lo, hi) = match split.get("spawn_count").and_then(soulscraft_rules::serde_json::Value::as_array) {
         Some(v) if v.len() == 2 => (v[0].as_u64().unwrap_or(2), v[1].as_u64().unwrap_or(3)),
         _ => (2, 3),
     };
@@ -1552,8 +1554,8 @@ pub(super) fn bleed_numbers() -> (f64, i32) {
     let s = state();
     let e = s.data.effects.get("bleeding");
     (
-        e.and_then(|e| e.get("damage")).and_then(serde_json::Value::as_f64).unwrap_or(1.0),
-        e.and_then(|e| e.get("period_ticks")).and_then(serde_json::Value::as_i64).unwrap_or(20) as i32,
+        e.and_then(|e| e.get("damage")).and_then(soulscraft_rules::serde_json::Value::as_f64).unwrap_or(1.0),
+        e.and_then(|e| e.get("period_ticks")).and_then(soulscraft_rules::serde_json::Value::as_i64).unwrap_or(20) as i32,
     )
 }
 

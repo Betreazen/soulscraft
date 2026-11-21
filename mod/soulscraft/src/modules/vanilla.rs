@@ -225,7 +225,7 @@ pub(super) fn on_level_tick(game: &mut Game<'_>, dim: &str, now: u64, hunters: &
                 target: m.ai.target,
                 swinging: m.ai.swinging,
                 using_item: m.extra.using_item > 0,
-                trident: m.extra.main_hand.as_deref() == Some("minecraft:trident"),
+                trident: m.extra.main_hand_id() == Some("minecraft:trident"),
                 swoop: m.extra.flag,
                 slowed: m.has_effect("minecraft:slowness"),
                 size: m.extra.size,
@@ -692,10 +692,13 @@ fn blow(game: &mut Game<'_>, dim: &str, mob: u32, target: u32, mult: f64, series
             t.invulnerable = 0;
         }
         if let Some(host) = game.lan.as_mut()
-            && let Some(g) = host.hub.guests.iter_mut().find(|g| g.entity_id as u32 == target)
-            && let Some(motion) = g.motion.as_deref_mut()
+            && let Some(i) = host.hub.guests.iter().position(|g| g.entity_id as u32 == target)
         {
-            motion.health.hurt.cooldown = 0;
+            host.hub.guests.update(i, |g| {
+                if let Some(motion) = g.motion.as_deref_mut() {
+                    motion.health.hurt.cooldown = 0;
+                }
+            });
         }
     }
     let Some(i) = crate::game::soulscraft_find::index_of(game, mob) else { return false };

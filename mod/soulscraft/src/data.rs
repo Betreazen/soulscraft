@@ -568,6 +568,12 @@ impl MobDef {
         }
     }
 
+    /// The `cue` of passive `id` (the brute's roar: `passives.rage.cue`). Parsed here, with the
+    /// crate's own serde: the game's serde_json is another crate than the one Cue derives for.
+    pub fn passive_cue(&self, id: &str) -> Option<crate::vanilla::Cue> {
+        serde_json::from_value(self.passive(id)?.get("cue")?.clone()).ok()
+    }
+
     pub fn move_clip(&self, id: &str) -> Option<&str> {
         self.moves.iter().find(|m| m.id == id)?.clip.as_deref()
     }

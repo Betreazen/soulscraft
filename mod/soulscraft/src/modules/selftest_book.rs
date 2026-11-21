@@ -323,7 +323,7 @@ fn kill_command(game: &mut Game<'_>, t: u64, c: &mut Case) -> Option<Result<(), 
 fn vanilla_numbers(game: &Game<'_>) -> Result<(), String> {
     let file = BookFile::embedded();
     let catalog = rb::Catalog::embedded();
-    let trophies: serde_json::Value = serde_json::from_str(soulscraft_rules::event::TROPHIES).map_err(|e| e.to_string())?;
+    let trophies: soulscraft_rules::serde_json::Value = soulscraft_rules::serde_json::from_str(soulscraft_rules::event::TROPHIES).map_err(|e| e.to_string())?;
     let stats = |k: &str| book::engine_stats(game, k);
     let page_text = |id: &str, kills: f64| -> Result<String, String> {
         let (e, m) = catalog.get(id).ok_or(format!("no entry {id}"))?.clone();
