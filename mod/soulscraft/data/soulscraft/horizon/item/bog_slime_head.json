@@ -1,6 +1,6 @@
 {
   "template": "minecraft:bone",
-  "place_block": "soulscraft:bog_slime_head_stand",
+  "block": "soulscraft:bog_slime_head_stand",
   "rarity": "uncommon",
   "components": {
     "minecraft:equippable": {

@@ -435,10 +435,10 @@ foreach ($m in $mobs.mobs) {
                     conditions = @([ordered]@{ type = 'minecraft:survives_explosion' }) }) }
         Write-Text (Join-Path $Content "data\soulscraft\loot_table\blocks\$b.json") (Json $loot)
     }
-    # The head item: places the stand (`place_block`, turned by state_for_placement), worn on the
+    # The head item: places the stand (`block`, turned by state_for_placement), worn on the
     # head (equippable, its model's display.head).
     Write-Text (Join-Path $Content "data\soulscraft\horizon\item\${id}_head.json") `
-        (Json ([ordered]@{ template = 'minecraft:bone'; place_block = "soulscraft:${id}_head_stand"; rarity = 'uncommon'
+        (Json ([ordered]@{ template = 'minecraft:bone'; block = "soulscraft:${id}_head_stand"; rarity = 'uncommon'
             components = [ordered]@{ 'minecraft:equippable' = [ordered]@{ slot = 'head' } } }))
     foreach ($b in "${id}_head", "${id}_trophy") {
         Copy-File (Join-Path $art "models\item\$b.json") (Join-Path $Content "assets\soulscraft\models\item\$b.json")
