@@ -6,6 +6,7 @@
 // reads a third of what a server tick pays.
 #[allow(unused_imports)]
 use super::soulscraft_compat::*;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, PoisonError};
 
 /// The parts of the level tick timed on their own, in the order the tick runs them.
@@ -83,6 +84,65 @@ impl Clock {
 
 pub(super) fn reset() {
     *TOTALS.lock().unwrap_or_else(PoisonError::into_inner) = Totals { nanos: 0, level_ticks: 0, server_ticks: 0, last_time: None, parts: [0; PARTS] };
+    for c in &CALLS {
+        c.0.store(0, Ordering::Relaxed);
+        c.1.store(0, Ordering::Relaxed);
+    }
+}
+
+/// The engine calls timed inside the parts (the compat layer's mob calls, nested in `own_mobs` and
+/// `vanilla`): how many and how long, for `/sc cost`.
+#[derive(Clone, Copy)]
+pub(super) enum Call {
+    Look,
+    Navigate,
+    Stop,
+    Navigating,
+    Attack,
+    Hurt,
+    /// The steps of the own mobs' part (server.rs on_level_tick).
+    Bleed,
+    Players,
+    Seen,
+    TickMob,
+    Notes,
+    /// Inside one own mob's tick (server.rs tick_mob).
+    Target,
+    Brain,
+    DefClone,
+    Act,
+    After,
+}
+
+pub(super) const CALLS_N: usize = 16;
+
+pub(super) const CALL_NAMES: [&str; CALLS_N] = [
+    "look_at", "navigate", "stop", "navigating", "mob_attack", "hurt_entity", "own_bleed", "own_players", "own_seen", "own_tick_mob", "own_notes",
+    "mob_target", "mob_brain", "mob_def_clone", "mob_act", "mob_after",
+];
+
+static CALLS: [(AtomicU64, AtomicU64); CALLS_N] = [const { (AtomicU64::new(0), AtomicU64::new(0)) }; CALLS_N];
+
+/// Runs `f`, charging its time to `call`.
+pub(super) fn timed<R>(call: Call, f: impl FnOnce() -> R) -> R {
+    let started = std::time::Instant::now();
+    let out = f();
+    let c = &CALLS[call as usize];
+    c.0.fetch_add(1, Ordering::Relaxed);
+    c.1.fetch_add(started.elapsed().as_nanos() as u64, Ordering::Relaxed);
+    out
+}
+
+/// Charges `nanos` to `call` (a span `timed` can't wrap).
+pub(super) fn add(call: Call, nanos: u64) {
+    let c = &CALLS[call as usize];
+    c.0.fetch_add(1, Ordering::Relaxed);
+    c.1.fetch_add(nanos, Ordering::Relaxed);
+}
+
+/// (calls, nanoseconds) by [`CALL_NAMES`] since the last reset.
+pub(super) fn calls() -> [(u64, u64); CALLS_N] {
+    std::array::from_fn(|i| (CALLS[i].0.load(Ordering::Relaxed), CALLS[i].1.load(Ordering::Relaxed)))
 }
 
 /// The totals since the last reset: (nanoseconds, level ticks, server ticks, nanoseconds by part).

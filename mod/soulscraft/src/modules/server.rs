@@ -321,7 +321,7 @@ pub(super) fn on_level_tick(game: &mut Game<'_>, dimension: &str) {
         }
         last.insert(dimension.to_owned(), now);
     }
-    hurt_bleeders(game, dimension);
+    crate::game::soulscraft_cost::timed(crate::game::soulscraft_cost::Call::Bleed, || hurt_bleeders(game, dimension));
     clock.lap(Part::Own);
     crate::game::soulscraft_altar::on_level_tick(game, dimension, now);
     clock.lap(Part::Altar);
@@ -337,15 +337,15 @@ pub(super) fn on_level_tick(game: &mut Game<'_>, dimension: &str) {
         crate::game::soulscraft_power::refresh(game, &online, now);
     }
     clock.lap(Part::Power);
-    let players = players_in(game, dimension);
-    let seen = seen_mobs(game);
+    let players = crate::game::soulscraft_cost::timed(crate::game::soulscraft_cost::Call::Players, || players_in(game, dimension));
+    let seen = crate::game::soulscraft_cost::timed(crate::game::soulscraft_cost::Call::Seen, || seen_mobs(game));
     remember_players(&players, &seen);
     let mut notes = Vec::new();
     for m in &seen {
-        tick_mob(game, dimension, now, m, &players, &mut notes);
+        crate::game::soulscraft_cost::timed(crate::game::soulscraft_cost::Call::TickMob, || tick_mob(game, dimension, now, m, &players, &mut notes));
     }
     forget_gone(dimension, now);
-    send_notes(game, dimension, now, &players, notes);
+    crate::game::soulscraft_cost::timed(crate::game::soulscraft_cost::Call::Notes, || send_notes(game, dimension, now, &players, notes));
     clock.lap(Part::Own);
     // The approved vanilla changes (07-vanilla-mobs.md): adopt and drive vanilla mobs.
     crate::game::soulscraft_vanilla::on_level_tick(game, dimension, now, &players);
@@ -486,11 +486,11 @@ fn tick_mob(
     }
     // A grabbing lurker keeps the one in its mouth: gone or dead, it has no target and lets go.
     let prey = GRABS.lock().unwrap_or_else(PoisonError::into_inner).get(&(m.id as i32)).map(|g| g.prey);
-    let target = match (prey, steer) {
+    let target = crate::game::soulscraft_cost::timed(crate::game::soulscraft_cost::Call::Target, || match (prey, steer) {
         (Some(e), _) => target_entity(game, m, e, players),
         (None, Some(Steering::Fight(e))) => target_entity(game, m, e, players),
         _ => choose_target(game, m, players),
-    };
+    });
     let blows = take_blows(m.id, m.health);
     // The hunter's book: the mob saw its target («Встречен», soulscraft_book).
     crate::game::soulscraft_book::saw(&m.kind, m.pos, target.as_ref().map(|t| (t.entity, t.player, t.pos)));
@@ -516,7 +516,7 @@ fn tick_mob(
         target: target.as_ref().map(|t| t.sense),
     };
     let sc = scaled(def, t.p, t.size);
-    let tick = t.brain.tick(def, &sc, &senses);
+    let tick = crate::game::soulscraft_cost::timed(crate::game::soulscraft_cost::Call::Brain, || t.brain.tick(def, &sc, &senses));
     if diver && let Some(tg) = &target {
         // The first shrike into its windup takes the target's turn; its dive's end gives it back.
         let dive_ticks = def.attack("dive").map_or(0, |a| u64::from(Timeline::of(a).end()));
@@ -539,7 +539,7 @@ fn tick_mob(
             label: if *debug { tick.label.clone() } else { String::new() },
         });
     }
-    let def = def.clone();
+    let def = crate::game::soulscraft_cost::timed(crate::game::soulscraft_cost::Call::DefClone, || def.clone());
     let p = t.p;
     let size = t.size;
     let style = t.brain.style;
@@ -549,7 +549,8 @@ fn tick_mob(
     guard_snapshot(m, &tick, style);
     log_events(&def, m.id, now, &tick);
     let leap_up = def.jump_velocity_at(size).unwrap_or(LEAP_UP);
-    let path = drive(game, dimension, now, m, &tick, style, repath, path, &sc, leap_up);
+    let path = crate::game::soulscraft_cost::timed(crate::game::soulscraft_cost::Call::Act, || drive(game, dimension, now, m, &tick, style, repath, path, &sc, leap_up));
+    let after = std::time::Instant::now();
     if let Some(t) = state().mobs.get_mut(&m.id) {
         t.path = path;
         t.stopped = matches!(tick.order, Order::Stay);
@@ -575,6 +576,7 @@ fn tick_mob(
     if tick.wants_cover || tick.wants_post {
         answer_marksman(game, &def, m, &tick, target.as_ref(), size, now);
     }
+    crate::game::soulscraft_cost::add(crate::game::soulscraft_cost::Call::After, after.elapsed().as_nanos() as u64);
 }
 
 /// The cues of this tick's attack phases (data/mobs.json `cue`, at its `on` phase) and of the

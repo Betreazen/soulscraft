@@ -299,7 +299,7 @@ impl ScEntities for Game<'_> {
             None => None,
         };
         let from = by.and_then(|t| self.target_position(t));
-        self.hurt_target(victim, amount, damage_type, by, None, from)
+        crate::game::soulscraft_cost::timed(crate::game::soulscraft_cost::Call::Hurt, || self.hurt_target(victim, amount, damage_type, by, None, from))
     }
     /// native_mobs.rs `kill_mob`, unchanged.
     fn sc_kill_mob(&mut self, dimension: &str, id: u32) -> bool {
@@ -382,38 +382,42 @@ impl ScEntities for Game<'_> {
             return false;
         }
         let at = to.map(|v| v.floor() as i32);
-        drive(self, dimension, mob, |m, w| {
-            let path = m.create_path_to(w, at, reach);
-            m.nav_move_to_path(w, path, speed)
+        crate::game::soulscraft_cost::timed(crate::game::soulscraft_cost::Call::Navigate, || {
+            drive(self, dimension, mob, |m, w| {
+                let path = m.create_path_to(w, at, reach);
+                m.nav_move_to_path(w, path, speed)
+            })
+            .unwrap_or(false)
         })
-        .unwrap_or(false)
     }
     /// The old body: `PathNavigation.isInProgress`.
     fn sc_mob_navigating(&mut self, dimension: &str, mob: u32) -> bool {
-        in_level(self, dimension, |g| {
-            g.mobs
-                .iter()
-                .any(|m| m.id == mob && !m.removed && m.alive() && m.ai.nav.is_in_progress())
+        crate::game::soulscraft_cost::timed(crate::game::soulscraft_cost::Call::Navigating, || {
+            in_level(self, dimension, |g| {
+                g.mobs
+                    .iter()
+                    .any(|m| m.id == mob && !m.removed && m.alive() && m.ai.nav.is_in_progress())
+            })
+            .unwrap_or(false)
         })
-        .unwrap_or(false)
     }
     /// The old body: `PathNavigation.stop` (nav.rs `nav_stop`).
     fn sc_mob_stop(&mut self, dimension: &str, mob: u32) -> bool {
-        drive(self, dimension, mob, |m, _| m.nav_stop()).is_some()
+        crate::game::soulscraft_cost::timed(crate::game::soulscraft_cost::Call::Stop, || drive(self, dimension, mob, |m, _| m.nav_stop()).is_some())
     }
     /// The old body: `LookControl.setLookAt` for the mob's next tick.
     fn sc_mob_look_at(&mut self, dimension: &str, mob: u32, at: [f64; 3]) -> bool {
         if !at.into_iter().all(f64::is_finite) {
             return false;
         }
-        drive(self, dimension, mob, |m, _| m.look_at(at)).is_some()
+        crate::game::soulscraft_cost::timed(crate::game::soulscraft_cost::Call::Look, || drive(self, dimension, mob, |m, _| m.look_at(at)).is_some())
     }
     /// The old body (no 8f83e5c function makes a mob strike): `Mob.doHurtTarget` (mobs/combat.rs).
     fn sc_mob_attack(&mut self, dimension: &str, mob: u32, target: u32) -> bool {
         if mob == target {
             return false;
         }
-        in_level(self, dimension, |g| mob_attack_here(g, mob, target)).unwrap_or(false)
+        crate::game::soulscraft_cost::timed(crate::game::soulscraft_cost::Call::Attack, || in_level(self, dimension, |g| mob_attack_here(g, mob, target)).unwrap_or(false))
     }
     /// `LivingEntity.addEffect` through the player's living handle (native_living_effects.rs
     /// `living_add_effect`). False for an unknown effect, a duration of 0 or below -1, a player not

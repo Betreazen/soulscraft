@@ -89,9 +89,13 @@ function Assert-QuietPc {
     foreach ($p in Get-Process -ErrorAction SilentlyContinue | Where-Object { $names -contains $_.ProcessName }) {
         $busy += "$($p.ProcessName) $($p.Id)"
     }
-    $gpu = & nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits 2>$null
-    if ($gpu -and [int]($gpu | Select-Object -First 1) -gt 15) { $busy += "GPU at $gpu %" }
-    if (Test-Path $Lock) { $busy += "heavy.lock: $(Get-Content $Lock -Raw)" }
+    # Five readings a second apart: one catches the desktop's spike (explorer, VS Code) as a busy PC;
+    # the measurement is the server's CPU time, so only a lasting load counts.
+    $gpus = @(1..5 | ForEach-Object { & nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits 2>$null | Select-Object -First 1; Start-Sleep -Seconds 1 } | Where-Object { $_ })
+    $gpu = if ($gpus) { [math]::Round(($gpus | ForEach-Object { [double]$_ } | Measure-Object -Average).Average, 1) } else { $null }
+    if ($gpu -and $gpu -gt 30) { $busy += "GPU at $gpu %" }
+    # Our own lock (heavy.ps1 take) is not someone else's measurement.
+    if ((Test-Path $Lock) -and (Get-Content $Lock -Raw) -notmatch '^soulscraft') { $busy += "heavy.lock: $(Get-Content $Lock -Raw)" }
     if (Test-Path "$env:LOCALAPPDATA\Horizon\joint-dev\maintenance.txt") { $busy += 'bench maintenance' }
     # The box: another session's native-build (another /hz/servers/* is refused by p5-box.sh start).
     $busy += @(Get-BoxBuilds)
@@ -261,16 +265,31 @@ if ($ModApi) {
     "Mod API bench: client $Version, server export $Export, /hz/servers/sc-p5 on 127.0.0.1:25591, cases $($Cases -join ',')" |
         Tee-Object -FilePath $Out -Append | Write-Host
 }
-Assert-QuietPc
-Set-Content $Lock "soulscraft agent: П5 measurement (prototypes/p5-bench.ps1), $Runs runs, started $(Get-Date -Format s)"
+# The PC's queue (C:\ai-bridge\README.md, «Очередь и самопроверки», since 2026-11-22): heavy.ps1
+# waits its turn for a free lock and a quiet PC and holds the lock at most 60 minutes.
+$Heavy = 'C:\ai-bridge\heavy.ps1'
+# SOULSCRAFT_HEAVY_HELD=1: the caller holds the lock already (builds and the measurement under one
+# turn of the queue), so it is neither taken nor released here.
+# Three ways: the queue takes and releases the lock here; a caller that holds it already
+# (SOULSCRAFT_HEAVY_HELD) leaves it alone, never rewriting or removing it (2026-11-22: writing the
+# old format over the queue's lock dropped its until= and kept it for 106 minutes); a PC without
+# heavy.ps1 writes the old lock by hand.
+$lockMode = if ($env:SOULSCRAFT_HEAVY_HELD) { 'held' } elseif (Test-Path $Heavy) { 'queue' } else { 'legacy' }
+if ($lockMode -eq 'queue') {
+    & pwsh -NoProfile -File $Heavy take -Who soulscraft -What "П5 measurement (prototypes/p5-bench.ps1), $Runs runs" -Minutes 50 -WaitMinutes 240
+    if ($LASTEXITCODE -ne 0) { throw "heavy.ps1 take gave up (exit $LASTEXITCODE)" }
+}
 $rows = @()
 try {
+    Assert-QuietPc
+    if ($lockMode -eq 'legacy') { Set-Content $Lock "soulscraft agent: П5 measurement (prototypes/p5-bench.ps1), $Runs runs, started $(Get-Date -Format s)" }
     for ($n = 1; $n -le $Runs; $n++) {
         "== run $n of $Runs, $(Get-Date -Format s)" | Tee-Object -FilePath $Out -Append | Write-Host
         $rows += Invoke-Run $n
     }
 } finally {
-    Remove-Item -LiteralPath $Lock -ErrorAction SilentlyContinue
+    if ($lockMode -eq 'queue') { & pwsh -NoProfile -File $Heavy release -Who soulscraft }
+    elseif ($lockMode -eq 'legacy') { Remove-Item -LiteralPath $Lock -ErrorAction SilentlyContinue }
 }
 Show-Stats $rows
 Write-Host "log: $Out"

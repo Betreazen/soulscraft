@@ -221,6 +221,11 @@ fn cost(game: &mut Game<'_>, on: bool) {
     for (name, nanos) in crate::game::soulscraft_cost::PART_NAMES.iter().zip(parts) {
         say(game, format!("cost soulscraft_part part={name} ms_per_server_tick={:.4}", per_tick(nanos)));
     }
+    // The engine calls inside the parts (nested in own_mobs and vanilla, not added to them).
+    for (name, (n, nanos)) in crate::game::soulscraft_cost::CALL_NAMES.iter().zip(crate::game::soulscraft_cost::calls()) {
+        let us = nanos as f64 / n.max(1) as f64 / 1000.0;
+        say(game, format!("cost soulscraft_call call={name} calls_per_server_tick={:.2} us_per_call={us:.2} ms_per_server_tick={:.4}", n as f64 / server_ticks.max(1) as f64, per_tick(nanos)));
+    }
 }
 
 /// The level's tick: the queued tasks of this level, and the waves.
