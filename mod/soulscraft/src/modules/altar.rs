@@ -740,7 +740,7 @@ fn start_events(game: &mut Game<'_>, dim: &str, now: u64) {
         let Some(item) = hub().pedestals.get(&(dim.to_owned(), a.pedestal())).cloned().unwrap_or_else(|| pedestal_item(game, a.pedestal())) else {
             continue;
         };
-        let data: MobsFile = crate::game::soulscraft_server::state().data.clone();
+        let data = crate::game::soulscraft_server::state().data.clone();
         let Some((index, ev)) = data.events.iter().enumerate().find(|(_, e)| e.item == item) else { continue };
         if a.level < ev.tier.max(1) {
             continue;

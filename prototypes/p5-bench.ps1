@@ -276,7 +276,7 @@ $Heavy = 'C:\ai-bridge\heavy.ps1'
 # heavy.ps1 writes the old lock by hand.
 $lockMode = if ($env:SOULSCRAFT_HEAVY_HELD) { 'held' } elseif (Test-Path $Heavy) { 'queue' } else { 'legacy' }
 if ($lockMode -eq 'queue') {
-    & pwsh -NoProfile -File $Heavy take -Who soulscraft -What "П5 measurement (prototypes/p5-bench.ps1), $Runs runs" -Minutes 50 -WaitMinutes 240
+    & pwsh -NoProfile -File $Heavy take -Who soulscraft -What "П5 measurement (prototypes/p5-bench.ps1), $Runs runs" -Minutes 50 -WaitMinutes 240 -HolderPid $PID
     if ($LASTEXITCODE -ne 0) { throw "heavy.ps1 take gave up (exit $LASTEXITCODE)" }
 }
 $rows = @()

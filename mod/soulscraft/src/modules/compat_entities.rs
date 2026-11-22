@@ -100,6 +100,13 @@ fn drive<R>(
     .flatten()
 }
 
+/// A change of one mob that needs no world (its look target, a nav stop): the mob found in place,
+/// without lifting the level's mobs or building a mob world as [`drive`] does (P5 2026-11-22:
+/// `look_at` through `drive` cost 1.9 µs a call, 50 calls a tick for 50 revenants).
+fn touch<R>(g: &mut Game<'_>, dimension: &str, mob: u32, f: impl FnOnce(&mut Mob) -> R) -> Option<R> {
+    in_level(g, dimension, |g| g.mobs.iter_mut().find(|m| m.id == mob && !m.removed && m.alive()).map(f)).flatten()
+}
+
 /// 7e4e421's `hurt_entity_target`: the player or mob `id` names in the level `dimension`: a player
 /// by their entity id (the one in place, whose turn it is, as `Target::Player`), a living mob.
 fn hurt_entity_target(g: &Game<'_>, dimension: &str, id: u32) -> Option<Target> {
@@ -403,14 +410,14 @@ impl ScEntities for Game<'_> {
     }
     /// The old body: `PathNavigation.stop` (nav.rs `nav_stop`).
     fn sc_mob_stop(&mut self, dimension: &str, mob: u32) -> bool {
-        crate::game::soulscraft_cost::timed(crate::game::soulscraft_cost::Call::Stop, || drive(self, dimension, mob, |m, _| m.nav_stop()).is_some())
+        crate::game::soulscraft_cost::timed(crate::game::soulscraft_cost::Call::Stop, || touch(self, dimension, mob, |m| m.nav_stop()).is_some())
     }
     /// The old body: `LookControl.setLookAt` for the mob's next tick.
     fn sc_mob_look_at(&mut self, dimension: &str, mob: u32, at: [f64; 3]) -> bool {
         if !at.into_iter().all(f64::is_finite) {
             return false;
         }
-        crate::game::soulscraft_cost::timed(crate::game::soulscraft_cost::Call::Look, || drive(self, dimension, mob, |m, _| m.look_at(at)).is_some())
+        crate::game::soulscraft_cost::timed(crate::game::soulscraft_cost::Call::Look, || touch(self, dimension, mob, |m| m.look_at(at)).is_some())
     }
     /// The old body (no 8f83e5c function makes a mob strike): `Mob.doHurtTarget` (mobs/combat.rs).
     fn sc_mob_attack(&mut self, dimension: &str, mob: u32, target: u32) -> bool {

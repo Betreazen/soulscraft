@@ -96,7 +96,9 @@ pub(super) struct PhaseRecord {
 }
 
 pub(super) struct State {
-    pub data: MobsFile,
+    /// Shared: a mob's tick and the events take a cheap handle instead of copying the file
+    /// (P5 2026-11-22: copying one mob's definition each tick cost 2 µs a mob).
+    pub data: std::sync::Arc<MobsFile>,
     pub source: String,
     pub mobs: HashMap<u32, Tracked>,
     pub p_override: Option<f64>,
@@ -122,7 +124,7 @@ static STATE: LazyLock<Mutex<State>> = LazyLock::new(|| {
     };
     log::info!("soulscraft: {} mobs from the {source} mobs.json", data.mobs.len());
     Mutex::new(State {
-        data,
+        data: std::sync::Arc::new(data),
         source,
         mobs: HashMap::new(),
         p_override: None,
@@ -250,7 +252,7 @@ pub(super) fn reload() -> Result<String, String> {
             if !same {
                 return Err("the mob list changed: restart the server for new mobs".into());
             }
-            s.data = d;
+            s.data = std::sync::Arc::new(d);
             s.source = "config".into();
             DATA_GENERATION.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             let respec: Vec<u32> = s.mobs.keys().copied().collect();
@@ -264,7 +266,7 @@ pub(super) fn reload() -> Result<String, String> {
 /// Back to the built-in numbers (the self-test, after it took its own file away).
 pub(super) fn reset_data() {
     let mut s = state();
-    s.data = MobsFile::embedded();
+    s.data = std::sync::Arc::new(MobsFile::embedded());
     s.source = "built-in".into();
     DATA_GENERATION.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 }
@@ -539,13 +541,15 @@ fn tick_mob(
             label: if *debug { tick.label.clone() } else { String::new() },
         });
     }
-    let def = crate::game::soulscraft_cost::timed(crate::game::soulscraft_cost::Call::DefClone, || def.clone());
+    let file = crate::game::soulscraft_cost::timed(crate::game::soulscraft_cost::Call::DefClone, || std::sync::Arc::clone(data));
+    let kind = t.kind;
     let p = t.p;
     let size = t.size;
     let style = t.brain.style;
     let repath = tick.repath;
     let path = t.path;
     drop(s);
+    let def = &file.mobs[kind];
     guard_snapshot(m, &tick, style);
     log_events(&def, m.id, now, &tick);
     let leap_up = def.jump_velocity_at(size).unwrap_or(LEAP_UP);
