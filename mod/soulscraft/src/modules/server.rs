@@ -449,7 +449,7 @@ fn tick_mob(
         on_death(game, dimension, now, m);
         return;
     }
-    no_drowned_conversion(game, m.id);
+    crate::game::soulscraft_cost::timed(crate::game::soulscraft_cost::Call::Drowned, || no_drowned_conversion(game, m.id));
     // A wave mob of an altar's event: the event walks it to the altar (its brain rests), or names
     // the participant its brain fights (soulscraft_event, «Оборона алтаря»).
     use crate::game::soulscraft_event::{Steering, steering};
@@ -475,7 +475,7 @@ fn tick_mob(
             })
         };
         if let Some((true, size)) = fit
-            && crate::game::soulscraft_cover::steer(game, dimension, now, m.id, m.pos, size).is_some()
+            && crate::game::soulscraft_cost::timed(crate::game::soulscraft_cost::Call::Cover, || crate::game::soulscraft_cover::steer(game, dimension, now, m.id, m.pos, size)).is_some()
         {
             if let Some(t) = state().mobs.get_mut(&m.id) {
                 t.seen = now;
@@ -493,9 +493,9 @@ fn tick_mob(
         (None, Some(Steering::Fight(e))) => target_entity(game, m, e, players),
         _ => choose_target(game, m, players),
     });
-    let blows = take_blows(m.id, m.health);
+    let blows = crate::game::soulscraft_cost::timed(crate::game::soulscraft_cost::Call::Blows, || take_blows(m.id, m.health));
     // The hunter's book: the mob saw its target («Встречен», soulscraft_book).
-    crate::game::soulscraft_book::saw(&m.kind, m.pos, target.as_ref().map(|t| (t.entity, t.player, t.pos)));
+    crate::game::soulscraft_cost::timed(crate::game::soulscraft_cost::Call::BookSaw, || crate::game::soulscraft_book::saw(&m.kind, m.pos, target.as_ref().map(|t| (t.entity, t.player, t.pos))));
     let mut s = state();
     let State { data, mobs, debug, turns, .. } = &mut *s;
     let Some(t) = mobs.get_mut(&m.id) else { return };

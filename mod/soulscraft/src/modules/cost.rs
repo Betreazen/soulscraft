@@ -112,13 +112,17 @@ pub(super) enum Call {
     DefClone,
     Act,
     After,
+    Drowned,
+    Cover,
+    Blows,
+    BookSaw,
 }
 
-pub(super) const CALLS_N: usize = 16;
+pub(super) const CALLS_N: usize = 20;
 
 pub(super) const CALL_NAMES: [&str; CALLS_N] = [
     "look_at", "navigate", "stop", "navigating", "mob_attack", "hurt_entity", "own_bleed", "own_players", "own_seen", "own_tick_mob", "own_notes",
-    "mob_target", "mob_brain", "mob_def_clone", "mob_act", "mob_after",
+    "mob_target", "mob_brain", "mob_def_clone", "mob_act", "mob_after", "mob_drowned", "mob_cover", "mob_blows", "mob_book_saw",
 ];
 
 static CALLS: [(AtomicU64, AtomicU64); CALLS_N] = [const { (AtomicU64::new(0), AtomicU64::new(0)) }; CALLS_N];
