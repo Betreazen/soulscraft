@@ -216,7 +216,7 @@ fn mob_attack_here(g: &mut Game<'_>, mob: u32, target: u32) -> bool {
     if let Err(e) = g.handle_mob_events(events) {
         log::warn!("soulscraft: mob {mob} attacking {target}: {e}");
     }
-    if let Some(conn) = guest {
+    if let Some((conn, _, _)) = guest {
         let mut to_guest: Vec<_> = to_guest.into_iter().map(|e| (conn, mob, e)).collect();
         g.lan_guest_mob_events(&mut to_guest);
     }
