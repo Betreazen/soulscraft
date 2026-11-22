@@ -179,10 +179,12 @@ fn cost(game: &mut Game<'_>, on: bool) {
     if on {
         game.sc_mob_cost_sampling(true);
         crate::game::soulscraft_cost::reset();
+        crate::game::soulscraft_cost::set_sampling(true);
         tools().cost_since = Some(std::time::Instant::now());
         return say(game, "cost sampling on");
     }
     game.sc_mob_cost_sampling(false);
+    crate::game::soulscraft_cost::set_sampling(false);
     let costs = game.sc_take_mob_costs();
     let since = tools().cost_since.take().map_or(0.0, |t| t.elapsed().as_secs_f64());
     let (own_ns, level_ticks, server_ticks, parts) = crate::game::soulscraft_cost::totals();

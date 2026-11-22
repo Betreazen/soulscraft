@@ -6,7 +6,7 @@
 // reads a third of what a server tick pays.
 #[allow(unused_imports)]
 use super::soulscraft_compat::*;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Mutex, PoisonError};
 
 /// The parts of the level tick timed on their own, in the order the tick runs them.
@@ -127,8 +127,18 @@ pub(super) const CALL_NAMES: [&str; CALLS_N] = [
 
 static CALLS: [(AtomicU64, AtomicU64); CALLS_N] = [const { (AtomicU64::new(0), AtomicU64::new(0)) }; CALLS_N];
 
-/// Runs `f`, charging its time to `call`.
+/// Whether `/sc cost` is sampling: the call timers cost nothing otherwise.
+static SAMPLING: AtomicBool = AtomicBool::new(false);
+
+pub(super) fn set_sampling(on: bool) {
+    SAMPLING.store(on, Ordering::Relaxed);
+}
+
+/// Runs `f`, charging its time to `call` while `/sc cost` samples.
 pub(super) fn timed<R>(call: Call, f: impl FnOnce() -> R) -> R {
+    if !SAMPLING.load(Ordering::Relaxed) {
+        return f();
+    }
     let started = std::time::Instant::now();
     let out = f();
     let c = &CALLS[call as usize];
@@ -139,6 +149,9 @@ pub(super) fn timed<R>(call: Call, f: impl FnOnce() -> R) -> R {
 
 /// Charges `nanos` to `call` (a span `timed` can't wrap).
 pub(super) fn add(call: Call, nanos: u64) {
+    if !SAMPLING.load(Ordering::Relaxed) {
+        return;
+    }
     let c = &CALLS[call as usize];
     c.0.fetch_add(1, Ordering::Relaxed);
     c.1.fetch_add(nanos, Ordering::Relaxed);

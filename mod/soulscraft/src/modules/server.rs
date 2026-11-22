@@ -459,7 +459,9 @@ fn tick_mob(
             t.seen = now;
             t.pos = m.pos;
             t.yaw = m.yaw;
-            t.dim = dimension.to_owned();
+            if t.dim != dimension {
+                t.dim = dimension.to_owned();
+            }
         }
         return;
     }
@@ -481,7 +483,9 @@ fn tick_mob(
                 t.seen = now;
                 t.pos = m.pos;
                 t.yaw = m.yaw;
+                if t.dim != dimension {
                 t.dim = dimension.to_owned();
+            }
             }
             return;
         }
@@ -503,7 +507,9 @@ fn tick_mob(
     t.seen = now;
     t.pos = m.pos;
     t.yaw = m.yaw;
-    t.dim = dimension.to_owned();
+    if t.dim != dimension {
+                t.dim = dimension.to_owned();
+            }
     let diver = t.brain.style == Style::Diver;
     let senses = Senses {
         now,
