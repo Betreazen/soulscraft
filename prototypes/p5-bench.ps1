@@ -21,16 +21,65 @@
 # -Engine runs another engine than the joint server's (p5-world.ps1), -Label names the log file.
 # Only on a quiet PC: it refuses while a native build, another game server, OBS or a busy GPU is
 # seen (-Force skips that check), and holds C:\ai-bridge\heavy.lock for the measurement only.
+#
+# The Mod API bench (0.8.0, mod/README.md): -Version <native client build> -Export <soulscraft-N>.
+# The server is the Linux export in the horizon-linux-dev box, П5's own folder /hz/servers/sc-p5 on
+# 127.0.0.1:25591 (tools/p5-box.sh, synced to /hz/src/soulscraft-tools: a fresh flat world `p5` from
+# seed `soulscraft-p5` every run, the rules of p5-world.ps1); the bot sc_a is a client of the
+# isolated 8f83e5c install under the 87% CPU cap (lib\bot.ps1 Use-ModApiBench); the console and the
+# log go through hlx.ps1. The default cases there are the four of П5 (no crowd), the log is
+# prototypes/logs/p5-modapi-<time>.txt. It refuses while another /hz/servers/* server or a build in
+# the box runs, besides the Windows checks above.
+#   pwsh -File .\prototypes\p5-bench.ps1 -Version native-8f83e5c-<id> -Export soulscraft-<n> [-Runs 3]
 param([int]$Runs = 3, [int]$Seconds = 30, [int]$Count = 50, [int]$Settle = 10, [int]$Crowd = 150, [int]$Herd = 450,
     [ValidateSet('revenants', 'mixed', 'zombies', 'empty', 'crowd')][string[]]$Cases = @('revenants', 'mixed', 'zombies', 'empty', 'crowd'),
-    [string]$Engine = '', [string]$Label = '', [switch]$Force)
+    [string]$Engine = '', [string]$Label = '', [switch]$Force,
+    [string]$Version = '', [string]$Export = '')
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'lib\bot.ps1')
-Use-P5Server
+$ModApi = [bool]($Version -and $Export)
+if (($Version -or $Export) -and -not $ModApi) { throw 'The Mod API bench needs both -Version and -Export' }
+if ($ModApi) {
+    Use-ModApiBench -Version $Version -Export $Export -ServerDir '/hz/servers/sc-p5'
+    if (-not $PSBoundParameters.ContainsKey('Cases')) { $Cases = @('revenants', 'mixed', 'zombies', 'empty') }
+} else {
+    Use-P5Server
+}
 $World = Join-Path $PSScriptRoot 'p5-world.ps1'
 $Server = "F:\horizon-servers\soulscraft-p5"
 $Lock = 'C:\ai-bridge\heavy.lock'
-$Out = Join-Path $PSScriptRoot ("logs\p5-{0}{1}.txt" -f (Get-Date -Format 'yyyy-MM-dd-HHmm'), $(if ($Label) { "-$Label" } else { '' }))
+$Out = Join-Path $PSScriptRoot ("logs\p5-{0}{1}{2}.txt" -f $(if ($ModApi) { 'modapi-' } else { '' }), (Get-Date -Format 'yyyy-MM-dd-HHmm'), $(if ($Label) { "-$Label" } else { '' }))
+$BoxTool = 'bash /hz/src/soulscraft-tools/p5-box.sh'
+
+# A command line in the box (hlx.ps1 -Sh): its output without hlx's own lines, and its exit code.
+function Invoke-Box([string]$Line) {
+    $out = @(& $script:Hlx -Sh $Line 2>&1 | ForEach-Object { "$_" } | Where-Object { $_ -notmatch '^hlx: ' })
+    [pscustomobject]@{ Code = $LASTEXITCODE; Out = $out }
+}
+
+# The build processes running in the box (another session's native-build), as "box: <pid> <args>".
+function Get-BoxBuilds {
+    if (-not $ModApi) { return @() }
+    @((Invoke-Box "$BoxTool builds").Out | Where-Object { $_ -match '\S' } | ForEach-Object { "box: $_" })
+}
+
+# П5's server log: the box's on the Mod API bench, the joint bench's П5 folder otherwise.
+function Get-P5Log {
+    if ($ModApi) { return @(Get-ServerLog) }
+    @(Get-Content "$Server\logs\latest.log")
+}
+
+# Start and stop П5's server: tools/p5-box.sh in the box, or p5-world.ps1 on the joint bench.
+function Start-P5Server {
+    if (-not $ModApi) { & $World start -Engine $Engine | Tee-Object -FilePath $Out -Append | Write-Host; return }
+    $r = Invoke-Box "$BoxTool start $Export"
+    $r.Out | Tee-Object -FilePath $Out -Append | Write-Host
+    if ($r.Code -ne 0) { throw "P5 server in the box did not start (exit $($r.Code)): $($r.Out -join ' | ')" }
+}
+function Stop-P5Server {
+    if (-not $ModApi) { & $World stop | Out-Null; return }
+    Invoke-Box "$BoxTool stop $Export" | Out-Null
+}
 $cx = -499.5; $cy = 101; $cz = 500.5
 $Inv = [Globalization.CultureInfo]::InvariantCulture
 
@@ -44,6 +93,8 @@ function Assert-QuietPc {
     if ($gpu -and [int]($gpu | Select-Object -First 1) -gt 15) { $busy += "GPU at $gpu %" }
     if (Test-Path $Lock) { $busy += "heavy.lock: $(Get-Content $Lock -Raw)" }
     if (Test-Path "$env:LOCALAPPDATA\Horizon\joint-dev\maintenance.txt") { $busy += 'bench maintenance' }
+    # The box: another session's native-build (another /hz/servers/* is refused by p5-box.sh start).
+    $busy += @(Get-BoxBuilds)
     # The average of five seconds: a single reading catches a browser's spike as a busy PC.
     $cpu = [math]::Round((1..5 | ForEach-Object {
                 (Get-CimInstance Win32_PerfFormattedData_PerfOS_Processor -Filter "Name='_Total'").PercentProcessorTime
@@ -56,8 +107,8 @@ function Assert-QuietPc {
 }
 
 function Get-BuildProcesses {
-    Get-Process -ErrorAction SilentlyContinue | Where-Object { 'cargo', 'rustc', 'horizon-launcher', 'horizon-mixins', 'link' -contains $_.ProcessName } |
-        ForEach-Object { $_.ProcessName } | Sort-Object -Unique
+    @(Get-Process -ErrorAction SilentlyContinue | Where-Object { 'cargo', 'rustc', 'horizon-launcher', 'horizon-mixins', 'link' -contains $_.ProcessName } |
+            ForEach-Object { $_.ProcessName }) + @(Get-BoxBuilds | ForEach-Object { ($_ -split ' ')[0..2] -join ' ' }) | Sort-Object -Unique
 }
 
 function Get-Number([string]$Line, [string]$Pattern) {
@@ -70,8 +121,7 @@ function Measure-Case([string]$Case, [scriptblock]$Spawn) {
     Invoke-Console 'kill @e[type=!minecraft:player]' | Out-Null
     & $Spawn
     Start-Sleep -Seconds $Settle
-    $log = "$Server\logs\latest.log"
-    $since = (Get-Content $log).Count
+    $since = (Get-P5Log).Count
     # joint.ps1 does not wait for heavy.lock: a build starting during the sample marks it noisy.
     $before = Get-BuildProcesses
     Invoke-Console 'sc cost start' | Out-Null
@@ -79,7 +129,7 @@ function Measure-Case([string]$Case, [scriptblock]$Spawn) {
     Invoke-Console 'sc cost stop' | Out-Null
     $noisy = @($before) + @(Get-BuildProcesses) | Sort-Object -Unique
     Start-Sleep -Seconds 1
-    $lines = Get-Content $log | Select-Object -Skip $since | Select-String 'soulscraft: cost ' |
+    $lines = Get-P5Log | Select-Object -Skip $since | Select-String 'soulscraft: cost ' |
         ForEach-Object { $_.Line -replace '^.*soulscraft: ', '' }
     $row = [ordered]@{ case = $Case; tick_ms = $null; own_ms = $null; mobs_ms = 0.0; kinds = @{}; parts = @{}; noisy = ($noisy -join ' ') }
     if ($row.noisy) { Add-Content $Out "  $Case | NOISY: $($row.noisy) ran during the sample" }
@@ -99,7 +149,7 @@ function Measure-Case([string]$Case, [scriptblock]$Spawn) {
 }
 
 function Invoke-Run([int]$N) {
-    & $World start -Engine $Engine | Tee-Object -FilePath $Out -Append | Write-Host
+    Start-P5Server
     $bot = $null
     try {
         $bot = Start-Bot sc_a
@@ -163,7 +213,7 @@ function Invoke-Run([int]$N) {
             }) | ForEach-Object { $_ | Add-Member run $N -PassThru }
     } finally {
         if ($bot) { Stop-Bot $bot }
-        & $World stop | Out-Null
+        Stop-P5Server
     }
 }
 
@@ -204,6 +254,13 @@ function Show-Stats($Rows) {
 }
 
 New-Item -ItemType Directory -Force (Split-Path $Out) | Out-Null
+if ($ModApi) {
+    # p5-box.sh into the box (a tar stream, as for the self-test's script).
+    $sync = & $script:Hlx -Sync (Join-Path (Split-Path $PSScriptRoot) 'tools') -SyncAs soulscraft-tools -Sh 'true' 2>&1
+    if ($LASTEXITCODE -ne 0) { throw "hlx -Sync tools failed: $sync" }
+    "Mod API bench: client $Version, server export $Export, /hz/servers/sc-p5 on 127.0.0.1:25591, cases $($Cases -join ',')" |
+        Tee-Object -FilePath $Out -Append | Write-Host
+}
 Assert-QuietPc
 Set-Content $Lock "soulscraft agent: П5 measurement (prototypes/p5-bench.ps1), $Runs runs, started $(Get-Date -Format s)"
 $rows = @()

@@ -106,13 +106,15 @@ if (Test-Path 'C:\Claude code projects\horizon-joint-dev\joint.ps1') {
 # The Mod API bench (mod/README.md): the server is the Linux export in the horizon-linux-dev box
 # (/hz/servers/soulscraft, 127.0.0.1:25591), the bots are offline clients of the isolated 8f83e5c
 # install in horizon-sdk-dev playing the native build $Version, muted, offscreen and under the
-# owner's 87% CPU cap. Call it after dot-sourcing this file and before Start-Bot.
-function Use-ModApiBench([Parameter(Mandatory)][string]$Version, [Parameter(Mandatory)][string]$Export) {
+# owner's 87% CPU cap. Call it after dot-sourcing this file and before Start-Bot. -ServerDir names
+# another server folder in the box (П5's /hz/servers/sc-p5, prototypes/p5-bench.ps1).
+function Use-ModApiBench([Parameter(Mandatory)][string]$Version, [Parameter(Mandatory)][string]$Export,
+    [string]$ServerDir = '/hz/servers/soulscraft') {
     $sdk = 'C:\Claude code projects\horizon-sdk-dev'
     $env:HORIZON_LAUNCHER_HOME = "$sdk\launcher"; $env:HORIZON_HOME = "$sdk\game"; $env:HORIZON_LAUNCHER_NO_SELF_UPDATE = '1'
     $script:ModApi = $true
     $script:Hlx = 'C:\Claude code projects\horizon-linux-dev\hlx.ps1'
-    $script:BoxServer = '/hz/servers/soulscraft'
+    $script:BoxServer = $ServerDir
     $script:BoxServerTool = "/hz/exports/$Export/horizon-server"
     $script:Ctl = "$sdk\launcher\versions\$Version\horizon-ctl.exe"
     $script:ModApiClient = "$sdk\launcher\versions\$Version\horizon-client.exe"
