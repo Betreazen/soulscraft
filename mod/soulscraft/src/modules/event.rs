@@ -702,9 +702,10 @@ fn adopt_zombie(game: &mut Game<'_>, id: u32, w: &WaveMob, power: f64, bearer_sc
         if m.kind.flags.burns_in_day {
             std::sync::Arc::make_mut(&mut m.kind).flags.burns_in_day = false;
         }
-        m.attrs.max_health = max as f32;
+        // Bases, not the `attrs` cache: a save keeps them (server.rs `apply_stats`).
+        horizon_client::mobs::finalize::set_base(m, horizon_client::mobs::finalize::Attr::MaxHealth, max);
         m.health = m.attrs.max_health;
-        m.attrs.attack_damage = sc.damage as f32;
+        horizon_client::mobs::finalize::set_base(m, horizon_client::mobs::finalize::Attr::AttackDamage, sc.damage);
         m.needs_sync = true;
     }
     server::set_xp_tag(game, id, ZOMBIE.health, max);

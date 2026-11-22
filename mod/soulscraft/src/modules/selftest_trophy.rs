@@ -120,7 +120,11 @@ fn placement(game: &mut Game<'_>, t: u64) -> Option<Result<(), String>> {
         return None;
     }
     let mut got = Vec::new();
-    for (cell, key) in [([3, 0, -6], "rotation"), ([5, 0, -6], "facing")] {
+    // The item in the placer's hand is the head's item and the diorama's own: 8f83e5c hands the
+    // hook an API context whose `item` must be a known item (api_values.rs, `UnknownItem`), and the
+    // floor head block has none of its own (`"item": false`), so naming the block there kept the
+    // hook from being asked at all.
+    for (cell, key, item) in [([3, 0, -6], "rotation", "soulscraft:brute_head"), ([5, 0, -6], "facing", "soulscraft:brute_trophy")] {
         let p = at(cell);
         let state = game.world.block(p[0], p[1], p[2]);
         // The engine's own path: `LevelAccess::before_state_for_placement` asks the native hook,
@@ -134,7 +138,7 @@ fn placement(game: &mut Game<'_>, t: u64) -> Option<Result<(), String>> {
             yaw: 90.0,
             pitch: 30.0,
             sneaking: false,
-            item: game.sc_block(p),
+            item: item.to_owned(),
             replace_clicked: false,
         };
         let answer = game.with_level(|_, level, _| {
@@ -149,7 +153,14 @@ fn placement(game: &mut Game<'_>, t: u64) -> Option<Result<(), String>> {
             answer
         });
         let Some(Some(chosen)) = answer else {
-            return Some(Err(format!("{key}: the hook gave {answer:?}")));
+            // Which half failed: the Part's own answer for the block (lib.rs `placement_property`;
+            // its level reads log a warning when they refuse), or the route to it.
+            let block = game.pack.assets.registry.state(state).map(|s| s.name.to_string()).unwrap_or_default();
+            let own = soulscraft_rules::placement_property(&block, ctx.yaw);
+            return Some(Err(format!(
+                "{key}: the hook gave {answer:?} for {block} (authoritative {}; the Part's own answer {own:?})",
+                game.native_authoritative()
+            )));
         };
         let value = game.pack.assets.registry.state(chosen).and_then(|s| s.properties.get(key).cloned());
         got.push(value.unwrap_or_default());

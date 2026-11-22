@@ -84,6 +84,13 @@ pub static BLEEDING: OnceLock<mod_api::EffectKey> = OnceLock::new();
 /// server's level tick keeps it equal to the loaded numbers.
 static BLEED_PERIOD: AtomicI32 = AtomicI32::new(20);
 
+/// `minecraft:poison` and `minecraft:regeneration`, which the undead types refuse.
+pub static UNDEAD_REFUSE: OnceLock<[mod_api::EffectKey; 2]> = OnceLock::new();
+
+pub fn undead_refuses(effect: mod_api::EffectKey) -> bool {
+    UNDEAD_REFUSE.get().is_some_and(|keys| keys.contains(&effect))
+}
+
 pub fn is_bleeding(effect: mod_api::EffectKey) -> bool {
     BLEEDING.get() == Some(&effect)
 }

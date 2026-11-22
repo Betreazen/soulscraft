@@ -85,6 +85,12 @@ pub fn block_entity_blocks() -> Vec<String> {
     blocks
 }
 
+/// The undead SoulsCraft types (data/mobs.json `undead: true`), as entity type ids.
+pub fn undead_types() -> &'static [String] {
+    static UNDEAD: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
+    UNDEAD.get_or_init(|| data::MobsFile::embedded().mobs.iter().filter(|m| m.undead).map(|m| m.key.clone()).collect())
+}
+
 fn path(id: &str) -> &str {
     id.strip_prefix("soulscraft:").unwrap_or(id)
 }
@@ -126,6 +132,8 @@ impl Hooks for SoulsCraft {
         r.item_part(book_item, HunterBook);
         let bleeding = r.effect_key("soulscraft:bleeding");
         let _ = bridge::BLEEDING.set(bleeding);
+        let undead_refuse = [r.effect_key("minecraft:poison"), r.effect_key("minecraft:regeneration")];
+        let _ = bridge::UNDEAD_REFUSE.set(undead_refuse);
 
         let mut payloads = r.payload_handlers();
         let mut registrar = payloads.registrar(PAYLOAD_VERSION);
@@ -186,6 +194,24 @@ impl Hooks for SoulsCraft {
             event.container.set_new_damage(amount);
         }
         Flow::Continue
+    }
+
+    /// SoulsCraft's undead types (data/mobs.json `undead`) refuse poison and regeneration, as
+    /// vanilla's `#minecraft:undead` (`ignores_poison_and_regen`) do. 8f83e5c's tag check cannot
+    /// say so for a mod's type: `mob_can_be_affected` (game/items/potions.rs:366) strips the
+    /// namespace and looks the tag up as `minecraft:<path>`, so `soulscraft:revenant` never
+    /// matches. `Mob::can_be_affected` (mobs.rs:4769, `flags.undead`) is not asked on this path.
+    fn mob_effect_applicable(
+        &self,
+        host: &mut dyn mod_api::ServerHost,
+        event: &mut mod_api::MobEffectApplicableEvent,
+    ) -> Option<mod_api::EffectApplicable> {
+        if !bridge::undead_refuses(event.effect) {
+            return None;
+        }
+        let kind = event.entity.entity().kind(&*host)?;
+        let id = kind.id(&*host);
+        undead_types().iter().any(|t| *t == id).then_some(mod_api::EffectApplicable::Deny)
     }
 
     /// soulscraft:bleeding hurts every `period_ticks` (data/mobs.json `effects.bleeding`).
@@ -347,13 +373,37 @@ impl BlockPart for Placement {
         level: &dyn mod_api::LevelHost,
         event: &mut mod_api::StateForPlacementEvent<'_>,
     ) -> Option<Option<mod_api::BlockState>> {
-        let block = level.state_block(event.state)?;
-        let (key, value) = match trophy::Kind::of(block)? {
-            trophy::Kind::Head(_) => ("rotation", trophy::floor_rotation(event.context.yaw).to_string()),
-            trophy::Kind::Diorama(_) => ("facing", trophy::facing_toward(event.context.yaw).to_owned()),
-            trophy::Kind::WallHead(_) => return None,
-        };
-        level.state_with_property(event.state, key, &value).map(Some)
+        placement_state(level, event)
+    }
+}
+
+/// The property a trophy block is placed with, from the placer's yaw: a floor head's `rotation`
+/// (0..15), a diorama's `facing`. None for every other block (the wall head's facing comes from the
+/// clicked face, soulscraft_trophy).
+pub fn placement_property(block: &str, yaw: f32) -> Option<(&'static str, String)> {
+    match trophy::Kind::of(block)? {
+        trophy::Kind::Head(_) => Some(("rotation", trophy::floor_rotation(yaw).to_string())),
+        trophy::Kind::Diorama(_) => Some(("facing", trophy::facing_toward(yaw).to_owned())),
+        trophy::Kind::WallHead(_) => None,
+    }
+}
+
+#[allow(clippy::option_option)]
+fn placement_state(
+    level: &dyn mod_api::LevelHost,
+    event: &mut mod_api::StateForPlacementEvent<'_>,
+) -> Option<Option<mod_api::BlockState>> {
+    let Some(block) = level.state_block(event.state) else {
+        log::warn!("soulscraft: placement: the level names no block for {:?}", event.state);
+        return None;
+    };
+    let (key, value) = placement_property(block, event.context.yaw)?;
+    match level.state_with_property(event.state, key, &value) {
+        Some(state) => Some(Some(state)),
+        None => {
+            log::warn!("soulscraft: placement: {block} has no state {key}={value}");
+            None
+        }
     }
 }
 
@@ -407,5 +457,26 @@ mod tests {
         let blocks = block_entity_blocks();
         assert_eq!(blocks.len(), 2 + 3 * TROPHY_MOBS.len());
         assert!(blocks.iter().all(|b| b.starts_with("soulscraft:")));
+    }
+
+    #[test]
+    fn the_undead_types_are_the_datas() {
+        let undead = undead_types();
+        for id in ["soulscraft:revenant", "soulscraft:marksman", "soulscraft:brute", "soulscraft:shrike"] {
+            assert!(undead.iter().any(|t| t == id), "{id}");
+        }
+        for id in ["soulscraft:stalker", "soulscraft:lurker", "soulscraft:bog_slime"] {
+            assert!(!undead.iter().any(|t| t == id), "{id}");
+        }
+    }
+
+    #[test]
+    fn floor_heads_and_dioramas_turn_to_the_placer() {
+        let head = placement_property("soulscraft:brute_head_stand", 90.0);
+        assert_eq!(head, Some(("rotation", trophy::floor_rotation(90.0).to_string())));
+        let diorama = placement_property("soulscraft:brute_trophy", 90.0);
+        assert_eq!(diorama, Some(("facing", trophy::facing_toward(90.0).to_owned())));
+        assert_eq!(placement_property("soulscraft:brute_head_mount", 90.0), None);
+        assert_eq!(placement_property("soulscraft:altar_core", 90.0), None);
     }
 }

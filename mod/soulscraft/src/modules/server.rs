@@ -832,20 +832,24 @@ pub(super) fn fit_hitbox(game: &mut Game<'_>, id: u32, kind: usize, size: u8) {
     (k.width, k.height, k.eye_height) = (hb.width, hb.height, hb.eye);
     m.needs_sync = true;
 }
-/// Sets the mob's attributes from its P: health, speed, damage and knockback resistance on the
-/// mob itself (mobs.rs:1017-1027, read by its tick and its blows), armour by `/attribute`, which
-/// keeps the command's own armour map (mobs/armor.rs:43-63).
+/// Sets the mob's attributes from its P: health, speed, damage, knockback resistance and armour
+/// as the bases of its attributes (`AttributeInstance.setBaseValue`, mobs/finalize.rs
+/// `set_base`). On 8f83e5c `attrs` is only the cache of those bases: a save writes the bases
+/// (entity_nbt.rs `attribute_entries`) and a load clamps Health to the saved maximum, so a value
+/// written into `attrs` alone came back as the template's (a revenant at 30 health after an
+/// unload, `survive_unload`).
 pub(super) fn apply_stats(game: &mut Game<'_>, id: u32, kind: usize, p: f64, size: u8, fresh: bool) {
+    use horizon_client::mobs::finalize::{self, Attr};
     let def = state().data.mobs[kind].clone();
     let sc = scaled(&def, p, size);
     let Some(m) = crate::game::soulscraft_find::mob_mut(game, id) else { return };
-    m.attrs.max_health = sc.max_health as f32;
-    m.attrs.speed = sc.speed;
-    m.attrs.attack_damage = sc.damage as f32;
-    m.attrs.knockback_resistance = sc.knockback_resistance;
+    finalize::set_base(m, Attr::MaxHealth, sc.max_health);
+    finalize::set_base(m, Attr::MovementSpeed, sc.speed);
+    finalize::set_base(m, Attr::AttackDamage, sc.damage);
+    finalize::set_base(m, Attr::KnockbackResistance, sc.knockback_resistance);
     // The zombie template's reinforcements (a hurt mob on Hard calls another of its own type,
     // game/zombie_reinforcements.rs:32-61) are not SoulsCraft's design: never.
-    m.attrs.spawn_reinforcements = 0.0;
+    finalize::set_base(m, Attr::SpawnReinforcements, 0.0);
     if fresh || m.health > m.attrs.max_health {
         m.health = m.attrs.max_health;
     }
@@ -862,6 +866,10 @@ pub(super) fn apply_stats(game: &mut Game<'_>, id: u32, kind: usize, p: f64, siz
 /// (mobs/armor.rs:43-63).
 fn set_armor(game: &mut Game<'_>, id: u32, armor: f64) {
     let Some(i) = crate::game::soulscraft_find::index_of(game, id) else { return };
+    // The base is what the live attribute map is built from (once the mob wears something with
+    // modifiers, mobs/armor.rs `values` reads only that map) and what a save keeps; the command's
+    // map below is read while the live one is not built.
+    horizon_client::mobs::finalize::set_base(&mut game.mobs[i], horizon_client::mobs::finalize::Attr::Armor, armor);
     if game.mobs[i].extra.armor_attributes.is_none() {
         game.mobs[i].extra.armor_attributes = game.motion.attributes.create("minecraft:zombie").map(Box::new);
     }

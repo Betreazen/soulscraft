@@ -369,6 +369,10 @@ fn apply_power(game: &mut Game<'_>, id: u32, p: f64) -> Option<(f64, f64)> {
         m.needs_sync = true;
     }
     if p > 0.0 {
+        // The base the live attribute map is built from and a save keeps (mobs/armor.rs `values`
+        // reads only the live map once the mob wears something with modifiers, a zombie's
+        // helmet); the command's map below is read while it is not built.
+        finalize::set_base(&mut game.mobs[i], Attr::Armor, base_armor + 6.0 * p);
         if game.mobs[i].extra.armor_attributes.is_none() {
             game.mobs[i].extra.armor_attributes = game.motion.attributes.create(&kind).map(Box::new);
         }
