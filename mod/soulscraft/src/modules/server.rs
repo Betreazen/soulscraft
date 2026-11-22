@@ -1055,6 +1055,21 @@ fn drive(
             let l = geom::len(d);
             let v = if l < 1e-3 { [0.0; 3] } else { geom::scale(d, speed.min(l) / l) };
             set_velocity(game, m.id, v, true);
+            if now.is_multiple_of(5) {
+                // How far a steered mob gets per order (the lurker's backoff, `lurker_grab`): the
+                // velocity set and where the engine has moved it.
+                log::log!(
+                    chatty(),
+                    "soulscraft: steer id={} at={:.2},{:.2},{:.2} v={:.2},{:.2},{:.2} tick={now}",
+                    m.id,
+                    m.pos[0],
+                    m.pos[1],
+                    m.pos[2],
+                    v[0],
+                    v[1],
+                    v[2]
+                );
+            }
             if let Some(at) = tick.look_at.or(Some(to)) {
                 game.sc_mob_look_at(dim, m.id, at);
             }

@@ -130,23 +130,52 @@ fn hurt_entity_target(g: &Game<'_>, dimension: &str, id: u32) -> Option<Target> 
 fn mob_attack_here(g: &mut Game<'_>, mob: u32, target: u32) -> bool {
     let live = |m: &Mob, id: u32| m.id == id && !m.removed && m.alive();
     let Some(i) = g.mobs.iter().position(|m| live(m, mob)) else {
+        log::info!("soulscraft: mob_attack refused mob={mob} target={target} why=no-living-mob");
         return false;
     };
+    // The guest by its entity id in the level in place, as `sc_hurt_entity` finds it (placed, in
+    // this level, alive). The old lookup also asked `hub.here` and `loaded` (the client's
+    // PlayerLoaded packet), which the bench's bot clients on 8f83e5c need not pass: the blow was
+    // then refused while `sc_hurt_entity`'s blows landed (`revenant_hold`, the bash `hit=false`).
+    let dim = g.dim.id().to_owned();
     let guest = g.lan.as_ref().and_then(|h| {
         h.hub
             .guests
             .iter()
-            .find(|x| h.hub.here(x) && x.loaded && !x.dead && u32::try_from(x.entity_id) == Ok(target))
-            .map(|x| x.conn)
+            .find(|x| x.placed && !x.dead && x.dimension == dim && u32::try_from(x.entity_id) == Ok(target))
+            .map(|x| {
+                let moved = [0, 1, 2].map(|k| x.position[k] - x.previous_position[k]);
+                (x.conn, x.uuid, moved)
+            })
     });
     // The mob code sees one player (`Who::Player`): the guest hit, as in a mob's tick that sees them.
     let (who, player) = match guest {
-        Some(conn) => match g.lan_guest_views().into_iter().find(|(c, _)| *c == conn) {
-            Some((_, view)) => (Who::Player, Some(view)),
-            None => return false,
-        },
+        Some((conn, uuid, moved)) => {
+            let view = g.lan_guest_views().into_iter().find(|(c, _)| *c == conn).map(|(_, v)| v).or_else(|| {
+                // Not among the views mobs see (not `loaded`): the same view, made as
+                // lan_mobs.rs `lan_guest_views` makes it.
+                g.as_guest(conn, |gg| gg.player_view()).flatten().map(|mut v| {
+                    v.hero = false;
+                    v.velocity = horizon_core::geometry::Vec3::new(moved[0], moved[1], moved[2]);
+                    v.uuid = horizon_client::lan::playerdata::uuid_ints(uuid);
+                    v.allies = Default::default();
+                    v.remote = true;
+                    v
+                })
+            });
+            match view {
+                Some(view) => (Who::Player, Some(view)),
+                None => {
+                    log::info!("soulscraft: mob_attack refused mob={mob} target={target} why=no-guest-view conn={conn}");
+                    return false;
+                }
+            }
+        }
         None if g.mobs.iter().any(|m| live(m, target)) => (Who::Mob(target), None),
-        None => return false,
+        None => {
+            log::info!("soulscraft: mob_attack refused mob={mob} target={target} why=no-such-target dim={dim}");
+            return false;
+        }
     };
     let snapshot: Vec<_> = g
         .mobs
