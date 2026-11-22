@@ -1,52 +1,53 @@
 # Код мода SoulsCraft
 
-Нативный бандл `soulscraft/` и контент-мод `content/` с одним id `soulscraft`. Движок Horizon на коммите `7e4e421` (тот же, что у RustCraft и Path-of-craft-tree, иначе общий стенд не соберёт). Прототипы и их итоги — [../prototypes/README.md](../prototypes/README.md).
+С версии 0.8.0 SoulsCraft — один пакет Mod API Horizon на сборке Nightly 2026-11-21 (`8f83e5c`), лаунчер 0.2.96 и новее. Лаунчер собирает только мод, игра берётся готовой из SDK этой сборки. Прежний формат — нативный бандл `horizon-mixin.toml` и отдельный контент-мод на Horizon `7e4e421` — новые сборки не загружают. Он описан в истории: [../docs/devlog.md](../docs/devlog.md) и [../prototypes/README.md](../prototypes/README.md).
+
+> [!IMPORTANT]
+> Два нативных мода в одной сборке пока не линкуются ([horizon#19616](https://github.com/horizon-rust/horizon/issues/19616)): каждый нативный мод тянет свои копии `serde` и `log`. Поэтому общий стенд с RustCraft и Path-of-craft-tree (`horizon-joint-dev`) для 0.8.0 не работает: SoulsCraft собирается и проверяется отдельно. Зависимости ради этого не меняем, решение за владельцем.
 
 ## Что где
 
 ```text
 mod/
-  sync.ps1                    копии из data/ и assets/ в content/ и в крейт; руками копии не правятся
-  content/                    контент-мод: только то, что пишет sync.ps1, плюс horizon-mod.toml
-    data/soulscraft/mobs.json                     числа мобов для других модов (путь ниже)
-    data/soulscraft/horizon/entity_type/*.json    семь типов на шаблоне minecraft:zombie
-    data/soulscraft/horizon/item/*.json           оружие из гнёзд ригов: ржавый меч, серп, молот
-    data/soulscraft/horizon/mob_effect/bleeding.json   общее кровотечение soulscraft:bleeding
-    assets/soulscraft/rigs/*.rig.json             риги для клиента (читаются во время игры)
-    assets/soulscraft/textures/entity/*.png       текстуры мобов
-    assets/soulscraft/{items,models/item,textures/item}/   модели и текстуры оружия
-    assets/soulscraft/lang/                       имена
-  soulscraft/                 пакет мода на Mod API (Horizon 8f83e5c): только Cargo-проект, assets/ и data/
-    horizon-mod.toml          манифест: модули и миксины, привязка [native] к сборке
-    src/*.rs                  крейт мода soulscraft-rules: правила без игры, лут (loot.rs), Hooks и Part (lib.rs), cargo test --lib
-    src/modules, src/mixins   код в игре: модули и хелперы миксинов (в дерево модулей крейта не входят)
-    server.rs                 сервер: учёт мобов, статы от P, мозг → навигация и урон, заметки клиентам
-    tools.rs                  /sc, арена, волны, стенд П5
-    power.rs                  сила игрока P: снаряжение и сводка PCT `pct:summary` (кэш на тике уровня)
-    selftest.rs               самотест стенда (soulscraft_selftest run)
-    client.rs                 клиент: риги, позы по тикам, оружие в гнезде, подписи отладки
-    altar.rs                  алтарь на сервере: ядра, уровни, высокие вещи, подставка, меню (очередь хука block_changed)
-    altar_ui.rs               меню, виды алтаря для клиентов, `/sc altar`, `/sc event`
-    event.rs                  ивент: фазы, участники, волны, мобы волны, вытягивание, проклятие, конец и награда
-    event_path.rs             карта путей зоны из мира и пролом громилы
-    event_ui.rs               боссбар и предупреждение, вид ивента, строки меню, снимок для самотеста
-    altar_client.rs           клиент алтаря: горн над подставкой, призрак, лучи и точки волны, экран меню
-    selftest_altar.rs         сценарии алтаря, ивента, обороны и места моба (`altar_`, `event_`, `defense_`, `fit_`)
-    cover.rs                  укрытие от атакующих турелей RustCraft (роль из block entity турели)
-    trophy.rs                 трофеи на сервере: block entity голов и диорам, поворот при установке, голова на стену, частицы диорам
-    trophy_client.rs          отрисовка головы и фигурки диорамы из <моб>.trophy.json и рига моба
-    spawn_boost.rs            учащённый спавн алтаря: сектор, его смещение, лишние проходы спавна и список спавна сектора
-    selftest_trophy.rs        сценарии трофеев, награды, знамён рода и учащённого спавна (`trophy_`, `reward_`, `kin_`, `boost_`)
-    selftest_turret.rs        совместные сценарии с турелями RustCraft (`run turret`)
-    vanilla.rs                ванильные мобы (07-vanilla-mobs.md): принятие, рост Г2 на ванильной базе, метка PCT, Г4, ворота целей, приёмы
-    selftest_vanilla.rs       сценарии ванильных мобов (`vanilla_`, `vtiming_`, `vskeleton_`; медленные — `run vslow`)
-    book.rs                   книга охотника на сервере: прогресс в данных игрока, засчитывание убийств, строка над панелью, `/sc book`
-    book_client.rs            окно книги: разделы, страницы, модель моба в клипах (`native_draw_scene`; ванильного — дерево частей и текстура его типа из движка, поза своя), шкалы фаз
-    selftest_book.rs          сценарии книги (`book_`) на площадке алтаря, големы вместо игроков
-    hook_*.rs                 тонкие хелперы: одна строка, вызов модуля
+  sync.ps1                       копии из ../data и ../assets в пакет; руками копии не правятся
+  soulscraft/                    пакет мода: только то, что берёт упаковщик Horizon
+    horizon-mod.toml             манифест: id, side = both, capabilities, [native] (сборка Horizon и
+                                 horizon-mixins), 33 модуля [[native.module]], 18 миксинов [[native.mixin]]
+    Cargo.toml, Cargo.lock       крейт soulscraft-rules (lib soulscraft_rules); Cargo.lock сделан из Cargo.lock игры
+    src/lib.rs                   модули правил, Hooks и Part мода: регистрации, хуки без игры, «ворота» миксинов
+    src/bridge.rs                очереди между крейтом и кодом в игре (сеть, тики block entity, книга, урон)
+    src/loot.rs                  изменения таблиц лута (data/loot.json)
+    src/<модуль>.rs              правила без игры (таблица ниже), у каждого свои тесты
+    src/modules/*.rs             код в игре: модули [[native.module]], компилируются внутри crate::game
+                                 как game::soulscraft_<имя> и видят закрытые поля Game
+    src/mixins/*.rs              хелперы [[native.mixin]]: по одной закрытой функции, без строк use
+    assets/soulscraft/           риги, модели, текстуры, звуки, имена (пишет sync.ps1)
+    data/soulscraft/             типы мобов, блоки, предметы, эффект, таблицы лута, рецепты, теги (пишет sync.ps1)
+    data/soulscraft/*.json       mobs, altar, trophies, book, loot: крейт вкомпилирует их через include_str!
+    .horizon/                    SDK сборки, его скачивает cargo horizon-mod; в git не идёт
 ```
 
-Крейт `rules`:
+Модули в игре:
+
+| Модуль | Что делает |
+| --- | --- |
+| `compat`, `compat_entities`, `compat_world`, `compat_client` | старые вызовы `Game::native_*` (7e4e421) под именами `game.sc_<старое имя>(…)` поверх функций 8f83e5c: мозг мобов (навигация, взгляд, удар), сущности, блоки, игроки, команды, сеть, рисование. Подписи старые, поэтому остальной код почти не менялся. Подписи над мобами и над ядром — `compat_client::draw_label` |
+| `goals` | новый моб SoulsCraft: цели зомби убираются (остаётся `Float`), горение на солнце снимается, своя рамка и флаг нежити |
+| `server` | сервер: учёт мобов, статы от P, мозг → навигация и урон, заметки клиентам |
+| `tools` | `/sc`, арена, волны, стенд П5; разбор типизированной команды (`on_mod_command`) |
+| `power` | сила игрока P: снаряжение и сводка PCT `pct:summary` (кэш на тике уровня) |
+| `client` | клиент: риги, позы по тикам, оружие в гнезде, подписи отладки |
+| `altar`, `altar_ui`, `altar_client` | алтарь на сервере, его меню и виды для клиентов, клиент алтаря (горн над подставкой, призрак, лучи, точки волны, экран меню) |
+| `event`, `event_path`, `event_ui` | ивент: фазы, участники, волны, вытягивание, проклятие, награда; карта путей и пролом; боссбар и строки меню |
+| `cover` | укрытие от атакующих турелей RustCraft |
+| `trophy`, `trophy_client` | трофеи: головы на стену, частицы диорам; отрисовка головы и фигурки диорамы |
+| `spawn_boost`, `natural` | учащённый спавн у алтаря; естественный спавн по биомам, спавнер удильщика, осколки души |
+| `vanilla` | ванильные мобы (07-vanilla-mobs.md): принятие, рост Г2, ворота целей, приёмы |
+| `book`, `book_client` | книга охотника на сервере и её окно |
+| `relic`, `cost`, `find` | Сердце бездны в левой руке; время мода в тике (`/sc cost`); моб по id через индекс тика |
+| `selftest*` | сценарии самотеста `soulscraft_selftest run [фильтр]` |
+
+Правила без игры (`src/*.rs`):
 
 | Модуль | Что делает |
 | --- | --- |
@@ -66,120 +67,125 @@ mod/
 | `fit` | место для рамки моба и поиск ближайшего (раунд 9) |
 | `cover` | укрытие: кто видит моба, ближайшее место вне линии огня |
 | `view` | сообщения алтаря клиенту и кнопки меню серверу (JSON) |
-| `trophy` | файлы трофеев (`<моб>.trophy.json`, копии в `data/trophy/`), какой блок чей, поворот головы и диорамы при установке, коробки частиц по `facing`, частота частиц, фаза клипа фигурки |
+| `trophy` | файлы трофеев (`<моб>.trophy.json`, копии в пакете: `assets/soulscraft/rigs/<моб>.trophy.json`), какой блок чей, поворот головы и диорамы при установке, коробки частиц по `facing`, частота частиц, фаза клипа фигурки |
 | `boost` | учащённый спавн: сектор и его смещение к алтарю, сила по уровню и знамёнам, лишние кандидаты-чанки, список спавна сектора, строка меню |
 | `vanilla` | `data/mobs.json` `vanilla`: группы, приёмы, сигналы замаха, проверки; мозг ванильного моба (`VBrain`): когда он берёт моба и что приказывает |
 | `book` | книга охотника: `data/book.json`, записи врагов из `mobs.json` (свои и `vanilla.groups`), прогресс игрока и его JSON, ступени (элитные быстрее), кому засчитать убийство, вес спавнера, отчёты машин RustCraft (`soulscraft-kill turret|guard`, старый `pct-machine kill`; `machine_kill`), что открывает предмет в руке, сообщение клиенту |
 | `book_page` | страницы книги по ступеням: строки, клипы, шкалы фаз атак; у ванильной строки — числа каждого типа от движка (`mob_page_with`, `VanillaStats`; куб — по размеру) и рост по силе P; разделы «Алтарь» и «Ивенты» |
 
-## Команды
+## Сборка и проверка
 
 ```powershell
-cargo test --lib                   # правила и лут, секунды (в mod/soulscraft)
-.\mod\sync.ps1                     # обновить копии после правки data/ или assets/
-.\mod\sync.ps1 -Check              # упасть, если копия отстала (перед коммитом и stage)
+cd mod/soulscraft
+cargo horizon-mod check           # один раз после клонирования: SDK 8f83e5c в .horizon/
+cargo test --lib                  # правила, лут и регистрации без игры, секунды
+cd ../..
+.\mod\sync.ps1                    # обновить копии после правки data/ или assets/
+.\mod\sync.ps1 -Check             # упасть, если копия отстала (перед коммитом)
 ```
 
-Сборка и проверки идут на общем стенде `C:\Claude code projects\horizon-joint-dev` (его README):
+Сборка для Windows-клиента и одиночной игры — изолированным лаунчером `C:\Claude code projects\horizon-sdk-dev\hl.ps1` (свои папки данных, без самообновления, под потолком CPU 87%, замок сборки):
 
 ```powershell
-.\joint.ps1 stage -Mod soulscraft
-.\joint.ps1 server                 # серверный движок со всеми модами стенда
-.\joint.ps1 check -Filter timing   # самотест без клиента: фазы атак всех мобов
-.\joint.ps1 build                  # сервер и клиент, для ботов и скриншотов
-.\joint.ps1 logs -Mod soulscraft
+& 'C:\Claude code projects\horizon-sdk-dev\hl.ps1' native-build "C:\Claude code projects\soulscraft-modapi\mod\soulscraft" `
+    --version nightly-2026-11-21-8f83e5c --trust-native-code
 ```
 
-Свой `dev.ps1` не нужен: стенд собирает три мода одним проходом на одном коммите.
+`native-build` собирает мод и выбирает сборку для экземпляра. Дальше одиночная игра: запустить этот экземпляр, создать мир с читами и ввести в чат `/soulscraft_selftest run [фильтр]`. Итог пишется в `selftest/soulscraft.json` в папке игры, строки `soulscraft: selftest PASS|FAIL` — в журнал. Первая сборка — несколько минут, пересборка после правки модуля — около минуты.
+
+Выделенный сервер собирается только под Linux x86-64 (SDK сервера есть только для Linux). Это делает лаунчер 0.2.96 в Docker через `C:\Claude code projects\horizon-linux-dev\hlx.ps1`:
+
+```powershell
+$hlx = 'C:\Claude code projects\horizon-linux-dev\hlx.ps1'
+& $hlx -Sync "C:\Claude code projects\soulscraft-modapi\mod\soulscraft" native-build /hz/src/soulscraft `
+    --server-output /hz/exports/soulscraft-N --version nightly-2026-11-21-8f83e5c --trust-native-code
+& $hlx -Sync "C:\Claude code projects\soulscraft-modapi\tools" -SyncAs soulscraft-tools `
+    -Sh "bash /hz/src/soulscraft-tools/linux-selftest.sh soulscraft-N [фильтр]"
+```
+
+[`../tools/linux-selftest.sh`](../tools/linux-selftest.sh) поднимает сервер `/hz/servers/soulscraft` на экспорте, запускает самотест из консоли, ждёт `selftest/soulscraft.json` с `"done":true`, печатает итог и останавливает сервер. Папка `--server-output` не должна существовать заранее: каждой сборке — свой номер.
+
+## Ловушки перехода на Mod API
+
+Всё, на чём мы споткнулись при переходе с бандла 7e4e421 на 8f83e5c, и как обошли.
+
+- **Пакет — плоский Cargo-проект.** Упаковщик (`horizon-mod-package`, `source_file`) берёт только `Cargo.toml`, `Cargo.lock`, `build.rs`, `src/**/*.rs|toml`, `assets/**`, `data/**` и README/LICENSE. Вложенные крейты (`rules/`, `loot/`) он отвергает: `unexpected package path: loot/Cargo.toml`. Поэтому правила и лут — модули одного крейта, а JSON, который крейт вкомпилирует, лежит в `data/` пакета.
+- **Крейт мода зовётся по-старому.** Пакет `soulscraft-rules`: код в игре всегда звал правила `soulscraft_rules::…`, а в патч-крейте игры имя мода — это имя его крейта. Крейт мода не может звать модули в игре; модули могут звать крейт. То, что крейт слышит без игры (пакеты сети, тик block entity, клик книгой), он кладёт в очередь `bridge.rs`, а модули забирают её на тике уровня или клиента.
+- **`Cargo.lock` — из игры.** `horizon-launcher native-lock` берёт самые новые версии, и сборка их отвергает. Lock сделан из `Cargo.lock` игры той же сборки и прорежен `cargo metadata`.
+- **Ворота миксинов.** Игра зовёт точку `native_*` только если какой-то мод подписан на её хук. HEAD-миксин на точке без метода в `Hooks`/Part молчит, поэтому у каждого такого миксина в `lib.rs` есть пустой метод.
+- **`inline(always)` не берёт миксин.** `native_block_entity`, `native_state_for_placement`, `native_block_changed`: первые два стали методами Part в `lib.rs`, третий — миксин на его единственном вызывающем (`<GameLevel as LevelAccess>::observe_block_changed`).
+- **Тип привязки RETURN — текст цели.** У `add_planned` это `HashMap<u32, u32>`, как в её сигнатуре; другой путь к тому же типу не подходит.
+- **Вызов по значению.** `native_apply_effect_tick` и `native_living_incoming_damage` получают `call` по значению: миксин может взять только `&call` и ничего через него не изменит. Урон щита латника поэтому считает `lib.rs` (`living_incoming_damage`) функцией, которую тик уровня кладёт в `bridge`.
+- **В блоках `block`, а не `place_block`.** Предмет головы ставит свою подставку через поле `block` файла предмета.
+- **Два `serde_json`.** Значения SDK (`LootTableLoadEvent::table`) — `serde_json` игры, правила собраны со своим. Таблица лута переходит через текст, а то, что уходит в правила из модулей, — через `soulscraft_rules::serde_json`.
+- **Ресурсы мода не лежат в дереве ClientResources.** На 8f83e5c ресурсы мода накладываются на паки, но в папку, которую читает `ClientResources`, не копируются: латник рисовался зомби. Риги и файлы трофеев вкомпилированы в крейт (`rig::embedded_text`, `trophy::embedded_text`), файл из пака по-прежнему главнее.
+- **Атрибуты — базы, а не кэш `attrs`.** `m.attrs` — только кэш баз атрибутов (`mobs/finalize.rs`). Сохранение пишет базы, загрузка обрезает здоровье по сохранённому максимуму, а броню при собранной живой карте атрибутов игра читает только из неё. Статы от P и броня ставятся через `finalize::set_base`; иначе после выгрузки чанка латник возвращался с 30 здоровья, а броня ванильного зомби не росла.
+- **Тег нежити не видит типы мода.** Проверка игры (`game/items/potions.rs`, `mob_can_be_affected`) ищет тип в теге как `minecraft:<путь>`, поэтому `soulscraft:revenant` в `#minecraft:undead` никогда не находится. Отказ нежити от отравления и регенерации даёт хук `mob_effect_applicable` в `lib.rs`.
+- **Контекст установки требует настоящий предмет.** Хук `state_for_placement` получает контекст с предметом в руке; неизвестный предмет (например, блок головы, у которого нет своего предмета) игра отвергает, и хук не спрашивается.
+- **Регистрация целей.** Мобов строит `horizon_client_lib`, его функции миксин не берут, а `EntityPart::register_goals` только добавляет цели. Поэтому новый моб подгоняется в `entity_join_level` (сервер) и обходом списка мобов на тиках уровня и клиента (копии у клиентов).
+- **Текста в мире нет в world geometry.** `submit_custom_geometry` рисует только линии и четырёхугольники. Подписи фаз и «Алтарь hp/max» рисуются как таблички имён в рисовании самого моба и ядра (`compat_client::draw_label`); теперь их закрывают стены.
+- **Пауза пустого сервера.** Выделенный сервер без игроков засыпает, и самотест из консоли стоит. Для самотеста: `horizon-server --dir <папка> config set properties.pause-when-empty-seconds=0`.
+- **Сеть.** `mod_net` нет. Пять каналов объявлены в `register` (`play_to_client`: `soulscraft:state`, `altar`, `menu`, `book`; `play_to_server`: `soulscraft:press`), байты прежние, без обёртки. В повторе LetsCam пакеты приходят обычными custom payload: их ловит хук `client_packet`.
+- **Block entity старых миров.** Тип block entity объявлен для каждого блока с block entity (ядро, подставка, 21 трофей), путь типа = путь блока. Без объявления игра молча выбрасывает сохранённые данные при загрузке чанка.
 
 ## Где лежат числа во время игры
 
 - Сервер берёт `data/mobs.json`, вкомпилированный в крейт (`soulscraft/data/soulscraft/mobs.json`, копия от `sync.ps1`).
 - `/sc reload` читает `config/soulscraft/mobs.json` в папке сервера. Туда его кладёт `prototypes/tune.ps1`. Если файл есть при старте, сервер берёт его.
-- Другие моды (турели RustCraft: `turret_effects`, `effects.bleeding`) читают копию из контент-мода: **`horizon-mods/soulscraft/data/soulscraft/mobs.json`** от папки сервера или instance.
+- Другие моды (турели RustCraft: `turret_effects`, `effects.bleeding`) читали копию из контент-мода `horizon-mods/soulscraft/data/soulscraft/mobs.json`. Теперь копия лежит в пакете по тому же пути `data/soulscraft/mobs.json`; как её найдёт другой мод на новом маршруте, пока не проверено.
 
-## Хуки
+## Функции игры
 
-| Хук | Где вызывается (SRC/crates/horizon-client/src) | Что делает мод | Ловушка `mods().is_empty()` |
-| --- | --- | --- | --- |
-| `level_tick_post` | `game/levels.rs:559-561` | весь сервер: мобы, задачи команд, самотест | нет проверки |
-| `native_register_goals` (по `target`) | `mobs/ai.rs:434`, функция `ai.rs:464` | у типов `soulscraft:` убирает цели зомби, оставляет `Float`; снимает горение на солнце | именованного хука нет; диспетчер `native_client_hooks.rs:123-127` доходит только до trait-модов, поэтому инъекция в саму функцию |
-| `register_commands` | `game/native_server.rs:1328` | `/sc …` (оператор 2), `soulscraft_selftest` (4) | нет |
-| `perform_command` | `game/native_server.rs:1500` | `/sc` игрока; состояние игрока подменено, поэтому изменения мира идут в очередь до тика уровня | нет |
-| `perform_console_command` | `game/native_hooks.rs:4636` | консоль и самотест | нет |
-| `living_incoming_damage` v1 | `game/native_hooks.rs:9707` | щит латника режет удар спереди на 80% | v1 вызывается всегда; v3 (с атакующим) ждёт trait-мод (`9676-9680`), поэтому атакующий берётся из `causing` или ближайший игрок |
-| `should_apply_effect_tick_this_tick`, `apply_effect_tick` | `game/potions.rs:1136-1139` | урон `soulscraft:bleeding` раз в `period_ticks`; в хуке игра только для чтения, удар ставится в очередь на следующий тик | нет |
-| `net_from_server` | `game/native_net.rs:162` | заметки о клипах | нет |
-| `mob_submit` | `game/native_mob_draw.rs:115` из `game/creatures.rs:7649` | рисует мобов SoulsCraft из ригов вместо зомби | нет |
-| `native_world_primitives` (по `target`) | `game/world_primitives.rs:43` | подписи фаз над мобами при `/sc debug on`; контуры призрака алтаря, точки волны, лучи вытягивания и проклятия | в каталоге хука нет |
+Хук — метод `Hooks` или Part в `lib.rs`. Миксин — строка `[[native.mixin]]`, хелпер в `src/mixins/`. Пути — относительно `crates/horizon-client/src/` исходников 8f83e5c; `nh::` — `horizon_client::game::native_hooks::`.
 
-Хуки второй итерации (алтарь и ивент, [../prototypes/p6-altar.md](../prototypes/p6-altar.md)):
-
-| Хук | Где вызывается (SRC/crates/horizon-client/src) | Что делает мод | Ловушка `mods().is_empty()` |
-| --- | --- | --- | --- |
-| `block_changed` (у `GameLevel`) | `game.rs:1388-1392` (`observe_block_changed`, каждый `Level.setBlock` авторитетного сервера) | ставит в очередь изменения блоков SoulsCraft и блоков в зонах алтарей; уровень только для чтения, хук зовётся и внутри наших `setblock`, поэтому берёт только замок своей очереди | нет |
-| `block_entity` | при установке и загрузке блока, все стороны (API 15) | block entity у ядра и подставки | нет |
-| `block_entity_ticks`, `block_entity_tick` | `native_hooks.rs:11815-11819`, тик из `tick_mod_block_entity` (`:12073-12096`) | тикающее ядро сообщает, где оно: так ядро в загруженном чанке находится без сканирования | нет |
-| `block_entity_update_tag` | `game/lan.rs:1428` | клиентам — предмет подставки | нет |
-| `right_click_block` | `native_hooks.rs:8307` (API 21), состояние игрока подменено | подставка берёт и отдаёт предмет (предметы игрока меняются сразу, мир — в тике уровня), ядро пустой рукой открывает меню | нет |
-| `destroy_block` | `native_hooks.rs:8280` (API 14) | высокую вещь, сломанную в творческом режиме, остальные части не роняют | нет |
-| `net_from_client` | `native_hooks.rs:8397` (API 40) | кнопки меню алтаря | нет |
-| `block_entity_submit`, `block_entity_render_bounding_box` | `game/native_block_entity_draw.rs:487, 501` | предмет над подставкой; маленькие крутящиеся копии призрака у ядра, рамка ядра ±4 блока | нет |
-| `tick` (окно) | `native_hooks.rs:2380` | открывает меню, которое прислал сервер, отправляет кнопки; на сервере выходит сразу (`remote.is_none()`) | нет |
-| `screen_render_post`, `screen_mouse_button_pressed_pre` | `native_hooks.rs:3797, 3825` (API 78, 80) | меню алтаря на своём экране мода (`native_mod_screen_open`), как окно дерева PCT | нет |
-
-Хуки третьей итерации (трофеи, знамёна, учащённый спавн; [../prototypes/p7-rewards.md](../prototypes/p7-rewards.md), [../prototypes/p4-spawn.md](../prototypes/p4-spawn.md)):
-
-| Хук | Где вызывается (SRC/crates/horizon-client/src) | Что делает мод | Ловушка `mods().is_empty()` |
-| --- | --- | --- | --- |
-| `block_entity`, `block_entity_ticks`, `block_entity_tick` (те же, что у алтаря) | см. выше | block entity у голов (`<моб>_head_stand` на полу, `<моб>_head_mount` на стене; не `*_head`: такому имени движок сам отдаёт ванильный block entity черепа, `horizon-client-render/src/containers.rs:265-279, 389`) и диорам (`<моб>_trophy`); тикают только диорамы и сообщают, где они | нет |
-| `state_for_placement` | `game.rs:1659-1669` (`before_state_for_placement`, каждый `BlockItem.place` авторитетного сервера, API 76) | голова на полу поворачивается к игроку (16 положений, как `SkullBlock`), диорама — табличкой к игроку | нет, только `native_authoritative` |
-| `right_click_block` (теперь с `face`) | `native_hooks.rs:8307` (API 21) | предмет `<моб>_head` по боковой грани блока — `<моб>_head_mount` лицом от стены (на пол его ставит `place_block` — `<моб>_head_stand`) (ставится в тике уровня, из стопки уходит одна, в творческом — нет) | нет |
-| `block_entity_submit` | `native_block_entity_draw.rs:501` | голова (из `<моб>.trophy.json`, в покое, `keep()`) и фигурка диорамы (риг моба, клип `trophy` по `game_time + partial`, без `keep()`), светящиеся кубы на полном свете | нет |
-| уровень (`level_tick_post`) | см. выше | частицы диорам: каждый тик по каждой строке файла трофея с шансом `1 / every` одна частица своего типа `soulscraft:*` в случайной точке коробки, повёрнутой по `facing` (`GameLevel::native_send_particles` через `Game::with_level`, `native_hooks.rs:9928-9963`, `game.rs:4716`) | нет |
-| `spawning_chunks`, `RETURN` (по имени функции) | `game/natural_spawning.rs:739-748`, из `spawn_natural` `:764` | чанки сектора учащённого спавна среди кандидатов повторяются `passes` раз | — |
-| `spawn_hooks`, `RETURN` (по имени функции) | `game/natural_spawning.rs:457-459`, из `mobs/spawn_selection.rs:715, 1312` | истина в измерении с активным сектором: так спавн спрашивает `potential_spawns` без trait-мода | сама функция и есть ловушка: `!mods().is_empty()` |
-| `potential_spawns` (API 388) | `native_hooks.rs:6335-6356` из `natural_spawning.rs:460-472` | позиция монстров в секторе: монстры других биомов и мобы SoulsCraft, знамя рода поднимает веса своей группы | вызывается только при `spawn_hooks()`, его включает инъекция выше |
-
-Хуки четвёртой итерации (книга охотника, [../prototypes/p9-book.md](../prototypes/p9-book.md)):
-
-| Хук | Где вызывается (SRC/crates/horizon-client/src) | Что делает мод | Ловушка `mods().is_empty()` |
-| --- | --- | --- | --- |
-| `use_item` (API 13) | `game.rs:6971` | правый клик книгой: забирает клик, сервер шлёт игроку прогресс с «открыть» | нет |
-| `mob_death_canceled`, `HEAD` (по имени функции) | `game/creatures.rs:1585`, из `mob_died` до `:1626` | смерть моба книги: убийца из последнего урона и `last_hurt_by_player`, метка спавнера | именованный `living_death` за `mods().is_empty()` (`:1586`), поэтому инъекция в функцию |
-| `add_planned`, `RETURN` (по имени функции) | `game/spawner.rs:145` | id мобов спавнера (их же читает PCT) | — |
-| `perform_console_command` (тот же) | `game/native_server.rs:779` для `native_run_mod_command` | отчёты машин RustCraft: своя команда `soulscraft-kill` (регистрируется в `register_commands`, уровень 4) и `pct-machine kill` | нет |
-| `block_entity_submit` (тот же) | `game/native_scene.rs:155-166` из `native_draw_scene` | фигурка моба в окне книги (block entity `soulscraft:book_figure` на невидимом блоке сцены) | нет |
-| `tick`, `screen_render_post`, `screen_mouse_button_pressed_pre`, `net_from_server` (те же) | см. выше | окно книги (экран `soulscraft_book`) и сообщение `soulscraft:book` | нет |
-
-Хуки срезов выживания (0.5, [../docs/design/10-survival.md](../docs/design/10-survival.md)) и предметов призыва (0.6, [../docs/design/11-summons-rewards.md](../docs/design/11-summons-rewards.md)):
-
-| Хук | Где вызывается | Что делает мод | Ловушка `mods().is_empty()` |
-| --- | --- | --- | --- |
-| `potential_spawns` (тот же, теперь с игрой) | см. выше | естественный спавн: мобы SoulsCraft биома точки (`native_biome`); `spawn_hooks` истинна во всём верхнем мире | — |
-| `guest_die`, `HEAD` (по имени функции) | `game/lan_actions.rs:4340`, единственный путь смерти игрока | участник идущего ивента остаётся с 1 здоровьем: нет смерти, выпадения вещей и наблюдателя в хардкоре | именованный `living_death` за `mods().is_empty()` (`:4343`) |
-| `native_loot_table_load`, `HEAD` (свободная функция) | `horizon-world/src/loot.rs:589`, каждая таблица при загрузке, сервер и клиент (API 75) | горны и осколки в сундуках структур, Гнилой горн с зомби, убитых игроком (крейт `loot`, `dependent = "horizon-world"`, `data/loot.json`) | нет |
-
-Trait-мод не нужен и в третьей итерации: `native_potential_spawns` молчит не из-за хука, а из-за одной функции `spawn_hooks`, и бандл сам возвращает из неё истину там, где стоит активный алтарь. Охраняемые хуки движка (40 мест в 20 файлах) остаются выключенными, как у PCT и RustCraft. Подробно и цена — [../prototypes/p4-spawn.md](../prototypes/p4-spawn.md).
+| Старая точка (7e4e421) | Что делает мод | Маршрут на 8f83e5c |
+| --- | --- | --- |
+| `level_tick_post` | весь сервер: мобы, задачи команд, самотест, очереди `bridge` | ворота `level_tick_post`; HEAD `nh::base::Game::native_level_tick_post`; хук теперь зовётся и на клиенте, хелпер работает только на сервере |
+| `register_goals` (по имени функции) | новый моб SoulsCraft: цели, рамка, флаги | ворота `entity_join_level`; HEAD `nh::base::Game::native_entity_join_level`; копии у клиента — `goals::fit_all` на тике клиента |
+| `register_commands` | `/sc` (уровень 2), `sc book`, `soulscraft_selftest` и `soulscraft-kill` (4) | хук `register_commands` в `lib.rs`, без игры |
+| `perform_command`, `perform_console_command` | команды игрока и консоли | ворота `run_mod_command`; HEAD `nh::base::Game::native_run_mod_command`; строка собирается из `CommandInvocation` (`bridge::command_line`) |
+| `living_incoming_damage` | щит латника режет удар спереди | хук `living_incoming_damage` в `lib.rs`, функция из `bridge` |
+| `should_apply_effect_tick_this_tick` | период кровотечения | хук в `lib.rs`, период из `bridge` |
+| `apply_effect_tick` | удар кровотечения в очередь | ворота; HEAD `nh::base::Game::native_apply_effect_tick` (`&call`) |
+| `net_from_server`, `net_from_client` | заметки клипов, виды и меню алтаря, книга; кнопки меню | объявленные пакеты, обработчики в `lib.rs` → `bridge` → тик клиента / уровня; повтор — хук `client_packet` |
+| `mob_submit` | моб SoulsCraft из рига вместо зомби, подписи фаз | ворота `render_living_pre`; HEAD `nh::render_living_pre::Game::native_render_living_pre` |
+| `native_world_primitives` (по имени функции) | контуры призрака, точки волны, лучи, столбики подписей | ворота `submit_custom_geometry`; HEAD `nh::submit_custom_geometry::Game::native_submit_custom_geometry` |
+| `block_changed` | очередь изменений блоков алтаря | HEAD `game::level_access::<GameLevel as LevelAccess>::observe_block_changed` |
+| `block_entity`, `block_entity_ticks`, `block_entity_tick`, `block_entity_update_tag`, `block_entity_render_bounding_box` | block entity ядра, подставки и трофеев: тикают, что видит клиент, рамка ядра | объявленные типы и `BlockEntityPart` в `lib.rs`, без игры; тики идут в `bridge` |
+| `block_entity_submit` | предмет на подставке, призрак, головы, диорамы, фигурка книги, «Алтарь hp/max» | ворота Part; HEAD `nh::base::Game::native_block_entity_submit` |
+| `right_click_block` | голова на стену, подставка и ядро | ворота; HEAD `nh::base::Game::native_right_click_block`; только сервер и главная рука, отмена кончает клик как `Success` |
+| `destroy_block` | высокая вещь в творческом режиме не роняет остальное | ворота `break_block`; HEAD `nh::base::Game::native_break_block` |
+| `tick` (окно) | меню алтаря и окно книги, очередь пакетов | ворота `client_tick_post`; HEAD `nh::client_tick_post::Game::native_client_tick_post` |
+| `screen_render_post`, `screen_mouse_button_pressed_pre` | меню алтаря и окно книги | ворота; HEAD на `nh::base::Game::native_screen_render_post` и `…::native_screen_mouse_button_pressed_pre` |
+| `state_for_placement` | поворот головы и диорамы к игроку | `BlockPart` `Placement` в `lib.rs` |
+| `use_item` | клик книгой | `ItemPart` на `soulscraft:hunter_book` в `lib.rs` → `bridge` |
+| `potential_spawns` | мобы SoulsCraft биома и сектора алтаря | ворота; HEAD `nh::native_potential_spawns::Game::native_potential_spawns` |
+| `spawning_chunks` (RETURN) | чанки сектора повторяются | RETURN `game::natural_spawning::Game::spawning_chunks` |
+| `spawn_hooks` (RETURN) | включал `potential_spawns` без trait-мода | не нужен: у мода есть `Hooks`, и `!mods().is_empty()` истинно |
+| `mob_death_canceled` | смерть моба для книги и сервера | HEAD `nh::living_death::Game::mob_death_canceled` (до проверки подписки, ворот не нужно) |
+| `add_planned` (RETURN) | мобы спавнера | RETURN `game::spawner::Game::add_planned` |
+| `guest_die` | страховка хардкора | HEAD `game::lan_actions::respawn::Game::guest_die` |
+| `native_loot_table_load` | горны и осколки в сундуках, Гнилой горн | хук `loot_table_load` в `lib.rs` |
+| — | отказ нежити от отравления и регенерации | хук `mob_effect_applicable` в `lib.rs` |
 
 ## Как устроен моб
 
-1. Тип `soulscraft:<моб>` копирует зомби (единственный подходящий шаблон: `content.rs:414-431`). Базовые атрибуты — из `mobs.json`. Размер типа мода в JSON не задаётся: строка типа в `entity-types.json` — строка шаблона (`mod_content.rs:829-833`), а в файле типа неизвестные поля запрещены (`content.rs:436-460`: `template`, `item`, `damage`, `attributes`, `deny_unknown_fields`). Поэтому рамку (`hitbox` из `mobs.json`) ставит хук `register_goals` в копию типа каждого моба (`Arc::make_mut`), у сервера и у клиентов; рамка моба — ширина и высота его типа (`mobs/living.rs:489`), по ним же путь (`mobs/path.rs:430-432`).
+1. Тип `soulscraft:<моб>` копирует зомби (единственный подходящий шаблон: `content.rs:414-431`). Базовые атрибуты — из `mobs.json`. Размер типа мода в JSON не задаётся: строка типа в `entity-types.json` — строка шаблона (`mod_content.rs:829-833`), а в файле типа неизвестные поля запрещены (`content.rs:436-460`: `template`, `item`, `damage`, `attributes`, `deny_unknown_fields`). Поэтому рамку (`hitbox` из `mobs.json`) ставит модуль `goals` в копию типа каждого моба (`Arc::make_mut`): на сервере при входе моба в уровень, у клиента на его тике; рамка моба — ширина и высота его типа (`mobs/living.rs:489`), по ним же путь (`mobs/path.rs:430-432`).
 2. Сила P — метка сущности `soulscraft.p=0.40`: она сохраняется с мобом. Без метки P считается по игрокам рядом (Г5) из брони, оружия и сводки PCT `pct:summary` (Г1; без сводки `T = 0`), или берётся из `/sc p`. Сводки читаются на тике уровня раз в 20 тиков в кэш (`power.rs`): внутри действия игрока данные других игроков недоступны (`native_place`).
-3. При первом появлении в памяти (спавн, загрузка чанка, перезапуск) сервер ставит атрибуты от P: здоровье, скорость, урон и сопротивление отбрасыванию прямо в моба (`mobs.rs:1017-1027`), броню — командой `/attribute` (она ведёт свою карту брони, `mobs/armor.rs:43-63`).
+3. При первом появлении в памяти (спавн, загрузка чанка, перезапуск) сервер ставит атрибуты от P базами атрибутов (`finalize::set_base`: здоровье, скорость, урон, сопротивление отбрасыванию, броня), их пишет сохранение; броня ещё и в карту брони команды `/attribute`, которую игра читает, пока живая карта атрибутов не собрана (`mobs/armor.rs`).
 4. Каждый тик мозг из крейта получает «чувства» (позиции, щит игрока, стена за ним, крыша) и отдаёт приказ, взгляд, события фаз и удары. Решения — раз в `20 − 10·P` тиков (Г8), фазы атаки — каждый тик.
-5. Удар — `native_hurt_entity` с типом `minecraft:mob_attack` от моба: броня, щит игрока, неуязвимость и хуки урона работают как у ванили. Болт стрелка — стрела со скоростью 3 и уроном удар/3.
-6. Клиент получает «клип и тик начала» только при смене и раз в 40 тиков всем; позу считает сам по тикам. Клиент только пишет заметки в свою таблицу (`client.rs`, `on_net`) и ничего не шлёт серверу и не ждёт ответа, поэтому в повторе записи LetsCam (заметки приходят в `net_from_server` в исходное время, без сервера) клипы и подписи показываются так же: начало клипа пересчитывается от `now` каждой пачки.
+5. Удар — `sc_hurt_entity` (compat) с типом `minecraft:mob_attack` от моба: броня, щит игрока, неуязвимость и хуки урона работают как у ванили. Болт стрелка — стрела со скоростью 3 и уроном удар/3.
+6. Клиент получает «клип и тик начала» только при смене и раз в 40 тиков всем; позу считает сам по тикам. Клиент только пишет заметки в свою таблицу (`client.rs`, `on_net`) и ничего не шлёт серверу и не ждёт ответа, поэтому в повторе записи LetsCam (заметки приходят обычными пакетами custom payload в исходное время, без сервера, и их ловит хук `client_packet`) клипы и подписи показываются так же: начало клипа пересчитывается от `now` каждой пачки.
 
 ## Как устроен ванильный моб
 
 Срез 8, [../prototypes/p8-vanilla.md](../prototypes/p8-vanilla.md).
 
 1. Тип ванили из `data/mobs.json` `vanilla.groups` принимается, когда тик уровня видит его впервые (после мобов SoulsCraft). Моб волны ивента (метка `soulscraft.wave` или список ивента) остаётся ивенту.
-2. P — как у своих мобов (метка `soulscraft.p=`, иначе игроки рядом). Рост Г2 — модификаторы `soulscraft:power` к здоровью, урону и скорости на ванильной базе (`mobs/finalize.rs`: `add_modifier`, `AddMultipliedBase`), броня — карта брони типа (как у своих мобов). Здоровье сохраняет долю максимума (`scale::kept_health`: моб, которому другой мод поставил мало здоровья, так и остаётся; свежий полный — полон). Метка PCT `pct.xpNNN` — от ванильного здоровья. Флаги нежити, вид и теги не трогаются.
+2. P — как у своих мобов (метка `soulscraft.p=`, иначе игроки рядом). Рост Г2 — модификаторы `soulscraft:power` к здоровью, урону и скорости на ванильной базе (`mobs/finalize.rs`: `add_modifier`, `AddMultipliedBase`), броня — база атрибута и карта брони типа (как у своих мобов). Здоровье сохраняет долю максимума (`scale::kept_health`: моб, которому другой мод поставил мало здоровья, так и остаётся; свежий полный — полон). Метка PCT `pct.xpNNN` — от ванильного здоровья. Флаги нежити, вид и теги не трогаются.
 3. Спавнер в `spawner_radius_blocks` при первом принятии — метка `soulscraft.spawner`: рост есть, мозга нет (Г4).
-4. Остальным в цели добавляются две цели-ворота с приоритетом раньше всех (`SoulscraftGate` — `MOVE | LOOK | JUMP`, `SoulscraftLeapGate` — `JUMP`), их не прерывают. Ворота срабатывают, пока мозг держит моба: так ванильные цели движения и атаки встают, и во время замаха ничего не бьёт. Ворота встают со следующего полного тика целей, поэтому при приказе «стоять» или «рывок» сервер каждый тик ещё и останавливает путь (`native_mob_stop`), ставит управление движением в `Wait` и обнуляет `zza`/`xxa`; куб в замахе теряет и горизонтальную скорость своего прыжка. Флаг `goals.disabled` не подошёл: `riders::drive` снимает его каждый тик (`mobs/riders.rs:381-396`, из `server_ai_step`, `ai.rs:1959`).
-5. Мозг (`soulscraft_rules::vanilla::VBrain`) получает цель ванили (`m.ai.target`: провокация PCT её меняет — мозг идёт за ней), отдаёт приказ, взгляд, позу `aggressive`, удары, сигнал замаха и вопросы серверу (высокая точка, укрытие от взгляда цели). Удар — `native_mob_attack` (ванильный удар моба с его эффектами: голод кадавра, иссушение) с множителем приёма; снаряды — `native_summon` трезубца, взрывного зелья или стрелы (id снаряда движок не отдаёт: бросок засчитан, если снаряд найден на месте командой `execute if entity`). `/sc force <приём>` берёт ближайшего моба SoulsCraft, а если его нет — ближайшего принятого ванильного с этим приёмом.
+4. Остальным в цели добавляются две цели-ворота с приоритетом раньше всех (`SoulscraftGate` — `MOVE | LOOK | JUMP`, `SoulscraftLeapGate` — `JUMP`), их не прерывают. Ворота срабатывают, пока мозг держит моба: так ванильные цели движения и атаки встают, и во время замаха ничего не бьёт. Ворота встают со следующего полного тика целей, поэтому при приказе «стоять» или «рывок» сервер каждый тик ещё и останавливает путь (`sc_mob_stop`), ставит управление движением в `Wait` и обнуляет `zza`/`xxa`; куб в замахе теряет и горизонтальную скорость своего прыжка. Флаг `goals.disabled` не подошёл: `riders::drive` снимает его каждый тик (`mobs/riders.rs:381-396`, из `server_ai_step`, `ai.rs:1959`).
+5. Мозг (`soulscraft_rules::vanilla::VBrain`) получает цель ванили (`m.ai.target`: провокация PCT её меняет — мозг идёт за ней), отдаёт приказ, взгляд, позу `aggressive`, удары, сигнал замаха и вопросы серверу (высокая точка, укрытие от взгляда цели). Удар — `sc_mob_attack` (ванильный удар моба с его эффектами: голод кадавра, иссушение) с множителем приёма; снаряды — `sc_summon` трезубца, взрывного зелья или стрелы (id снаряда движок не отдаёт: бросок засчитан, если снаряд найден на месте командой `execute if entity`). `/sc force <приём>` берёт ближайшего моба SoulsCraft, а если его нет — ближайшего принятого ванильного с этим приёмом.
 6. Фантом не берётся: мозг только держит его ванильное пике (`m.extra.flag`, `mobs/phantom.rs`) 10 тиков после решения и кричит.
 
 ## Строки лога

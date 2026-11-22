@@ -8,7 +8,7 @@
 Every enemy blow shows itself first: a windup, the blow, then a window to answer. Read the windup, strike in the window, then call the waves to your altar.
 
 [![Release](https://img.shields.io/github/v/release/Betreazen/soulscraft?color=b8860b)](https://github.com/Betreazen/soulscraft/releases/latest)
-![Horizon](https://img.shields.io/badge/Horizon-native%20mod-7c4dff)
+![Horizon](https://img.shields.io/badge/Horizon-Mod%20API%20·%208f83e5c-7c4dff)
 ![Minecraft](https://img.shields.io/badge/Minecraft-26.3-3c8527)
 ![Rust](https://img.shields.io/badge/Rust-2024-b7410e?logo=rust)
 [Install](#install) · [Handbook](https://betreazen.github.io/soulscraft/showcase/) · [How to play](#how-to-play) · [For servers](#for-server-owners) · [Changelog](CHANGELOG.md)
@@ -87,39 +87,40 @@ Every recipe is in the game's recipe book and in the [slice spec](docs/design/10
 
 ## Install
 
-You need the [Horizon launcher](https://github.com/horizon-rust/horizon) and a licensed Minecraft: Java Edition account.
+You need the [Horizon launcher](https://github.com/horizon-rust/horizon) 0.2.96 or newer, the Horizon Nightly 2026-11-21 build (commit `8f83e5c`) and a licensed Minecraft: Java Edition account.
 
 > [!WARNING]
 > Horizon native mods are compiled into the game and run with your rights, unsandboxed. Read the code before installing; the launcher asks you to confirm that you trust the mod. See [SECURITY.md](SECURITY.md).
 
-The mod has two parts with one id, `soulscraft`: the native bundle [`mod/soulscraft`](mod/soulscraft) (the server runs the attacks, the client draws the models) and the content mod [`mod/content`](mod/content) (mob types, models, textures, blocks). It is needed both in the game and on the server.
+Since 0.8.0 SoulsCraft is one Horizon Mod API package: the folder [`mod/soulscraft`](mod/soulscraft) with its `horizon-mod.toml` manifest, a Rust crate and its resources (`assets/`, `data/`). Mob types, models, textures and blocks are in the same package; there is no separate content mod any more. The launcher compiles only the mod against the prebuilt game. The mod is needed both in the game and on the server.
+
+The mod is pinned to one Horizon build (`[native] horizon` in [`horizon-mod.toml`](mod/soulscraft/horizon-mod.toml)); another build needs a rebuild. Versions 0.7.1 and older use the old bundle format (Horizon `7e4e421`, launcher 0.2.58), which newer Horizon builds don't load.
+
+> [!IMPORTANT]
+> For now SoulsCraft can't be built into one game or one server with other native mods (RustCraft, Path-of-craft-tree, LetsCam): two native mods in one build don't link ([horizon#19616](https://github.com/horizon-rust/horizon/issues/19616)). Until Horizon fixes it, install SoulsCraft on its own.
 
 ### Single player and LAN
 
-**In the launcher:** Mods → **Add from GitHub** → paste `https://github.com/Betreazen/soulscraft` → **Build**.
-
-**From the command line:**
-
 ```powershell
-horizon-launcher mods add-github https://github.com/Betreazen/soulscraft --trust-native-code
-horizon-launcher native-build --trust-native-code
+git clone https://github.com/Betreazen/soulscraft
+horizon-launcher native-build soulscraft/mod/soulscraft --version nightly-2026-11-21-8f83e5c --trust-native-code
 ```
 
-The launcher takes the [latest release](https://github.com/Betreazen/soulscraft/releases/latest). The first build downloads Rust and takes 20–30 minutes; later ones are faster. The mod builds on the Horizon commit it pins (`[compatibility] horizon_revision` in [`mod/soulscraft/horizon-mixin.toml`](mod/soulscraft/horizon-mixin.toml)). If your other native mods pin another commit, the launcher offers **Build anyway**.
+`native-build` builds the mod and selects that build for the launcher's instance; then play as usual. The first build downloads the SDK and Rust and takes a few minutes; a rebuild after an edit takes about a minute.
 
 ### Dedicated server
 
-```powershell
-git clone --branch v0.7.1 https://github.com/Betreazen/soulscraft
-horizon-launcher native-build soulscraft/mod/soulscraft `
-    --server-output C:\horizon-engines\soulscraft-0.7.1 --version <Horizon version> --trust-native-code
-horizon-server --dir <server folder> config set engine.path=C:\horizon-engines\soulscraft-0.7.1\horizon-engine.exe
+A server with native mods is built for Linux x86-64 only: the dedicated-server SDK exists for Linux alone, and the launcher refuses that export on Windows.
+
+```bash
+git clone https://github.com/Betreazen/soulscraft
+horizon-launcher native-build soulscraft/mod/soulscraft \
+    --server-output /srv/horizon-engines/soulscraft-0.8.0 --version nightly-2026-11-21-8f83e5c --trust-native-code
+horizon-server --dir <server folder> config set engine.path=/srv/horizon-engines/soulscraft-0.8.0/horizon-engine
 horizon-server --dir <server folder> restart
 ```
 
-The `--server-output` folder must not exist yet. To build a server with several mods, for example with Path-of-craft-tree and RustCraft, put their folders side by side and pass the common folder to `native-build`. See [Horizon's native mod docs](https://github.com/horizon-rust/horizon/blob/main/docs/native-mods.md#standalone-server-export).
-
-Players need the same version of the mod in their game: the client draws the models and windows.
+The `--server-output` folder must not exist yet. Players need the same mod version on the same Horizon build: the client draws the models and windows.
 
 ## For server owners
 
@@ -139,7 +140,7 @@ The `/sc` commands are for operators of level 2 and up and for the console.
 | `/sc power` · `/sc p <strength>` | Show the strength of players nearby · set enemy strength by hand |
 | `/sc info` | How many of the mod's mobs and changed vanilla mobs are in the world |
 | `/sc reload` | Re-read `config/soulscraft/mobs.json` in the server folder without a restart |
-| `soulscraft_selftest run [filter]` | Console only: the in-world self-test, 105 scenarios of attacks, the altar, events, trophies and the book |
+| `soulscraft_selftest run [filter]` | The console or a level-4 player (cheats on in single player): the in-world self-test, 105 scenarios of attacks, the altar, events, trophies and the book |
 
 ### Numbers without a rebuild
 
@@ -152,13 +153,15 @@ Hunter's book progress is kept in player data (`soulscraft:book`) and survives a
 ## For developers
 
 ```powershell
-cd mod/soulscraft; cargo test --lib     # the game-free rules: attacks, mob minds, the altar, events, the book, trophies, loot
+cd mod/soulscraft
+cargo horizon-mod check     # once: fetch the pinned SDK into .horizon/
+cargo test --lib            # the game-free rules: attacks, mob minds, the altar, events, the book, trophies, loot
 ```
 
 - **Rules without the game.** All logic lives in the mod's crate [`soulscraft-rules`](mod/soulscraft/src) and is checked by `cargo test --lib` in `mod/soulscraft`; the modules that hold `Game` only pass events on.
 - **One source of numbers.** [`data/mobs.json`](data/mobs.json), [`data/altar.json`](data/altar.json), [`data/trophies.json`](data/trophies.json) and [`data/book.json`](data/book.json) feed the server, Blender and the showcase.
 - **Models from code.** Mobs, blocks and trophies are built by Blender scripts: [`assets/models/README.md`](assets/models/README.md).
-- **In-game checks.** The bench self-test and bot clients with screenshots: [`prototypes/README.md`](prototypes/README.md). How the code is laid out and which Horizon hooks it takes: [`mod/README.md`](mod/README.md).
+- **In-game checks.** The `soulscraft_selftest run` self-test in single player and on a Linux dedicated server ([`tools/linux-selftest.sh`](tools/linux-selftest.sh)). How the package is laid out, which Horizon functions it takes, how to build it and what tripped us up moving to the Mod API: [`mod/README.md`](mod/README.md) (in Russian).
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) to help out.
 

@@ -8,7 +8,7 @@
 Каждый удар врага виден заранее: замах, удар и окно для ответа. Читайте замах, бейте в окно, а потом зовите волны к своему алтарю.
 
 [![Релиз](https://img.shields.io/github/v/release/Betreazen/soulscraft?label=%D1%80%D0%B5%D0%BB%D0%B8%D0%B7&color=b8860b)](https://github.com/Betreazen/soulscraft/releases/latest)
-![Horizon](https://img.shields.io/badge/Horizon-native%20mod-7c4dff)
+![Horizon](https://img.shields.io/badge/Horizon-Mod%20API%20·%208f83e5c-7c4dff)
 ![Minecraft](https://img.shields.io/badge/Minecraft-26.3-3c8527)
 ![Rust](https://img.shields.io/badge/Rust-2024-b7410e?logo=rust)
 [Установка](#установка) · [Справочник](https://betreazen.github.io/soulscraft/showcase/) · [Как играть](#как-играть) · [Для серверов](#для-владельцев-серверов) · [Изменения](CHANGELOG.md) · [Концепт](docs/design/02-one-sheet.md)
@@ -87,39 +87,40 @@ SoulsCraft добавляет врагов, которых нужно читат
 
 ## Установка
 
-Нужны [лаунчер Horizon](https://github.com/horizon-rust/horizon) и лицензионный аккаунт Minecraft: Java Edition.
+Нужны [лаунчер Horizon](https://github.com/horizon-rust/horizon) 0.2.96 или новее, сборка Horizon Nightly 2026-11-21 (коммит `8f83e5c`) и лицензионный аккаунт Minecraft: Java Edition.
 
 > [!WARNING]
 > Нативные моды Horizon компилируются прямо в игру и работают с вашими правами, без песочницы. Перед установкой прочитайте код. Лаунчер попросит подтвердить, что вы доверяете моду. Подробнее — в [SECURITY.md](SECURITY.md).
 
-Мод состоит из двух частей с одним id `soulscraft`: нативного бандла [`mod/soulscraft`](mod/soulscraft) (сервер ведёт атаки, клиент рисует модели) и контент-мода [`mod/content`](mod/content) (типы мобов, модели, текстуры, блоки). Он нужен и в игре, и на сервере.
+С версии 0.8.0 SoulsCraft — один пакет Mod API Horizon: папка [`mod/soulscraft`](mod/soulscraft) с манифестом `horizon-mod.toml`, крейтом на Rust и ресурсами (`assets/`, `data/`). Типы мобов, модели, текстуры и блоки лежат в том же пакете, отдельного контент-мода больше нет. Лаунчер собирает только мод, игру он берёт готовой. Мод нужен и в игре, и на сервере.
+
+Мод привязан к одной сборке Horizon (`[native] horizon` в [`horizon-mod.toml`](mod/soulscraft/horizon-mod.toml)). На другой сборке его нужно пересобрать. Версии 0.7.1 и старше — старый формат бандла (Horizon `7e4e421`, лаунчер 0.2.58): новые сборки Horizon их не загружают.
+
+> [!IMPORTANT]
+> Пока SoulsCraft нельзя собрать в одну игру или на один сервер с другими нативными модами (RustCraft, Path-of-craft-tree, LetsCam): два нативных мода в одной сборке не линкуются ([horizon#19616](https://github.com/horizon-rust/horizon/issues/19616)). До исправления в Horizon ставьте SoulsCraft отдельно.
 
 ### Одиночная игра и игра по сети с хостом
 
-**В окне лаунчера:** Mods → **Add from GitHub** → вставьте `https://github.com/Betreazen/soulscraft` → **Build**.
-
-**Из командной строки:**
-
 ```powershell
-horizon-launcher mods add-github https://github.com/Betreazen/soulscraft --trust-native-code
-horizon-launcher native-build --trust-native-code
+git clone https://github.com/Betreazen/soulscraft
+horizon-launcher native-build soulscraft/mod/soulscraft --version nightly-2026-11-21-8f83e5c --trust-native-code
 ```
 
-Лаунчер берёт [последний релиз](https://github.com/Betreazen/soulscraft/releases/latest). Первая сборка скачивает Rust и занимает 20–30 минут, следующие быстрее. Мод собирается на коммите Horizon, который в нём закреплён (`[compatibility] horizon_revision` в [`mod/soulscraft/horizon-mixin.toml`](mod/soulscraft/horizon-mixin.toml)). Если другие ваши нативные моды закреплены на другом коммите, лаунчер предложит **Build anyway**.
+`native-build` собирает мод и выбирает эту сборку для экземпляра лаунчера: дальше игра запускается как обычно. Первая сборка скачивает SDK и Rust и занимает несколько минут, пересборка после правки — около минуты.
 
 ### Выделенный сервер
 
-```powershell
-git clone --branch v0.7.1 https://github.com/Betreazen/soulscraft
-horizon-launcher native-build soulscraft/mod/soulscraft `
-    --server-output C:\horizon-engines\soulscraft-0.7.1 --version <версия Horizon> --trust-native-code
-horizon-server --dir <папка сервера> config set engine.path=C:\horizon-engines\soulscraft-0.7.1\horizon-engine.exe
+Сервер с нативными модами собирается только под Linux x86-64: SDK выделенного сервера есть только для Linux, на Windows лаунчер такой экспорт не делает.
+
+```bash
+git clone https://github.com/Betreazen/soulscraft
+horizon-launcher native-build soulscraft/mod/soulscraft \
+    --server-output /srv/horizon-engines/soulscraft-0.8.0 --version nightly-2026-11-21-8f83e5c --trust-native-code
+horizon-server --dir <папка сервера> config set engine.path=/srv/horizon-engines/soulscraft-0.8.0/horizon-engine
 horizon-server --dir <папка сервера> restart
 ```
 
-Папка `--server-output` не должна существовать заранее. Чтобы собрать сервер с несколькими модами, например с Path-of-craft-tree и RustCraft, положите их папки рядом и передайте `native-build` общую папку. Подробнее — в [документации Horizon о нативных модах](https://github.com/horizon-rust/horizon/blob/main/docs/native-mods.md#standalone-server-export).
-
-Игрокам сервера нужен мод той же версии в своей игре: модели и окна рисует клиент.
+Папка `--server-output` не должна существовать заранее. Игрокам сервера нужен мод той же версии на той же сборке Horizon: модели и окна рисует клиент.
 
 ## Для владельцев серверов
 
@@ -139,7 +140,7 @@ horizon-server --dir <папка сервера> restart
 | `/sc power` · `/sc p <сила>` | Показать силу игроков рядом · задать силу врагов вручную |
 | `/sc info` | Сколько мобов мода и изменённых ванильных сейчас в мире |
 | `/sc reload` | Перечитать `config/soulscraft/mobs.json` в папке сервера без перезапуска |
-| `soulscraft_selftest run [фильтр]` | Только консоль: самотест в мире сервера, 105 сценариев атак, алтаря, ивента, трофеев и книги |
+| `soulscraft_selftest run [фильтр]` | Консоль или игрок с уровнем 4 (в одиночной игре — с читами): самотест в мире, 105 сценариев атак, алтаря, ивента, трофеев и книги |
 
 ### Числа без пересборки
 
@@ -152,13 +153,15 @@ horizon-server --dir <папка сервера> restart
 ## Для разработчиков
 
 ```powershell
-cd mod/soulscraft; cargo test --lib     # правила без игры: атаки, мозг мобов, алтарь, ивент, книга, трофеи, лут
+cd mod/soulscraft
+cargo horizon-mod check     # один раз: скачать закреплённый SDK в .horizon/
+cargo test --lib            # правила без игры: атаки, мозг мобов, алтарь, ивент, книга, трофеи, лут
 ```
 
 - **Правила без игры.** Вся логика — в крейте мода [`soulscraft-rules`](mod/soulscraft/src), её проверяет `cargo test --lib` в `mod/soulscraft`. Модули с `Game` только передают события.
 - **Один источник чисел.** [`data/mobs.json`](data/mobs.json), [`data/altar.json`](data/altar.json), [`data/trophies.json`](data/trophies.json) и [`data/book.json`](data/book.json) читают сервер, Blender и витрина.
 - **Модели кодом.** Мобы, блоки и трофеи строятся скриптами в Blender: [`assets/models/README.md`](assets/models/README.md).
-- **Проверка в игре.** Самотест стенда и боты-клиенты со снимками: [`prototypes/README.md`](prototypes/README.md). Как устроен код и какие хуки Horizon он берёт — [`mod/README.md`](mod/README.md).
+- **Проверка в игре.** Самотест `soulscraft_selftest run` в одиночной игре и на выделенном сервере Linux ([`tools/linux-selftest.sh`](tools/linux-selftest.sh)). Как устроен пакет, какие функции Horizon он берёт, как его собрать и на чём мы споткнулись при переходе на Mod API — [`mod/README.md`](mod/README.md).
 
 Как помочь проекту — в [CONTRIBUTING.md](CONTRIBUTING.md).
 

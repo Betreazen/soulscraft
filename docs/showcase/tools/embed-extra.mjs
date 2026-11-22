@@ -1,9 +1,9 @@
 // Writes docs/showcase/js/extra.js: what the handbook needs and the Blender build (assets/models/build.py)
 // does not embed. Run from anywhere: node docs/showcase/tools/embed-extra.mjs
 //   data/loot.json                              -> chests, shards in chests, drops of vanilla zombies
-//   mod/content/data/soulscraft/recipe/*.json   -> the 24 recipes as a 3x3 grid
-//   mod/content/data/soulscraft/horizon/item/   -> numbers of the items (damage, durability, health)
-//   mod/content/assets/soulscraft/lang/ru_ru.json -> names of items, blocks, mobs
+//   mod/soulscraft/data/soulscraft/recipe/*.json   -> the 24 recipes as a 3x3 grid
+//   mod/soulscraft/data/soulscraft/horizon/item/   -> numbers of the items (damage, durability, health)
+//   mod/soulscraft/assets/soulscraft/lang/ru_ru.json -> names of items, blocks, mobs
 // js/extra.js registers it as SC.extra({...}) like js/data.js registers SC.data (js/core.js).
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -39,7 +39,7 @@ const CHEST_NAMES = {
 // A shaped pattern keeps its place in the grid, as the game puts it (rows pad to the right, the
 // grid pads at the bottom); a shapeless recipe is its ingredients in a row, for any order.
 function recipe(file) {
-  const r = read('mod', 'content', 'data', 'soulscraft', 'recipe', file);
+  const r = read('mod', 'soulscraft', 'data', 'soulscraft', 'recipe', file);
   const out = { id: file.replace(/\.json$/, ''), result: r.result.id, count: r.result.count, shaped: r.type.endsWith('shaped') };
   if (out.shaped) {
     const width = Math.max(...r.pattern.map((row) => row.length));
@@ -52,10 +52,10 @@ function recipe(file) {
   return out;
 }
 
-const recipes = listJson('mod', 'content', 'data', 'soulscraft', 'recipe').map(recipe);
+const recipes = listJson('mod', 'soulscraft', 'data', 'soulscraft', 'recipe').map(recipe);
 const items = {};
-for (const f of listJson('mod', 'content', 'data', 'soulscraft', 'horizon', 'item')) {
-  const it = read('mod', 'content', 'data', 'soulscraft', 'horizon', 'item', f);
+for (const f of listJson('mod', 'soulscraft', 'data', 'soulscraft', 'horizon', 'item')) {
+  const it = read('mod', 'soulscraft', 'data', 'soulscraft', 'horizon', 'item', f);
   const c = it.components || {};
   items[f.replace(/\.json$/, '')] = {
     template: it.template, max_stack_size: it.max_stack_size, rarity: it.rarity,
@@ -70,7 +70,7 @@ const data = {
   chest_names: CHEST_NAMES,
   recipes,
   items,
-  lang: read('mod', 'content', 'assets', 'soulscraft', 'lang', 'ru_ru.json'),
+  lang: read('mod', 'soulscraft', 'assets', 'soulscraft', 'lang', 'ru_ru.json'),
   vanilla_names: VANILLA_NAMES,
 };
 const missing = [...used].filter((id) => !id.startsWith('soulscraft:') && !VANILLA_NAMES[id]);

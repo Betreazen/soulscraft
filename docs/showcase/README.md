@@ -83,7 +83,7 @@
 | `js/trophies.js` | страница трофеев, блок «Трофей: диорама» на странице моба, сборка диорамы и головы из glb по файлу трофея, частицы | руками |
 | `js/book.js` | макет книги охотника | руками |
 | `js/defense.js`, `js/vanilla.js`, `js/recipes.js` | страницы «Оборона алтаря», «Ванильные мобы» и «Предметы и рецепты» | руками |
-| `js/extra.js` | `data/loot.json`, рецепты (`mod/content/data/soulscraft/recipe/*.json`), числа предметов, названия из `ru_ru.json`: `SC.extra({...})` | `node docs/showcase/tools/embed-extra.mjs` (Node, Python и Blender не нужны) |
+| `js/extra.js` | `data/loot.json`, рецепты (`mod/soulscraft/data/soulscraft/recipe/*.json`), числа предметов, названия из `ru_ru.json`: `SC.extra({...})` | `node docs/showcase/tools/embed-extra.mjs` (Node, Python и Blender не нужны) |
 | `js/blocks.js` | реестр блоков: блоки, модели (glb, границы, свечение), постройки с местом каждого блока, свои типы частиц (`behaviour` и спрайт) | `assets/models/build_blocks.py` |
 | `js/mobs/<id>.js` | заметки, сцены и поля данных (`fields`, шаблоны над `data/mobs.json`) одного моба | руками, по файлу на моба |
 | `js/data.js` | числа: `SC.data(mobs.json)`, `SC.altarData`, `SC.trophyData`, `SC.bookData` | `node docs/showcase/tools/embed-data.mjs` (Node, строка в строку как `embed.py`) или `assets/models/build.py` (`embed.py`) |
