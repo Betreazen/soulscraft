@@ -175,3 +175,32 @@ impl ScClient for Game<'_> {
             .map_err(|e| format!("{e:?}"))
     }
 }
+
+/// A line of text over something in the world, facing the camera as a name tag does
+/// (`EntityRenderer.renderNameTag`: the camera's rotation, then 0.025 of a block a font pixel),
+/// drawn in `draw`'s pose, full bright with a black ring so it reads on any background. `at` is in
+/// blocks from the pose's origin; `turn` undoes the pose's own turn about Y (a mob's draw is turned
+/// with its body: pass its body yaw; a block entity's is not turned: 0). 8f83e5c's world geometry
+/// draws no text, so the old `WorldPrimitives` labels come here, through the game's world text
+/// path (`native_draw_text`, the one signs, text displays and name tags use). Unlike the old
+/// labels it is depth tested: walls hide it.
+pub(super) fn draw_label(game: &Game<'_>, draw: &mut BlockEntityDraw, at: [f32; 3], turn: f32, line: &str, argb: u32) {
+    // The camera's facing, turned round in third-person front view (interface/names.rs
+    // `styled_name_tag_quads`).
+    let (yaw, pitch) = match game.posed_rotation {
+        Some(rotation) => rotation,
+        None if game.camera_type == mod_api::CameraType::ThirdPersonFront => (game.yaw + 180.0, -game.pitch),
+        None => (game.yaw, game.pitch),
+    };
+    let text = Text::literal(line.to_owned());
+    game.native_draw_push(draw);
+    game.native_draw_translate(draw, at);
+    game.native_draw_rotate_about(draw, [0.0, 1.0, 0.0], turn, [0.0; 3]);
+    // Camera.rotation(): rotationYXZ(180° - yaw, -pitch, 0).
+    game.native_draw_rotate_about(draw, [0.0, 1.0, 0.0], 180.0 - yaw, [0.0; 3]);
+    game.native_draw_rotate_about(draw, [1.0, 0.0, 0.0], -pitch, [0.0; 3]);
+    game.native_draw_scale(draw, [0.025, -0.025, 0.025]);
+    let width = game.native_draw_text_width(draw, &text);
+    game.native_draw_text(draw, &text, [-width / 2.0, 0.0], argb & 0xFF_FFFF, true, Some(0));
+    game.native_draw_pop(draw);
+}

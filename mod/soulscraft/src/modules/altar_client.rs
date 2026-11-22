@@ -218,7 +218,27 @@ pub(super) fn draw_block_entity(game: &Game<'_>, pos: [i32; 3], block: &str, ent
         draw_pedestal_item(game, pos, entity, draw);
     } else if block == ra::CORE {
         draw_ghost_copies(game, pos, draw);
+        draw_core_label(game, pos, draw);
     }
+}
+
+/// During a run, «Алтарь hp/max» over the core as a name tag, flashing red while the altar is
+/// losing; in the core's own draw, since 8f83e5c's world geometry draws no text
+/// (`compat_client::draw_label`). Within the core's view distance, as the ghost is.
+fn draw_core_label(game: &Game<'_>, core: [i32; 3], draw: &mut BlockEntityDraw) {
+    let t = now(game);
+    let (line, color) = {
+        let c = client();
+        let Some((v, at)) = c.views.get(&core) else { return };
+        if t - at > STALE {
+            return;
+        }
+        let Some(e) = &v.event else { return };
+        let color = if e.losing && (t / 5) % 2 == 0 { 0xFFFF_4040 } else { 0xFFE8_E0D0 };
+        (format!("Алтарь {:.0}/{:.0}", e.hp.ceil(), e.max), color)
+    };
+    // Where the old label stood: 1.4 over the beams' top, 1.6 over the core's bottom.
+    super::soulscraft_compat::draw_label(game, draw, [0.5, 3.0, 0.5], 0.0, &line, color);
 }
 
 /// The summon item over the pedestal's bowl: its centre `height_px` over the pedestal's bottom,
@@ -339,8 +359,7 @@ impl Geo {
 }
 
 /// Each frame: the ghost's outlines, the coming wave's spawn points and the drain and curse beams.
-// TODO(port): the altar's health over the core («Алтарь hp/max») was world text; 8f83e5c's world
-// geometry draws none (the boss bar still shows it, soulscraft_event_ui).
+/// The altar's health over the core is drawn with the core (`draw_core_label`).
 pub(super) fn primitives(game: &Game<'_>, _view: &mod_api::WorldRenderView, draw: &mut WorldGeometry) {
     let mut p = Geo::default();
     {

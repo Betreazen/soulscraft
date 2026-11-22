@@ -416,8 +416,15 @@ impl ScEntities for Game<'_> {
         let living = self.player(uuid).and_then(|p| self.living(p.entity()))?;
         Some((self.living_attribute_base(living, &id)?, self.living_attribute_value(living, &id)?))
     }
-    /// Food and experience, then health, through the player's handle (native_player_food.rs,
-    /// native_living_refs.rs `living_set_health`).
+    /// Food and experience, then health, as 7e4e421 did (native_player_state.rs
+    /// `native_set_player_status`): food through the player's handle (native_player_food.rs), the
+    /// experience and the health with the player's state in place (native_server.rs
+    /// `native_as_player_handle`, the turn `player_set_experience_levels` writes in). Level,
+    /// progress and total are written together, as Bukkit's `setLevel`, `setExp` and
+    /// `setTotalExperience`; 8f83e5c's host has no setter for the total. Health above 0 is set and
+    /// capped at the maximum; 0 or less kills as `/kill` does for the player in place
+    /// (administration/commands/mod.rs `kill_target_in_level`, `Target::Player`), with
+    /// vanilla's generic death message.
     fn sc_set_player_status(
         &mut self,
         uuid: u128,
@@ -438,19 +445,26 @@ impl ScEntities for Game<'_> {
             self.player_set_saturation(player, saturation.max(0.0));
             self.player_set_exhaustion(player, exhaustion.clamp(0.0, 40.0));
         }
-        if let Some((level, _progress, _total)) = xp {
-            // TODO(port): 8f83e5c sets levels and points apart; the old progress and total are
-            // not written (SoulsCraft never passes experience).
-            self.player_set_experience_levels(player, level);
+        if xp.is_none() && health.is_none() {
+            return true;
         }
-        if let Some(health) = health {
-            let Some(living) = self.living(player.entity()) else {
-                return false;
-            };
-            // TODO(port): the old 0-or-less killed as `/kill` does; `living_set_health` only sets.
-            return self.living_set_health(living, health.max(0.0));
-        }
-        true
+        self.native_as_player_handle(player, |game| {
+            if let Some((level, progress, total)) = xp {
+                game.experience.level = level;
+                game.experience.progress = progress;
+                game.experience.total = total;
+            }
+            if let (Some(health), Some(p)) = (health, game.player.as_mut()) {
+                if health > 0.0 {
+                    let _ = p.set_health(health, false);
+                    let _ = p.clamp_health_to_max();
+                } else {
+                    // LivingEntity.die(damageSources().generic()).
+                    let _ = p.set_health(0.0, false);
+                    game.ui.death_cause = Some("death.attack.generic".into());
+                }
+            }
+        })
     }
     /// native_hooks/shared.rs `native_item_entities`, unchanged.
     fn sc_item_entities(&self, dimension: &str, min: [f64; 3], max: [f64; 3]) -> Vec<NativeItemEntity> {

@@ -326,6 +326,7 @@ fn locomotion(rig: &Rig, id: &str, mob: &MobRender<'_>) -> (String, f32) {
 }
 
 pub(super) fn draw_mob(game: &Game<'_>, mob: &MobRender<'_>, draw: &mut BlockEntityDraw, drawn: &mut bool) {
+    debug_label(game, mob, draw);
     if *drawn {
         return;
     }
@@ -435,15 +436,37 @@ fn draw_items(game: &Game<'_>, model: &Model, poses: &[Pose], flags: &[&str], dr
     }
 }
 
-/// `/sc debug on`: the server sends each mob's phase as a label; over the mob, coloured by phase
-/// (windup yellow, hold orange, hit red, recover green), seen through walls.
-///
-/// 8f83e5c's world geometry (`submit_custom_geometry`: lines and quads, world_geometry.rs:234-282)
-/// draws no text, and the old `WorldPrimitives` text is no longer fed by mods. So each labelled
-/// mob gets a post over its head in its phase's colour, through walls (`/sc log on` prints the
-/// phases' text on the server).
-// TODO(port): the label's text over the mob; a name-tag style text needs a game text path in the
-// world (`name_tag_quads` is the game's own) or one drawn in render_living_pre's draw.
+/// A label's colour by its phase: windup yellow, hold orange, hit red, recover green.
+fn phase_color(label: &str) -> u32 {
+    match label.split(':').nth(1).and_then(|r| r.split(' ').next()) {
+        Some("windup") => 0xFFFF_E040,
+        Some("hold") => 0xFFFF_9020,
+        Some("hit") => 0xFFFF_3030,
+        Some("recover") => 0xFF40_E060,
+        _ => 0xFFE0_E0E0,
+    }
+}
+
+/// `/sc debug on`: the server sends each mob's phase as a label, drawn over the mob as a name
+/// tag in its phase's colour, in the mob's own draw (render_living_pre, for SoulsCraft's mobs and
+/// the vanilla mobs the server labels alike). 8f83e5c's world geometry draws no text, so the text
+/// goes through the game's world text path (`compat_client::draw_label`); it is depth tested, so
+/// `debug_labels` adds a short post through walls under it.
+fn debug_label(game: &Game<'_>, mob: &MobRender<'_>, draw: &mut BlockEntityDraw) {
+    let (label, color) = {
+        let c = client();
+        let Some(s) = c.shown.get(&mob.id) else { return };
+        if s.flags & wire::DEBUG == 0 || s.label.is_empty() {
+            return;
+        }
+        (s.label.clone(), phase_color(&s.label))
+    };
+    let height = game.mobs.iter().find(|m| m.id == mob.id).map_or(2.0, |m| m.kind.height) as f32;
+    super::soulscraft_compat::draw_label(game, draw, [0.0, height + 0.7, 0.0], mob.body_yaw, &label, color);
+}
+
+/// Under each label, a post in its colour seen through walls, so a labelled mob behind a wall is
+/// still found (the old labels were drawn through walls).
 pub(super) fn debug_labels(game: &Game<'_>, _view: &mod_api::WorldRenderView, draw: &mut WorldGeometry) {
     let c = client();
     if c.shown.values().all(|s| s.flags & wire::DEBUG == 0) {
@@ -456,16 +479,10 @@ pub(super) fn debug_labels(game: &Game<'_>, _view: &mod_api::WorldRenderView, dr
         if s.flags & wire::DEBUG == 0 || s.label.is_empty() {
             continue;
         }
-        let color = match s.label.split(':').nth(1).and_then(|r| r.split(' ').next()) {
-            Some("windup") => 0xFFFF_E040,
-            Some("hold") => 0xFFFF_9020,
-            Some("hit") => 0xFFFF_3030,
-            Some("recover") => 0xFF40_E060,
-            _ => 0xFFE0_E0E0,
-        };
+        let color = phase_color(&s.label);
         let top = m.position.y + m.kind.height;
-        let from = [m.position.x, top + 0.3, m.position.z];
-        let to = [m.position.x, top + 1.0, m.position.z];
+        let from = [m.position.x, top + 0.1, m.position.z];
+        let to = [m.position.x, top + 0.45, m.position.z];
         posts.push(mod_api::WorldLine::new(from, to, color, 4.0, mod_api::WorldDepth::ThroughWalls));
     }
     drop(c);
