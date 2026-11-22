@@ -1,32 +1,31 @@
-final-version checks (0.7.0), 2026-11-18T15:09:38
+final-version checks (0.7.0), 2026-11-22T13:27:19
 
-######## stalker_flank, 2026-11-18T15:09:47
-== stalker watched (4 s)
-  kind=mode mob=stalker id=133 mode=engage tick=10478
-  kind=phase mob=stalker id=133 attack=double_slash phase=windup t=0 tick=10498
-  kind=phase mob=stalker id=133 attack=double_slash phase=hit t=6 tick=10504
-  kind=strike mob=stalker id=133 attack=double_slash t=6 tick=10504 hit=true dmg=1.20 target=sc_a
-  kind=strike mob=stalker id=133 attack=double_slash t=9 tick=10507 hit=true dmg=1.20 target=sc_a
-  kind=phase mob=stalker id=133 attack=double_slash phase=recover t=10 tick=10508
-  kind=phase mob=stalker id=133 attack=double_slash phase=end t=18 tick=10516
-  kind=mode mob=stalker id=133 mode=backoff tick=10516
-  kind=mode mob=stalker id=133 mode=engage tick=10526
-  kind=mode mob=stalker id=133 mode=circle tick=10538
-  bearings from the bot: 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 4 4 3 1 1 -2 -2 -2 -1 -1 -1 (circled 6 degrees); distances 7,1 6,89 6,68 6,48 6,27 6,07 5,86 5,66 5,45 5,25 5,04 4,77 4,46 4,14 3,82 3,5 3,18 2,86 2,54 2,22 1,9 1,76 1,72 1,71 1,71 1,71 1,71 1,71 1,71 1,71 1,71 1,79 2,03 2,33 2,64 2,96 3,01 2,81 2,52 2,21 1,89 1,57; strikes 2
-== stalker looked away from
-  kind=adopt mob=stalker id=134 p=0.00 size=0 fresh=true health=22.0 tick=10566
-  kind=mode mob=stalker id=134 mode=circle tick=10566
-  kind=mode mob=stalker id=134 mode=engage tick=10586
-  kind=phase mob=stalker id=134 attack=lunge phase=windup t=0 tick=10606
-  kind=phase mob=stalker id=134 attack=lunge phase=hit t=12 tick=10618
-  kind=strike mob=stalker id=134 attack=lunge t=17 tick=10623 hit=true dmg=2.40 target=sc_a
-  strike 57 ticks after adopt; stalker 180 degrees off the view axis (sees_me is true inside 60)
--> PASS: watched: circled at most 4.46 blocks off and struck 2 time(s) in 4 s; looked away from: circled 20 ticks (< 40), struck 57 ticks after adopt, 180 degrees off the view
+######## revenant_hold, 2026-11-22T13:27:38
+== revenant hold: phase lines
+  soulscraft: phase mob=revenant id=240 attack=overhead phase=windup t=0 tick=33334
+  soulscraft: phase mob=revenant id=240 attack=overhead phase=hold t=10 tick=33344
+  soulscraft: phase mob=revenant id=240 attack=overhead phase=hit t=18 tick=33352
+  soulscraft: strike mob=revenant id=240 attack=overhead t=18 tick=33352 hit=true dmg=5.20 target=sc_a
+  soulscraft: phase mob=revenant id=240 attack=overhead phase=recover t=20 tick=33354
+  soulscraft: phase mob=revenant id=240 attack=overhead phase=end t=36 tick=33370
+  soulscraft: phase mob=revenant id=240 attack=overhead phase=windup t=0 tick=33385
+  t=10 windup_end mob at -499.5,499.22 distance to the bot 2.77
+  t=14 hold_mid mob at -499.5,499.06 distance to the bot 2.62
+  t=18 hit mob at -499.5,498.85 distance to the bot 2.41
+== revenant shield bash
+  soulscraft: phase mob=revenant id=242 attack=overhead phase=recover t=20 tick=33518
+  soulscraft: phase mob=revenant id=242 attack=shield_bash phase=windup t=0 tick=33530
+  soulscraft: phase mob=revenant id=242 attack=shield_bash phase=hit t=8 tick=33538
+  soulscraft: strike mob=revenant id=242 attack=shield_bash t=8 tick=33538 hit=true dmg=2.00 target=sc_a
+  soulscraft: phase mob=revenant id=242 attack=shield_bash phase=recover t=10 tick=33540
+  soulscraft: phase mob=revenant id=242 attack=shield_bash phase=end t=18 tick=33548
+  bot moved 8.5 blocks (survival, resistance on)
+-> PASS: closed 0.37 blocks during the hold; the bash threw the bot 8.5 blocks
 
 ######## summary
 
 Scene         Status Reason
 -----         ------ ------
-stalker_flank PASS   watched: circled at most 4.46 blocks off and struck 2 time(s) in 4 s; looked away from: circled 20 ticks (< 40), struck 57 ticks after adopt, 180 degrees off the view
+revenant_hold PASS   closed 0.37 blocks during the hold; the bash threw the bot 8.5 blocks
 
 

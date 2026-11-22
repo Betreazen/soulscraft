@@ -25,16 +25,28 @@
 # Wave-2 skeleton and grab/dive checks need the mobs of tasks 2 (wip/final-2) in the build; where a
 # scene needs a log line the mod does not print (the shrike's token, the lurker's grab) it works from
 # the phase/strike lines, positions and health, and says so in its reason.
-param([string[]]$Only)
+param(
+    [string[]]$Only,
+    # The Mod API bench (mod/README.md): the native client build and the Linux server export; both
+    # set, the bots join /hz/servers/soulscraft in the horizon-linux-dev box instead of the joint bench.
+    [string]$Version = '',
+    [string]$Export = ''
+)
 $ErrorActionPreference = 'Stop'
 # The server's replies are UTF-8 (the boss bar's Russian name): read them so whatever shell started us.
 [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
 . (Join-Path $PSScriptRoot 'lib\bot.ps1')
+# `pwsh -File … -Only a,b` hands the list over as one string.
+$Only = @($Only | ForEach-Object { $_ -split ',' } | Where-Object { $_ })
+if ($Version -and $Export) {
+    Use-ModApiBench -Version $Version -Export $Export
+    # LetsCam can't share a build with SoulsCraft on 8f83e5c (horizon-rust/horizon#19616).
+    if (-not $Only) { $Only = @('revenant_hold', 'zombie_lunge', 'stalker_flank', 'marksman_cover', 'brute_wave', 'shrike_turns', 'bog_slime', 'lurker_grab', 'altar_menu', 'event_zone', 'event_bearer') }
+}
 $Repo = Split-Path $PSScriptRoot
 $Out = Join-Path $PSScriptRoot 'evidence\final'
 $Raw = Join-Path $script:Scratch 'final'
 New-Item -ItemType Directory -Force $Out, $Raw | Out-Null
-$log = "$env:LOCALAPPDATA\Horizon\joint-dev\server\logs\latest.log"
 $Text = Join-Path $Out 'console.txt'
 $MobData = (Get-Content -Raw -Encoding utf8 (Join-Path $Repo 'data\mobs.json') | ConvertFrom-Json)
 # The arena's middle, feet level (tools.rs ARENA is 100: the floor). `/sc altar` stands 6 south.
@@ -52,9 +64,9 @@ function Note([string]$Title, $Lines) {
     Add-Content $Text "== $Title"
     @($Lines) | ForEach-Object { Add-Content $Text "  $_" }
 }
-function Mark { (Get-Content $log).Count }
+function Mark { (Get-ServerLog).Count }
 function Get-LogSince([int]$Since, [string]$Pattern) {
-    Get-Content $log | Select-Object -Skip $Since | Select-String $Pattern | ForEach-Object { $_.Line -replace '^\[[^\]]*\] \[[^\]]*\]: ', '' }
+    Get-ServerLog | Select-Object -Skip $Since | Select-String $Pattern | ForEach-Object { $_.Line -replace '^\[[^\]]*\] \[[^\]]*\]: ', '' }
 }
 # The mod's `soulscraft: <kind> k=v …` lines after $Since as objects (lib\log.ps1's reader, but from a mark).
 function Get-Rows([int]$Since, [string]$Kinds) {
@@ -153,7 +165,10 @@ function Skip-ToWave([int]$Wave, [int]$Since, [int]$MaxSec) {
     $t0 = Get-Date
     while (((Get-Date) - $t0).TotalSeconds -lt $MaxSec) {
         if (@(Get-LogSince $Since "soulscraft: event spawn wave=$Wave ").Count -gt 0) { return $true }
-        C 'kill @e[tag=soulscraft.wave]' | Out-Null
+        # Once the wave is announced (telegraph, 60 ticks before its spawn) nothing is killed any
+        # more: a kill sent after the spawn would take the wave itself (the Mod API bench reads the
+        # log from the box, a second late).
+        if (@(Get-LogSince $Since "soulscraft: event telegraph wave=$Wave ").Count -eq 0) { C 'kill @e[tag=soulscraft.wave]' | Out-Null }
         Start-Sleep -Seconds 3
     }
     $false
@@ -200,8 +215,14 @@ try {
         Start-Sleep -Seconds 2
         $mark = Mark
         $a = Get-Attack 'revenant' 'overhead'
-        $bp = @($cx, $cy, ($cz - 3))
+        # The brain steps after its target in the hold only beyond 1.6 blocks (brain.rs walk_up):
+        # the revenant has walked up to the bot by now, so the bot is put 3 blocks in front of it.
+        # Frozen first: the console's round trip to the box is long enough for it to walk up again.
         C 'tick freeze' | Out-Null
+        $m0 = Get-MobPos 'soulscraft:revenant'
+        $bp = @($m0[0], $m0[1], ($m0[2] - 3))
+        C "tp sc_a $($bp[0]) $($bp[1]) $($bp[2]) 0 5" | Out-Null
+        Start-Sleep -Milliseconds 500
         C 'sc force overhead' | Out-Null
         $stops = [ordered]@{ windup_end = $a.windup; hold_mid = $a.windup + [math]::Floor($a.hold / 2); hit = $a.windup + $a.hold }
         $at = -1; $dist = [ordered]@{}; $lines = @()
@@ -408,9 +429,12 @@ try {
             for ($i = 0; $i -lt 4; $i++) { $ys += [math]::Round([double]((Get-BotPos)[1]) - $b[1], 2); Start-Sleep -Milliseconds 40 }
             if ($Jump) { Invoke-Bot $script:Bot 'key space up' | Out-Null }
             Step-World 30
-            C 'tick unfreeze' | Out-Null
-            Start-Sleep -Milliseconds 500
+            # Read while still frozen: after unfreezing, the brute's next blow can land before the
+            # read (seen on the Mod API bench, whose console calls are slower).
+            Start-Sleep -Milliseconds 300
             $h1 = Get-Health
+            C 'sc clear' | Out-Null
+            C 'tick unfreeze' | Out-Null
             $lines = @(Get-LogSince $mark 'soulscraft: (phase|strike) mob=brute')
             [pscustomobject]@{ lost = [math]::Round($h0 - $h1, 2); lines = $lines; ys = ($ys -join ' '); jumped = @($lines | Where-Object { $_ -match 'jumped=true' }).Count -gt 0 }
         }
@@ -609,7 +633,7 @@ try {
         # The menu is a mod screen drawn by the client, so the bot cannot read its text: the shot
         # carries the proof (four events with their horns, no «До уровня» without sky), and the
         # script only checks that a screen opened. Names expected, from data/mobs.json and the lang file:
-        $lang = Get-Content -Raw -Encoding utf8 (Join-Path $Repo 'mod\content\assets\soulscraft\lang\ru_ru.json') | ConvertFrom-Json
+        $lang = Get-Content -Raw -Encoding utf8 (Join-Path $Repo 'mod\soulscraft\assets\soulscraft\lang\ru_ru.json') | ConvertFrom-Json
         $want = @($MobData.events | ForEach-Object { "$($_.name) / $($lang.("item." + ($_.item -replace ':', '.')))" })
         C 'clear sc_a' | Out-Null
         C 'sc altar 4' | Out-Null
