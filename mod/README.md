@@ -105,6 +105,11 @@ $hlx = 'C:\Claude code projects\horizon-linux-dev\hlx.ps1'
 
 [`../tools/linux-selftest.sh`](../tools/linux-selftest.sh) поднимает сервер `/hz/servers/soulscraft` на экспорте, запускает самотест из консоли, ждёт `selftest/soulscraft.json` с `"done":true`, печатает итог и останавливает сервер. Папка `--server-output` не должна существовать заранее: каждой сборке — свой номер.
 
+Боты гоняют сцены 0.7.x на том же сервере: `prototypes/check-final.ps1 -Version native-8f83e5c-<ключ> -Export soulscraft-N [-Only сцена,…]`.
+- Сервер запускают `horizon-server --dir /hz/servers/soulscraft start` и после прогона останавливают `stop`. Порт `127.0.0.1:25591` общий, поэтому перед запуском проверьте, что другие серверы в `/hz/servers` стоят.
+- Боты — клиенты изолированной установки `horizon-sdk-dev` с этой сборкой, без звука и под ограничением CPU в 87 %. Консоль и журнал сервера идут через `hlx.ps1` (функция `Use-ModApiBench` в `prototypes/lib/bot.ps1`).
+- Сцена записи LetsCam пропускается, пока LetsCam нельзя собрать вместе с SoulsCraft ([horizon#19616](https://github.com/horizon-rust/horizon/issues/19616)).
+
 ## Ловушки перехода на Mod API
 
 Всё, на чём мы споткнулись при переходе с бандла 7e4e421 на 8f83e5c, и как обошли.
