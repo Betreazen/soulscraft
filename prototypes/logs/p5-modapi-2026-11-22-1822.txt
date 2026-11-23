@@ -1,0 +1,226 @@
+Mod API bench: client native-8f83e5c-1e58672b71a2, server export soulscraft-4, /hz/servers/sc-p5 on 127.0.0.1:25591, cases revenants,mixed,zombies,empty
+quiet check 2026-11-22T19:03:20: CPU 13 %, GPU 1.2 %, busy: nothing
+== run 1 of 3, 2026-11-22T19:03:20
+Starting..................
+The server is running (pid 86614). `horizon-server status` shows how it does, `horizon-server stop` stops it.
+p5-box: up on 0.0.0.0:25591 (127.0.0.1:25591 outside the box), fresh world p5 (seed soulscraft-p5), engine /hz/exports/soulscraft-4/horizon-engine
+  relic | heart in the off hand: The value of attribute Max Health for entity sc_a is 24.0 | hand empty again: The value of attribute Max Health for entity sc_a is 20.0
+  revenants | cost sampling on
+  revenants | cost over 30.6 s: tick rate 20, server tick average 2.90 ms
+  revenants | cost soulscraft_level_tick level_ticks=613 server_ticks=613 ms_per_server_tick=1.380
+  revenants | cost soulscraft_part part=index ms_per_server_tick=0.0032
+  revenants | cost soulscraft_part part=tasks ms_per_server_tick=0.0012
+  revenants | cost soulscraft_part part=altar ms_per_server_tick=0.0069
+  revenants | cost soulscraft_part part=trophy ms_per_server_tick=0.0012
+  revenants | cost soulscraft_part part=spawning ms_per_server_tick=0.0021
+  revenants | cost soulscraft_part part=relic ms_per_server_tick=0.0005
+  revenants | cost soulscraft_part part=power ms_per_server_tick=0.0196
+  revenants | cost soulscraft_part part=own_mobs ms_per_server_tick=1.3261
+  revenants | cost soulscraft_part part=vanilla ms_per_server_tick=0.0024
+  revenants | cost soulscraft_part part=book ms_per_server_tick=0.0163
+  mixed | cost sampling on
+  mixed | cost over 30.7 s: tick rate 20, server tick average 2.60 ms
+  mixed | cost soulscraft_level_tick level_ticks=614 server_ticks=614 ms_per_server_tick=0.280
+  mixed | cost soulscraft_part part=index ms_per_server_tick=0.0028
+  mixed | cost soulscraft_part part=tasks ms_per_server_tick=0.0010
+  mixed | cost soulscraft_part part=altar ms_per_server_tick=0.0061
+  mixed | cost soulscraft_part part=trophy ms_per_server_tick=0.0013
+  mixed | cost soulscraft_part part=spawning ms_per_server_tick=0.0018
+  mixed | cost soulscraft_part part=relic ms_per_server_tick=0.0004
+  mixed | cost soulscraft_part part=power ms_per_server_tick=0.0165
+  mixed | cost soulscraft_part part=own_mobs ms_per_server_tick=0.2318
+  mixed | cost soulscraft_part part=vanilla ms_per_server_tick=0.0026
+  mixed | cost soulscraft_part part=book ms_per_server_tick=0.0151
+  zombies | cost sampling on
+  zombies | cost over 30.6 s: tick rate 20, server tick average 2.04 ms
+  zombies | cost soulscraft_level_tick level_ticks=613 server_ticks=613 ms_per_server_tick=0.076
+  zombies | cost soulscraft_part part=index ms_per_server_tick=0.0027
+  zombies | cost soulscraft_part part=tasks ms_per_server_tick=0.0009
+  zombies | cost soulscraft_part part=altar ms_per_server_tick=0.0054
+  zombies | cost soulscraft_part part=trophy ms_per_server_tick=0.0010
+  zombies | cost soulscraft_part part=spawning ms_per_server_tick=0.0017
+  zombies | cost soulscraft_part part=relic ms_per_server_tick=0.0004
+  zombies | cost soulscraft_part part=power ms_per_server_tick=0.0152
+  zombies | cost soulscraft_part part=own_mobs ms_per_server_tick=0.0045
+  zombies | cost soulscraft_part part=vanilla ms_per_server_tick=0.0347
+  zombies | cost soulscraft_part part=book ms_per_server_tick=0.0093
+  empty | cost sampling on
+  empty | cost over 30.6 s: tick rate 20, server tick average 1.49 ms
+  empty | cost soulscraft_level_tick level_ticks=613 server_ticks=613 ms_per_server_tick=0.044
+  empty | cost soulscraft_part part=index ms_per_server_tick=0.0018
+  empty | cost soulscraft_part part=tasks ms_per_server_tick=0.0009
+  empty | cost soulscraft_part part=altar ms_per_server_tick=0.0058
+  empty | cost soulscraft_part part=trophy ms_per_server_tick=0.0012
+  empty | cost soulscraft_part part=spawning ms_per_server_tick=0.0021
+  empty | cost soulscraft_part part=relic ms_per_server_tick=0.0004
+  empty | cost soulscraft_part part=power ms_per_server_tick=0.0168
+  empty | cost soulscraft_part part=own_mobs ms_per_server_tick=0.0046
+  empty | cost soulscraft_part part=vanilla ms_per_server_tick=0.0018
+  empty | cost soulscraft_part part=book ms_per_server_tick=0.0080
+== run 2 of 3, 2026-11-22T19:07:31
+Starting................
+The server is running (pid 88085). `horizon-server status` shows how it does, `horizon-server stop` stops it.
+p5-box: up on 0.0.0.0:25591 (127.0.0.1:25591 outside the box), fresh world p5 (seed soulscraft-p5), engine /hz/exports/soulscraft-4/horizon-engine
+  relic | heart in the off hand: The value of attribute Max Health for entity sc_a is 24.0 | hand empty again: The value of attribute Max Health for entity sc_a is 20.0
+  revenants | cost sampling on
+  revenants | cost over 30.7 s: tick rate 20, server tick average 2.89 ms
+  revenants | cost soulscraft_level_tick level_ticks=615 server_ticks=615 ms_per_server_tick=0.633
+  revenants | cost soulscraft_part part=index ms_per_server_tick=0.0032
+  revenants | cost soulscraft_part part=tasks ms_per_server_tick=0.0011
+  revenants | cost soulscraft_part part=altar ms_per_server_tick=0.0062
+  revenants | cost soulscraft_part part=trophy ms_per_server_tick=0.0012
+  revenants | cost soulscraft_part part=spawning ms_per_server_tick=0.0018
+  revenants | cost soulscraft_part part=relic ms_per_server_tick=0.0004
+  revenants | cost soulscraft_part part=power ms_per_server_tick=0.0176
+  revenants | cost soulscraft_part part=own_mobs ms_per_server_tick=0.5843
+  revenants | cost soulscraft_part part=vanilla ms_per_server_tick=0.0021
+  revenants | cost soulscraft_part part=book ms_per_server_tick=0.0146
+  mixed | cost sampling on
+  mixed | cost over 30.6 s: tick rate 20, server tick average 2.24 ms
+  mixed | cost soulscraft_level_tick level_ticks=613 server_ticks=613 ms_per_server_tick=0.189
+  mixed | cost soulscraft_part part=index ms_per_server_tick=0.0029
+  mixed | cost soulscraft_part part=tasks ms_per_server_tick=0.0010
+  mixed | cost soulscraft_part part=altar ms_per_server_tick=0.0055
+  mixed | cost soulscraft_part part=trophy ms_per_server_tick=0.0010
+  mixed | cost soulscraft_part part=spawning ms_per_server_tick=0.0016
+  mixed | cost soulscraft_part part=relic ms_per_server_tick=0.0004
+  mixed | cost soulscraft_part part=power ms_per_server_tick=0.0156
+  mixed | cost soulscraft_part part=own_mobs ms_per_server_tick=0.1449
+  mixed | cost soulscraft_part part=vanilla ms_per_server_tick=0.0019
+  mixed | cost soulscraft_part part=book ms_per_server_tick=0.0139
+  zombies | cost sampling on
+  zombies | cost over 30.6 s: tick rate 20, server tick average 2.03 ms
+  zombies | cost soulscraft_level_tick level_ticks=613 server_ticks=613 ms_per_server_tick=0.083
+  zombies | cost soulscraft_part part=index ms_per_server_tick=0.0031
+  zombies | cost soulscraft_part part=tasks ms_per_server_tick=0.0010
+  zombies | cost soulscraft_part part=altar ms_per_server_tick=0.0057
+  zombies | cost soulscraft_part part=trophy ms_per_server_tick=0.0011
+  zombies | cost soulscraft_part part=spawning ms_per_server_tick=0.0018
+  zombies | cost soulscraft_part part=relic ms_per_server_tick=0.0004
+  zombies | cost soulscraft_part part=power ms_per_server_tick=0.0162
+  zombies | cost soulscraft_part part=own_mobs ms_per_server_tick=0.0046
+  zombies | cost soulscraft_part part=vanilla ms_per_server_tick=0.0384
+  zombies | cost soulscraft_part part=book ms_per_server_tick=0.0102
+  empty | cost sampling on
+  empty | cost over 30.6 s: tick rate 20, server tick average 1.41 ms
+  empty | cost soulscraft_level_tick level_ticks=613 server_ticks=613 ms_per_server_tick=0.039
+  empty | cost soulscraft_part part=index ms_per_server_tick=0.0014
+  empty | cost soulscraft_part part=tasks ms_per_server_tick=0.0009
+  empty | cost soulscraft_part part=altar ms_per_server_tick=0.0051
+  empty | cost soulscraft_part part=trophy ms_per_server_tick=0.0010
+  empty | cost soulscraft_part part=spawning ms_per_server_tick=0.0015
+  empty | cost soulscraft_part part=relic ms_per_server_tick=0.0004
+  empty | cost soulscraft_part part=power ms_per_server_tick=0.0150
+  empty | cost soulscraft_part part=own_mobs ms_per_server_tick=0.0047
+  empty | cost soulscraft_part part=vanilla ms_per_server_tick=0.0016
+  empty | cost soulscraft_part part=book ms_per_server_tick=0.0070
+== run 3 of 3, 2026-11-22T19:11:39
+Starting................
+The server is running (pid 89556). `horizon-server status` shows how it does, `horizon-server stop` stops it.
+p5-box: up on 0.0.0.0:25591 (127.0.0.1:25591 outside the box), fresh world p5 (seed soulscraft-p5), engine /hz/exports/soulscraft-4/horizon-engine
+  relic | heart in the off hand: The value of attribute Max Health for entity sc_a is 24.0 | hand empty again: The value of attribute Max Health for entity sc_a is 20.0
+  revenants | cost sampling on
+  revenants | cost over 30.7 s: tick rate 20, server tick average 3.25 ms
+  revenants | cost soulscraft_level_tick level_ticks=613 server_ticks=613 ms_per_server_tick=0.668
+  revenants | cost soulscraft_part part=index ms_per_server_tick=0.0030
+  revenants | cost soulscraft_part part=tasks ms_per_server_tick=0.0011
+  revenants | cost soulscraft_part part=altar ms_per_server_tick=0.0064
+  revenants | cost soulscraft_part part=trophy ms_per_server_tick=0.0013
+  revenants | cost soulscraft_part part=spawning ms_per_server_tick=0.0019
+  revenants | cost soulscraft_part part=relic ms_per_server_tick=0.0004
+  revenants | cost soulscraft_part part=power ms_per_server_tick=0.0172
+  revenants | cost soulscraft_part part=own_mobs ms_per_server_tick=0.6186
+  revenants | cost soulscraft_part part=vanilla ms_per_server_tick=0.0023
+  revenants | cost soulscraft_part part=book ms_per_server_tick=0.0156
+  mixed | cost sampling on
+  mixed | cost over 30.7 s: tick rate 20, server tick average 2.26 ms
+  mixed | cost soulscraft_level_tick level_ticks=613 server_ticks=613 ms_per_server_tick=0.175
+  mixed | cost soulscraft_part part=index ms_per_server_tick=0.0026
+  mixed | cost soulscraft_part part=tasks ms_per_server_tick=0.0009
+  mixed | cost soulscraft_part part=altar ms_per_server_tick=0.0051
+  mixed | cost soulscraft_part part=trophy ms_per_server_tick=0.0011
+  mixed | cost soulscraft_part part=spawning ms_per_server_tick=0.0017
+  mixed | cost soulscraft_part part=relic ms_per_server_tick=0.0005
+  mixed | cost soulscraft_part part=power ms_per_server_tick=0.0148
+  mixed | cost soulscraft_part part=own_mobs ms_per_server_tick=0.1344
+  mixed | cost soulscraft_part part=vanilla ms_per_server_tick=0.0019
+  mixed | cost soulscraft_part part=book ms_per_server_tick=0.0121
+  zombies | cost sampling on
+  zombies | cost over 30.7 s: tick rate 20, server tick average 2.19 ms
+  zombies | cost soulscraft_level_tick level_ticks=613 server_ticks=613 ms_per_server_tick=0.079
+  zombies | cost soulscraft_part part=index ms_per_server_tick=0.0026
+  zombies | cost soulscraft_part part=tasks ms_per_server_tick=0.0010
+  zombies | cost soulscraft_part part=altar ms_per_server_tick=0.0055
+  zombies | cost soulscraft_part part=trophy ms_per_server_tick=0.0012
+  zombies | cost soulscraft_part part=spawning ms_per_server_tick=0.0018
+  zombies | cost soulscraft_part part=relic ms_per_server_tick=0.0004
+  zombies | cost soulscraft_part part=power ms_per_server_tick=0.0158
+  zombies | cost soulscraft_part part=own_mobs ms_per_server_tick=0.0047
+  zombies | cost soulscraft_part part=vanilla ms_per_server_tick=0.0367
+  zombies | cost soulscraft_part part=book ms_per_server_tick=0.0096
+  empty | cost sampling on
+  empty | cost over 30.7 s: tick rate 20, server tick average 1.40 ms
+  empty | cost soulscraft_level_tick level_ticks=613 server_ticks=613 ms_per_server_tick=0.038
+  empty | cost soulscraft_part part=index ms_per_server_tick=0.0013
+  empty | cost soulscraft_part part=tasks ms_per_server_tick=0.0008
+  empty | cost soulscraft_part part=altar ms_per_server_tick=0.0050
+  empty | cost soulscraft_part part=trophy ms_per_server_tick=0.0010
+  empty | cost soulscraft_part part=spawning ms_per_server_tick=0.0016
+  empty | cost soulscraft_part part=relic ms_per_server_tick=0.0004
+  empty | cost soulscraft_part part=power ms_per_server_tick=0.0147
+  empty | cost soulscraft_part part=own_mobs ms_per_server_tick=0.0044
+  empty | cost soulscraft_part part=vanilla ms_per_server_tick=0.0018
+  empty | cost soulscraft_part part=book ms_per_server_tick=0.0068
+
+case      server tick, ms      SoulsCraft hook, ms/tick mob ticks, ms/tick   quiet samples
+----      ---------------      ------------------------ ------------------   -------------
+revenants 2,900 (2,890..3,250) 0,668 (0,633..1,380)     0,000 (0,000..0,000) 3 of 3
+mixed     2,260 (2,240..2,600) 0,189 (0,175..0,280)     0,000 (0,000..0,000) 3 of 3
+zombies   2,040 (2,030..2,190) 0,079 (0,076..0,083)     0,000 (0,000..0,000) 3 of 3
+empty     1,410 (1,400..1,490) 0,039 (0,038..0,044)     0,000 (0,000..0,000) 3 of 3
+
+
+part     case      SoulsCraft ms per server tick
+----     ----      -----------------------------
+altar    revenants 0,006 (0,006..0,007)
+altar    mixed     0,005 (0,005..0,006)
+altar    zombies   0,005 (0,005..0,006)
+altar    empty     0,005 (0,005..0,006)
+book     revenants 0,016 (0,015..0,016)
+book     mixed     0,014 (0,012..0,015)
+book     zombies   0,010 (0,009..0,010)
+book     empty     0,007 (0,007..0,008)
+index    revenants 0,003 (0,003..0,003)
+index    mixed     0,003 (0,003..0,003)
+index    zombies   0,003 (0,003..0,003)
+index    empty     0,001 (0,001..0,002)
+own_mobs revenants 0,619 (0,584..1,326)
+own_mobs mixed     0,145 (0,134..0,232)
+own_mobs zombies   0,005 (0,004..0,005)
+own_mobs empty     0,005 (0,004..0,005)
+power    revenants 0,018 (0,017..0,020)
+power    mixed     0,016 (0,015..0,017)
+power    zombies   0,016 (0,015..0,016)
+power    empty     0,015 (0,015..0,017)
+relic    revenants 0,000 (0,000..0,001)
+relic    mixed     0,000 (0,000..0,001)
+relic    zombies   0,000 (0,000..0,000)
+relic    empty     0,000 (0,000..0,000)
+spawning revenants 0,002 (0,002..0,002)
+spawning mixed     0,002 (0,002..0,002)
+spawning zombies   0,002 (0,002..0,002)
+spawning empty     0,002 (0,002..0,002)
+tasks    revenants 0,001 (0,001..0,001)
+tasks    mixed     0,001 (0,001..0,001)
+tasks    zombies   0,001 (0,001..0,001)
+tasks    empty     0,001 (0,001..0,001)
+trophy   revenants 0,001 (0,001..0,001)
+trophy   mixed     0,001 (0,001..0,001)
+trophy   zombies   0,001 (0,001..0,001)
+trophy   empty     0,001 (0,001..0,001)
+vanilla  revenants 0,002 (0,002..0,002)
+vanilla  mixed     0,002 (0,002..0,003)
+vanilla  zombies   0,037 (0,035..0,038)
+vanilla  empty     0,002 (0,002..0,002)
+
+

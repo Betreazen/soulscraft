@@ -1,0 +1,2 @@
+Mod API bench: client native-8f83e5c-1e58672b71a2, server export soulscraft-4, /hz/servers/sc-p5 on 127.0.0.1:25591, cases revenants,mixed,zombies,empty
+quiet check 2026-11-22T15:41:16: CPU 56.4 %, GPU 2 %, busy: cargo 8316; cargo 13808; rustc 3292; rustc 8028; rustc 11468; rustc 24580; rustc 25888; rustc 29748; rustc 33360; box: 70758 horizon-launcher native-build /hz/src/r4h11a --server-output /hz/exports/r4h11a-1 --version nightly-2026-11-21-8f83e5c --trust-native-code ; CPU at 56.4 %

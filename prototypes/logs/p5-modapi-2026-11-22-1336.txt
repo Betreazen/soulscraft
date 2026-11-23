@@ -1,0 +1,2 @@
+Mod API bench: client native-8f83e5c-1e58672b71a2, server export soulscraft-4, /hz/servers/sc-p5 on 127.0.0.1:25591, cases revenants,mixed,zombies,empty
+quiet check 2026-11-22T13:36:47: CPU 3.2 %, GPU 0 %, busy: cargo 15232; cargo 29352; heavy.lock: rustcraft perf round 4: criterion baseline of rules-bench, 2026-11-22T13:31:25

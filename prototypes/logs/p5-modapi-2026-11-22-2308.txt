@@ -1,0 +1,159 @@
+Mod API bench: client native-8f83e5c-e32ea66663ef, server export soulscraft-6, /hz/servers/sc-p5 on 127.0.0.1:25591, cases revenants,mixed
+quiet check 2026-11-22T23:28:41: CPU 4.8 %, GPU 0.2 %, busy: nothing
+== run 1 of 2, 2026-11-22T23:28:41
+Starting.................
+The server is running (pid 633). `horizon-server status` shows how it does, `horizon-server stop` stops it.
+p5-box: up on 0.0.0.0:25591 (127.0.0.1:25591 outside the box), fresh world p5 (seed soulscraft-p5), engine /hz/exports/soulscraft-6/horizon-engine
+  relic | heart in the off hand: The value of attribute Max Health for entity sc_a is 24.0 | hand empty again: The value of attribute Max Health for entity sc_a is 20.0
+  revenants | cost sampling on
+  revenants | cost over 30.8 s: tick rate 20, server tick average 3.54 ms
+  revenants | cost soulscraft_level_tick level_ticks=615 server_ticks=615 ms_per_server_tick=0.715
+  revenants | cost soulscraft_part part=index ms_per_server_tick=0.0033
+  revenants | cost soulscraft_part part=tasks ms_per_server_tick=0.0017
+  revenants | cost soulscraft_part part=altar ms_per_server_tick=0.0066
+  revenants | cost soulscraft_part part=trophy ms_per_server_tick=0.0014
+  revenants | cost soulscraft_part part=spawning ms_per_server_tick=0.0019
+  revenants | cost soulscraft_part part=relic ms_per_server_tick=0.0005
+  revenants | cost soulscraft_part part=power ms_per_server_tick=0.0195
+  revenants | cost soulscraft_part part=own_mobs ms_per_server_tick=0.6611
+  revenants | cost soulscraft_part part=vanilla ms_per_server_tick=0.0027
+  revenants | cost soulscraft_part part=book ms_per_server_tick=0.0161
+  revenants | cost soulscraft_call call=look_at calls_per_server_tick=50.00 us_per_call=1.88 ms_per_server_tick=0.0939
+  revenants | cost soulscraft_call call=navigate calls_per_server_tick=4.04 us_per_call=19.92 ms_per_server_tick=0.0805
+  revenants | cost soulscraft_call call=stop calls_per_server_tick=0.78 us_per_call=1.84 ms_per_server_tick=0.0014
+  revenants | cost soulscraft_call call=navigating calls_per_server_tick=0.00 us_per_call=0.00 ms_per_server_tick=0.0000
+  revenants | cost soulscraft_call call=mob_attack calls_per_server_tick=0.00 us_per_call=0.00 ms_per_server_tick=0.0000
+  revenants | cost soulscraft_call call=hurt_entity calls_per_server_tick=0.51 us_per_call=49.02 ms_per_server_tick=0.0250
+  revenants | cost soulscraft_call call=own_bleed calls_per_server_tick=1.00 us_per_call=0.57 ms_per_server_tick=0.0006
+  revenants | cost soulscraft_call call=own_players calls_per_server_tick=1.00 us_per_call=2.71 ms_per_server_tick=0.0027
+  revenants | cost soulscraft_call call=own_seen calls_per_server_tick=1.00 us_per_call=4.53 ms_per_server_tick=0.0045
+  revenants | cost soulscraft_call call=own_tick_mob calls_per_server_tick=50.00 us_per_call=12.43 ms_per_server_tick=0.6216
+  revenants | cost soulscraft_call call=own_notes calls_per_server_tick=1.00 us_per_call=27.20 ms_per_server_tick=0.0272
+  revenants | cost soulscraft_call call=mob_target calls_per_server_tick=50.00 us_per_call=1.07 ms_per_server_tick=0.0533
+  revenants | cost soulscraft_call call=mob_brain calls_per_server_tick=50.00 us_per_call=0.51 ms_per_server_tick=0.0255
+  revenants | cost soulscraft_call call=mob_def_clone calls_per_server_tick=50.00 us_per_call=1.92 ms_per_server_tick=0.0961
+  revenants | cost soulscraft_call call=mob_act calls_per_server_tick=50.00 us_per_call=3.69 ms_per_server_tick=0.1843
+  revenants | cost soulscraft_call call=mob_after calls_per_server_tick=50.00 us_per_call=1.30 ms_per_server_tick=0.0648
+  mixed | cost sampling on
+  mixed | cost over 30.6 s: tick rate 20, server tick average 2.54 ms
+  mixed | cost soulscraft_level_tick level_ticks=613 server_ticks=613 ms_per_server_tick=0.219
+  mixed | cost soulscraft_part part=index ms_per_server_tick=0.0030
+  mixed | cost soulscraft_part part=tasks ms_per_server_tick=0.0015
+  mixed | cost soulscraft_part part=altar ms_per_server_tick=0.0063
+  mixed | cost soulscraft_part part=trophy ms_per_server_tick=0.0012
+  mixed | cost soulscraft_part part=spawning ms_per_server_tick=0.0018
+  mixed | cost soulscraft_part part=relic ms_per_server_tick=0.0004
+  mixed | cost soulscraft_part part=power ms_per_server_tick=0.0179
+  mixed | cost soulscraft_part part=own_mobs ms_per_server_tick=0.1717
+  mixed | cost soulscraft_part part=vanilla ms_per_server_tick=0.0022
+  mixed | cost soulscraft_part part=book ms_per_server_tick=0.0127
+  mixed | cost soulscraft_call call=look_at calls_per_server_tick=0.00 us_per_call=0.00 ms_per_server_tick=0.0000
+  mixed | cost soulscraft_call call=navigate calls_per_server_tick=0.00 us_per_call=0.00 ms_per_server_tick=0.0000
+  mixed | cost soulscraft_call call=stop calls_per_server_tick=0.00 us_per_call=0.00 ms_per_server_tick=0.0000
+  mixed | cost soulscraft_call call=navigating calls_per_server_tick=0.00 us_per_call=0.00 ms_per_server_tick=0.0000
+  mixed | cost soulscraft_call call=mob_attack calls_per_server_tick=0.00 us_per_call=0.00 ms_per_server_tick=0.0000
+  mixed | cost soulscraft_call call=hurt_entity calls_per_server_tick=0.00 us_per_call=0.00 ms_per_server_tick=0.0000
+  mixed | cost soulscraft_call call=own_bleed calls_per_server_tick=1.00 us_per_call=0.57 ms_per_server_tick=0.0006
+  mixed | cost soulscraft_call call=own_players calls_per_server_tick=1.00 us_per_call=2.64 ms_per_server_tick=0.0026
+  mixed | cost soulscraft_call call=own_seen calls_per_server_tick=1.00 us_per_call=3.33 ms_per_server_tick=0.0033
+  mixed | cost soulscraft_call call=own_tick_mob calls_per_server_tick=46.00 us_per_call=3.43 ms_per_server_tick=0.1580
+  mixed | cost soulscraft_call call=own_notes calls_per_server_tick=1.00 us_per_call=2.97 ms_per_server_tick=0.0030
+  mixed | cost soulscraft_call call=mob_target calls_per_server_tick=46.00 us_per_call=0.07 ms_per_server_tick=0.0031
+  mixed | cost soulscraft_call call=mob_brain calls_per_server_tick=46.00 us_per_call=0.14 ms_per_server_tick=0.0065
+  mixed | cost soulscraft_call call=mob_def_clone calls_per_server_tick=46.00 us_per_call=1.76 ms_per_server_tick=0.0811
+  mixed | cost soulscraft_call call=mob_act calls_per_server_tick=46.00 us_per_call=0.11 ms_per_server_tick=0.0048
+  mixed | cost soulscraft_call call=mob_after calls_per_server_tick=46.00 us_per_call=0.07 ms_per_server_tick=0.0033
+== run 2 of 2, 2026-11-22T23:30:52
+Starting................
+The server is running (pid 1334). `horizon-server status` shows how it does, `horizon-server stop` stops it.
+p5-box: up on 0.0.0.0:25591 (127.0.0.1:25591 outside the box), fresh world p5 (seed soulscraft-p5), engine /hz/exports/soulscraft-6/horizon-engine
+  relic | heart in the off hand: The value of attribute Max Health for entity sc_a is 24.0 | hand empty again: The value of attribute Max Health for entity sc_a is 20.0
+  revenants | cost sampling on
+  revenants | cost over 30.7 s: tick rate 20, server tick average 3.71 ms
+  revenants | cost soulscraft_level_tick level_ticks=615 server_ticks=615 ms_per_server_tick=0.723
+  revenants | cost soulscraft_part part=index ms_per_server_tick=0.0033
+  revenants | cost soulscraft_part part=tasks ms_per_server_tick=0.0017
+  revenants | cost soulscraft_part part=altar ms_per_server_tick=0.0067
+  revenants | cost soulscraft_part part=trophy ms_per_server_tick=0.0014
+  revenants | cost soulscraft_part part=spawning ms_per_server_tick=0.0024
+  revenants | cost soulscraft_part part=relic ms_per_server_tick=0.0005
+  revenants | cost soulscraft_part part=power ms_per_server_tick=0.0193
+  revenants | cost soulscraft_part part=own_mobs ms_per_server_tick=0.6693
+  revenants | cost soulscraft_part part=vanilla ms_per_server_tick=0.0024
+  revenants | cost soulscraft_part part=book ms_per_server_tick=0.0164
+  revenants | cost soulscraft_call call=look_at calls_per_server_tick=50.00 us_per_call=1.95 ms_per_server_tick=0.0976
+  revenants | cost soulscraft_call call=navigate calls_per_server_tick=4.04 us_per_call=20.33 ms_per_server_tick=0.0822
+  revenants | cost soulscraft_call call=stop calls_per_server_tick=0.78 us_per_call=1.95 ms_per_server_tick=0.0015
+  revenants | cost soulscraft_call call=navigating calls_per_server_tick=0.00 us_per_call=0.00 ms_per_server_tick=0.0000
+  revenants | cost soulscraft_call call=mob_attack calls_per_server_tick=0.00 us_per_call=0.00 ms_per_server_tick=0.0000
+  revenants | cost soulscraft_call call=hurt_entity calls_per_server_tick=0.50 us_per_call=47.19 ms_per_server_tick=0.0237
+  revenants | cost soulscraft_call call=own_bleed calls_per_server_tick=1.00 us_per_call=0.56 ms_per_server_tick=0.0006
+  revenants | cost soulscraft_call call=own_players calls_per_server_tick=1.00 us_per_call=2.79 ms_per_server_tick=0.0028
+  revenants | cost soulscraft_call call=own_seen calls_per_server_tick=1.00 us_per_call=4.89 ms_per_server_tick=0.0049
+  revenants | cost soulscraft_call call=own_tick_mob calls_per_server_tick=50.00 us_per_call=12.60 ms_per_server_tick=0.6302
+  revenants | cost soulscraft_call call=own_notes calls_per_server_tick=1.00 us_per_call=26.58 ms_per_server_tick=0.0266
+  revenants | cost soulscraft_call call=mob_target calls_per_server_tick=50.00 us_per_call=1.01 ms_per_server_tick=0.0505
+  revenants | cost soulscraft_call call=mob_brain calls_per_server_tick=50.00 us_per_call=0.51 ms_per_server_tick=0.0254
+  revenants | cost soulscraft_call call=mob_def_clone calls_per_server_tick=50.00 us_per_call=2.01 ms_per_server_tick=0.1006
+  revenants | cost soulscraft_call call=mob_act calls_per_server_tick=50.00 us_per_call=3.80 ms_per_server_tick=0.1902
+  revenants | cost soulscraft_call call=mob_after calls_per_server_tick=50.00 us_per_call=1.29 ms_per_server_tick=0.0644
+  mixed | cost sampling on
+  mixed | cost over 30.7 s: tick rate 20, server tick average 2.62 ms
+  mixed | cost soulscraft_level_tick level_ticks=613 server_ticks=613 ms_per_server_tick=0.235
+  mixed | cost soulscraft_part part=index ms_per_server_tick=0.0030
+  mixed | cost soulscraft_part part=tasks ms_per_server_tick=0.0016
+  mixed | cost soulscraft_part part=altar ms_per_server_tick=0.0065
+  mixed | cost soulscraft_part part=trophy ms_per_server_tick=0.0013
+  mixed | cost soulscraft_part part=spawning ms_per_server_tick=0.0019
+  mixed | cost soulscraft_part part=relic ms_per_server_tick=0.0004
+  mixed | cost soulscraft_part part=power ms_per_server_tick=0.0184
+  mixed | cost soulscraft_part part=own_mobs ms_per_server_tick=0.1860
+  mixed | cost soulscraft_part part=vanilla ms_per_server_tick=0.0024
+  mixed | cost soulscraft_part part=book ms_per_server_tick=0.0138
+  mixed | cost soulscraft_call call=look_at calls_per_server_tick=0.00 us_per_call=0.00 ms_per_server_tick=0.0000
+  mixed | cost soulscraft_call call=navigate calls_per_server_tick=0.00 us_per_call=0.00 ms_per_server_tick=0.0000
+  mixed | cost soulscraft_call call=stop calls_per_server_tick=0.00 us_per_call=0.00 ms_per_server_tick=0.0000
+  mixed | cost soulscraft_call call=navigating calls_per_server_tick=0.00 us_per_call=0.00 ms_per_server_tick=0.0000
+  mixed | cost soulscraft_call call=mob_attack calls_per_server_tick=0.00 us_per_call=0.00 ms_per_server_tick=0.0000
+  mixed | cost soulscraft_call call=hurt_entity calls_per_server_tick=0.00 us_per_call=0.00 ms_per_server_tick=0.0000
+  mixed | cost soulscraft_call call=own_bleed calls_per_server_tick=1.00 us_per_call=0.56 ms_per_server_tick=0.0006
+  mixed | cost soulscraft_call call=own_players calls_per_server_tick=1.00 us_per_call=2.68 ms_per_server_tick=0.0027
+  mixed | cost soulscraft_call call=own_seen calls_per_server_tick=1.00 us_per_call=3.75 ms_per_server_tick=0.0037
+  mixed | cost soulscraft_call call=own_tick_mob calls_per_server_tick=48.00 us_per_call=3.57 ms_per_server_tick=0.1714
+  mixed | cost soulscraft_call call=own_notes calls_per_server_tick=1.00 us_per_call=3.20 ms_per_server_tick=0.0032
+  mixed | cost soulscraft_call call=mob_target calls_per_server_tick=48.00 us_per_call=0.07 ms_per_server_tick=0.0033
+  mixed | cost soulscraft_call call=mob_brain calls_per_server_tick=48.00 us_per_call=0.14 ms_per_server_tick=0.0069
+  mixed | cost soulscraft_call call=mob_def_clone calls_per_server_tick=48.00 us_per_call=1.84 ms_per_server_tick=0.0882
+  mixed | cost soulscraft_call call=mob_act calls_per_server_tick=48.00 us_per_call=0.11 ms_per_server_tick=0.0051
+  mixed | cost soulscraft_call call=mob_after calls_per_server_tick=48.00 us_per_call=0.07 ms_per_server_tick=0.0035
+
+case      server tick, ms      SoulsCraft hook, ms/tick mob ticks, ms/tick   quiet samples
+----      ---------------      ------------------------ ------------------   -------------
+revenants 3,625 (3,540..3,710) 0,719 (0,715..0,723)     0,000 (0,000..0,000) 2 of 2
+mixed     2,580 (2,540..2,620) 0,227 (0,219..0,235)     0,000 (0,000..0,000) 2 of 2
+
+
+part     case      SoulsCraft ms per server tick
+----     ----      -----------------------------
+altar    revenants 0,007 (0,007..0,007)
+altar    mixed     0,006 (0,006..0,006)
+book     revenants 0,016 (0,016..0,016)
+book     mixed     0,013 (0,013..0,014)
+index    revenants 0,003 (0,003..0,003)
+index    mixed     0,003 (0,003..0,003)
+own_mobs revenants 0,665 (0,661..0,669)
+own_mobs mixed     0,179 (0,172..0,186)
+power    revenants 0,019 (0,019..0,019)
+power    mixed     0,018 (0,018..0,018)
+relic    revenants 0,001 (0,001..0,001)
+relic    mixed     0,000 (0,000..0,000)
+spawning revenants 0,002 (0,002..0,002)
+spawning mixed     0,002 (0,002..0,002)
+tasks    revenants 0,002 (0,002..0,002)
+tasks    mixed     0,002 (0,002..0,002)
+trophy   revenants 0,001 (0,001..0,001)
+trophy   mixed     0,001 (0,001..0,001)
+vanilla  revenants 0,003 (0,002..0,003)
+vanilla  mixed     0,002 (0,002..0,002)
+
+
